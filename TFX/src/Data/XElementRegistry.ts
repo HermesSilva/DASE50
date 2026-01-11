@@ -182,11 +182,11 @@ export class XElementRegistry
 
 export function RegisterElement(pTagName: string, pClassID?: string, pOrder?: number): ClassDecorator
 {
-    return function <T extends XElementConstructor>(pTarget: T): T
+    return function <TFunction extends Function>(pTarget: TFunction): TFunction
     {
         XElementRegistry.Instance.Register({
             TagName: pTagName,
-            Constructor: pTarget,
+            Constructor: pTarget as unknown as XElementConstructor,
             ClassID: pClassID,
             Order: pOrder
         });
@@ -196,9 +196,9 @@ export function RegisterElement(pTagName: string, pClassID?: string, pOrder?: nu
 
 export function RegisterChildElement(pParentTag: string): ClassDecorator
 {
-    return function <T extends XElementConstructor>(pTarget: T): T
+    return function <TFunction extends Function>(pTarget: TFunction): TFunction
     {
-        const meta = XElementRegistry.Instance.GetByConstructor(pTarget);
+        const meta = XElementRegistry.Instance.GetByConstructor(pTarget as unknown as XElementConstructor);
         if (meta)
             XElementRegistry.Instance.RegisterChildTag(pParentTag, meta.TagName);
         return pTarget;

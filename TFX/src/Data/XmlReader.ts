@@ -1,7 +1,7 @@
 import { XGuid } from "../Core/XGuid.js";
 import { XProperty } from "../Core/XProperty.js";
 import type { XPersistableElement } from "../Core/XPersistableElement.js";
-import { XSerializationContext, XSerializationPhase, type XISerializationError } from "./XSerializationContext.js";
+import { XSerializationContext, XSerializationPhase } from "./XSerializationContext.js";
 import { XElementRegistry } from "./XElementRegistry.js";
 import { XTypeConverter, type XDataTypeName } from "./XTypeConverter.js";
 
