@@ -1,14 +1,11 @@
 
 import type { XProperty, XPropertyDefault } from "./XProperty.js";
-import type { XModule } from "./XModule.js";
 
 export type XValueChanged = (pProperty: XProperty, pOldValue: unknown, pNewValue: unknown) => void;
 
 export type XOnPropertyChanged = (pSender: unknown, pProperty: XProperty, pValue: unknown) => void;
 
 export type XPropertyDefaultChanged = (pName: string, pSender: XPropertyDefault) => void;
-
-export type XGetElements = (pModule: XModule) => Iterable<unknown>;
 
 export type XRegisterPropertyLink = (pPropertyId: string) => void;
 

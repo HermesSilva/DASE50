@@ -7,9 +7,6 @@ export { XEvent } from "./XEvent.js";
 // XDispatcher - Action executor
 export { XDispatcher } from "./XDispatcher.js";
 
-// XModule - Module system
-export { XModule } from "./XModule.js";
-
 // XError - Error handling
 export { XError } from "./XError.js";
 
@@ -49,7 +46,6 @@ export type {
     XValueChanged,
     XOnPropertyChanged,
     XPropertyDefaultChanged,
-    XGetElements,
     XPropertySelector,
     XPropertySetter,
     XRegisterPropertyLink,
