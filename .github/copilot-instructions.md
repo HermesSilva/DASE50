@@ -62,6 +62,7 @@ They exist to keep decisions consistent when trade-offs appear.
 20. Security is an invariant, not a feature.
 21. Integrity is non-negotiable: we do not trade truth for appearance, even when it looks “better” on paper.
 22. A green pipeline is not a certificate: it is a signal that must remain honest to keep meaning.
+23. Just as 10 seconds of silence end a life of $3 \times 10^9$ beats, sequential errors are software's demise: continuity is life, statistics are an illusion.
 
 ---
 

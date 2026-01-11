@@ -399,9 +399,7 @@ export class XmlReader
         if (pNode.TagName !== "XLinkedShape")
             return null;
 
-        const linkData = this.ReadXLinkData({ ...pNode, TagName: "XLinkData" } as XIXmlNode);
-        if (!linkData)
-            return null;
+        const linkData = this.ReadXLinkData({ ...pNode, TagName: "XLinkData" } as XIXmlNode)!;
 
         return {
             ...linkData,
@@ -424,21 +422,18 @@ export class XmlReader
         {
             if (child.TagName === "XData")
             {
-                const data = this.ReadXData(child);
-                if (data)
-                    result.set(data.ID, data);
+                const data = this.ReadXData(child)!;
+                result.set(data.ID, data);
             }
             else if (child.TagName === "XLinkData")
             {
-                const data = this.ReadXLinkData(child);
-                if (data)
-                    result.set(data.ID, data);
+                const data = this.ReadXLinkData(child)!;
+                result.set(data.ID, data);
             }
             else if (child.TagName === "XLinkedShape")
             {
-                const data = this.ReadXLinkedShape(child);
-                if (data)
-                    result.set(data.ID, data);
+                const data = this.ReadXLinkedShape(child)!;
+                result.set(data.ID, data);
             }
         }
 

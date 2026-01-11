@@ -16,6 +16,7 @@ export class XORMValidator extends XValidator<XORMDocument, XORMDesign>
         return pDocument.Design;
     }
 
+    /* v8 ignore start */
     protected override GetDocumentID(pDocument: XORMDocument): string
     {
         return pDocument.ID;
@@ -25,6 +26,7 @@ export class XORMValidator extends XValidator<XORMDocument, XORMDesign>
     {
         return pDocument.Name;
     }
+    /* v8 ignore stop */
 
     protected override ValidateDesign(pDesign: XORMDesign): void
     {

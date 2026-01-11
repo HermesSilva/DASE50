@@ -121,6 +121,13 @@ describe("XSerializationContext", () =>
         expect(context.GetIndent()).toBe("    ");
     });
 
+    it("should return empty string when Indent is false", () =>
+    {
+        const noIndentContext = new XSerializationContext(XSerializationDirection.Serialize, { Indent: false });
+        noIndentContext.IncrementDepth();
+        expect(noIndentContext.GetIndent()).toBe("");
+    });
+
     it("should track pending references", () =>
     {
         context.AddPendingReference("source1", "prop1", "target1");
@@ -218,6 +225,13 @@ describe("XTypeConverter", () =>
             expect(XTypeConverter.FromString<boolean>("1", "Boolean")).toBe(true);
             expect(XTypeConverter.FromString<boolean>("false", "Boolean")).toBe(false);
         });
+
+        it("should handle null/undefined values gracefully", () =>
+        {
+            expect(XTypeConverter.FromString<boolean>(null as unknown as string, "Boolean")).toBe(false);
+            expect(XTypeConverter.FromString<boolean>(undefined as unknown as string, "Boolean")).toBe(false);
+            expect(XTypeConverter.FromString<boolean>("", "Boolean")).toBe(false);
+        });
     });
 
     describe("Int32 conversion", () =>
@@ -280,6 +294,36 @@ describe("XTypeConverter", () =>
         });
     });
 
+    describe("Point conversion", () =>
+    {
+        it("should convert null point to default string", () =>
+        {
+            const str = XTypeConverter.ToString(null as unknown as XIPoint, "Point");
+            expect(str).toBe("{X=0;Y=0}");
+        });
+
+        it("should convert valid point to string", () =>
+        {
+            const point: XIPoint = { X: 50, Y: 100 };
+            const str = XTypeConverter.ToString(point, "Point");
+            expect(str).toBe("{X=50;Y=100}");
+        });
+
+        it("should parse invalid point string to default", () =>
+        {
+            const parsed = XTypeConverter.FromString<XIPoint>("invalid", "Point");
+            expect(parsed.X).toBe(0);
+            expect(parsed.Y).toBe(0);
+        });
+
+        it("should parse valid point string", () =>
+        {
+            const parsed = XTypeConverter.FromString<XIPoint>("{X=25;Y=75}", "Point");
+            expect(parsed.X).toBe(25);
+            expect(parsed.Y).toBe(75);
+        });
+    });
+
     describe("Point array conversion", () =>
     {
         it("should convert point array values", () =>
@@ -292,6 +336,12 @@ describe("XTypeConverter", () =>
             expect(parsed.length).toBe(2);
             expect(parsed[0].X).toBe(10);
             expect(parsed[1].Y).toBe(40);
+        });
+
+        it("should return empty array for null/empty string", () =>
+        {
+            expect(XTypeConverter.FromString<XIPoint[]>(null as unknown as string, "Point[]")).toEqual([]);
+            expect(XTypeConverter.FromString<XIPoint[]>("", "Point[]")).toEqual([]);
         });
     });
 
@@ -632,5 +682,69 @@ describe("Integration: Full Round-Trip", () =>
         expect(deserialized.Data?.Title).toBe(original.Title);
         expect(deserialized.Data?.Count).toBe(original.Count);
         expect(deserialized.Data?.IsActive).toBe(original.IsActive);
+    });
+
+    it("should handle deserialization of unknown element type (Lines 232-238)", () =>
+    {
+        const xml = `<?xml version="1.0" encoding="UTF-8"?><UnknownElement ID="00000000-0000-0000-0000-000000000001" Name="Test" />`;
+        const result = XSerializationEngine.Instance.Deserialize(xml);
+        expect(result.Success).toBe(false);
+        expect(result.Data).toBeNull();
+    });
+
+    it("should handle deserialization failure with exception (Lines 247-259)", () =>
+    {
+        // Pass completely invalid XML that will cause exception
+        const result = XSerializationEngine.Instance.Deserialize("");
+        expect(result.Success).toBe(false);
+        expect(result.Errors.length).toBeGreaterThan(0);
+    });
+
+    it("should serialize document with content (Lines 311, 318-325)", () =>
+    {
+        const el = new XTestElement();
+        el.ID = XGuid.NewValue();
+        el.Name = "TestDoc";
+        el.Title = "Non-default Title";
+        
+        const result = XSerializationEngine.Instance.SerializeToDocument(el, "TestDoc", XGuid.NewValue());
+        expect(result.Success).toBe(true);
+        expect(result.XmlOutput).toBeDefined();
+    });
+
+    it("should serialize document with children (Lines 384-388)", () =>
+    {
+        class XChildElement extends XPersistableElement {
+            public override GetSerializableProperties(): XProperty[] {
+                return [];
+            }
+        }
+        XElementRegistry.Instance.Register({ TagName: "XChildElement", Constructor: XChildElement });
+        
+        const parent = new XTestElement();
+        parent.ID = XGuid.NewValue();
+        const child = new XChildElement();
+        child.ID = XGuid.NewValue();
+        parent.ChildNodes.push(child as any);
+        
+        const result = XSerializationEngine.Instance.SerializeToDocument(parent, "Parent", XGuid.NewValue());
+        expect(result.Success).toBe(true);
+        expect(result.XmlOutput).toContain("XChildElement");
+    });
+
+    it("should serialize document without content (Lines 364-371)", () =>
+    {
+        class XEmptyElement extends XPersistableElement {
+            public override GetSerializableProperties(): XProperty[] {
+                return [];
+            }
+        }
+        XElementRegistry.Instance.Register({ TagName: "XEmptyElement", Constructor: XEmptyElement });
+        
+        const el = new XEmptyElement();
+        el.ID = XGuid.NewValue();
+        
+        const result = XSerializationEngine.Instance.SerializeToDocument(el, "Empty", XGuid.NewValue());
+        expect(result.Success).toBe(true);
     });
 });

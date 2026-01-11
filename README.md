@@ -3,8 +3,8 @@
 ## TFX — Core Framework
 
 [![TFX CI](https://github.com/Tootega/DASE50/actions/workflows/tfx-ci.yml/badge.svg)](https://github.com/Tootega/DASE50/actions/workflows/tfx-ci.yml)
-![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
-![Tests](https://img.shields.io/badge/tests-978%20passed-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-86%25-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1113%20passed-brightgreen)
 ![Node.js Version](https://img.shields.io/badge/node-%3E%3D%2020-blue.svg)
 ![Vitest](https://img.shields.io/badge/tested%20with-vitest-663399?logo=vitest)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-3178C6?logo=typescript&logoColor=white)
@@ -39,6 +39,7 @@ The goal is to explore:
 ## 📋 Table of Contents
 
 - [Project Overview](#-project-overview)
+- [Philosophical Principles](#-philosophical-principles)  
 - [Repository Structure](#-repository-structure)
 - [DASE — VS Code Extension](#-dase--vs-code-extension)
 - [TFX — Tootega Framework X](#-tfx--tootega-framework-x)
@@ -68,6 +69,37 @@ The project consists of two main components:
 
 ---
 
+## 🧭 Philosophical Principles
+
+These principles are the foundation behind every directive in this document.  
+They exist to keep decisions consistent when trade-offs appear.
+
+1. The best code is code that writes itself — guided by clear intent.
+2. Any line of code that cannot be exercised by automated tests should not exist.
+3. Truth over optics: we refuse “metric theater” (coverage inflation, artificial branches, cosmetic tests).
+4. Coverage is evidence, not a goal: the goal is confidence in behavior under realistic conditions.
+5. If a branch is truly unreachable, the correct action is removal or an explicit invariant — not a fabricated test.
+6. Unreachable code is a design smell: either the model is wrong, or the branch is dead, or the contract is unclear.
+7. Prefer deletion to decoration: removing dead paths is higher quality than “covering” them.
+8. Tests must represent plausible worlds: a test that cannot occur in production is documentation of fiction.
+9. Every test must answer a question: “What failure would this catch, and why would it matter?”
+10. Assertions are contracts: validate invariants where they belong, and test through public behavior.
+11. Strong contracts reduce defensive noise: less “just in case”, more “cannot happen by construction”.
+12. Write code that is easy to prove: clarity beats cleverness; determinism beats surprises.
+13. Prefer domain truth over framework convenience: the model dictates the code, not the other way around.
+14. Code is a liability: every added line MUST pay rent (clear value, verified behavior).
+15. Make state explicit; implicit state becomes hidden bugs.
+16. Optimize for the next reader: the future maintainer is usually you.
+17. Complexity must be earned by measurable benefit; simple mechanisms scale best.
+18. Fail fast, fail loud: reject invalid input early with precise, actionable errors.
+19. Measure before optimizing; optimize only what profiling proves is hot.
+20. Security is an invariant, not a feature.
+21. Integrity is non-negotiable: we do not trade truth for appearance, even when it looks “better” on paper.
+22. A green pipeline is not a certificate: it is a signal that must remain honest to keep meaning.
+23. Just as 10 seconds of silence end a life of $3 \times 10^9$ beats, sequential errors are software's demise: continuity is life, statistics are an illusion.
+
+---
+
 ## 📁 Repository Structure
 
 ```
@@ -82,7 +114,7 @@ DASE50/
 │   │   ├── Data/                  # Serialization engine
 │   │   ├── Design/                # Visual design elements
 │   │   └── Designers/             # Domain-specific designers
-│   └── tests/                     # Unit tests (978 tests)
+│   └── tests/                     # Unit tests
 ├── DASE/                          # VS Code Extension
 │   ├── src/
 │   │   ├── Commands/              # Extension commands
@@ -90,7 +122,8 @@ DASE50/
 │   │   ├── Designer/              # ORM designer
 │   │   ├── Services/              # Business services
 │   │   └── Models/                # Data models
-│   └── media/                     # Webview assets
+│   ├── media/                     # Webview assets
+│   └── tests/                     # Unit tests
 └── README.md                      # This file
 ```
 
@@ -477,7 +510,7 @@ The repository maintains two independent CI/CD workflows:
 7. **Upload Reports** — Publish coverage artifacts
 
 **Quality Gates:**
-- ✅ All 978 tests must pass
+- ✅ All automated tests must pass
 - ✅ 100% code coverage required
 - ✅ No TypeScript compilation errors
 - ✅ Zero-allocation patterns enforced
@@ -504,7 +537,7 @@ The repository maintains two independent CI/CD workflows:
 11. **Package** (master only) — Create VSIX extension package
 
 **Quality Gates:**
-- ✅ All 341 tests must pass
+- ✅ All automated tests must pass
 - ✅ 100% code coverage required
 - ✅ No TypeScript/ESLint violations
 - ✅ TFX dependency integrity validated

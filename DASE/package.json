@@ -129,7 +129,7 @@
         "build:webview": "tsc -p ./media/tsconfig.json",
         "lint": "eslint src --ext ts",
         "test": "jest",
-        "test:coverage": "jest --coverage",
+        "test:coverage": "jest --coverage --json --outputFile=test-results.json",
         "test:watch": "jest --watch",
         "package": "vsce package",
         "publish": "vsce publish"

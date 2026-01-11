@@ -230,12 +230,14 @@ export class XSerializationEngine
                 };
             }
 
+            
             return {
                 Success: false,
                 Data: null,
                 Errors: [...context.Errors],
                 ResolvedReferences: 0
             };
+            
         }
         catch (error)
         {
@@ -248,6 +250,7 @@ export class XSerializationEngine
                 err
             ));
 
+            
             return {
                 Success: false,
                 Data: null,
@@ -304,12 +307,15 @@ export class XSerializationEngine
 
             const hasContent = this.SerializeDocumentContent(pElement, writer, context);
 
+            
             if (hasContent)
                 writer.WriteEndElement(tagName);
+            
 
             const output = writer.GetOutput();
             context.Phase = XSerializationPhase.Completed;
 
+            
             return {
                 Success: !context.HasErrors,
                 Data: output,
@@ -317,9 +323,11 @@ export class XSerializationEngine
                 XmlOutput: output,
                 ResolvedReferences: 0
             };
+            
         }
         catch (error)
         {
+            
             const err = error as Error;
             let elementID = XGuid.EmptyValue;
             try { elementID = (pElement as any)?.ID ?? XGuid.EmptyValue; } catch { /* ignore */ }
@@ -331,7 +339,9 @@ export class XSerializationEngine
                 `Document serialization failed: ${err.message}`,
                 err
             ));
+            
 
+            
             return {
                 Success: false,
                 Data: null,
@@ -350,28 +360,39 @@ export class XSerializationEngine
         let hasContent = false;
 
         const props = pElement.GetSerializableProperties();
-        const hasProperties = props.some(p =>
+        
+        let hasProperties = false;
+        for (const p of props)
         {
-            if (!p.Default.IsPersistable || p.Default.AsAttribute)
-                return false;
-            const val = pElement.GetValue(p);
-            return val !== p.Default.DefaultValue;
-        });
-
+            if (p.Default.IsPersistable && !p.Default.AsAttribute)
+            {
+                const val = pElement.GetValue(p);
+                if (val !== p.Default.DefaultValue)
+                {
+                    hasProperties = true;
+                    break;
+                }
+            }
+        }
+        
+        
         if (hasProperties)
         {
             pWriter.WritePropertiesSection(pElement);
             hasContent = true;
         }
+        
 
         for (const child of pElement.ChildNodes)
         {
+            
             const pe = child as unknown as XPersistableElement;
             if (pe && typeof pe.GetSerializableProperties === "function")
             {
                 this.SerializeElement(pe, pWriter, pContext);
                 hasContent = true;
             }
+            
         }
 
         return hasContent;
@@ -496,3 +517,4 @@ export interface XICustomSerializer
     Serialize?(pElement: XPersistableElement, pWriter: XmlWriter, pContext: XSerializationContext): void;
     Deserialize?(pNode: XIXmlNode, pReader: XmlReader, pContext: XSerializationContext): XPersistableElement | null;
 }
+

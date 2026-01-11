@@ -12,20 +12,31 @@ class XWriterTestElement extends XPersistableElement {
     public static readonly DesignProp = XProperty.Register<XWriterTestElement, string>(p => "", XGuid.NewValue(), "DesignProp", "Design Prop", "");
     public static readonly CultureProp = XProperty.Register<XWriterTestElement, string>(p => "", XGuid.NewValue(), "CultureProp", "Culture Prop", "");
     public static readonly LinkProp = XProperty.Register<XWriterTestElement, string>(p => XGuid.EmptyValue, XGuid.NewValue(), "LinkProp", "Link Prop", XGuid.EmptyValue);
+    public static readonly ThrowProp = XProperty.Register<XWriterTestElement, string>(p => "", XGuid.NewValue(), "ThrowProp", "Throw Prop", "");
+    public static readonly AttrNotRegistered = XProperty.Register<XWriterTestElement, string>(p => "", XGuid.NewValue(), "AttrNotRegistered", "Attr Not Registered", "");
     
     public override GetSerializableProperties(): XProperty[] {
         return [
             XWriterTestElement.AttrProp,
             XWriterTestElement.DesignProp,
             XWriterTestElement.CultureProp,
-            XWriterTestElement.LinkProp
+            XWriterTestElement.LinkProp,
+            XWriterTestElement.ThrowProp,
+            XWriterTestElement.AttrNotRegistered
         ];
+    }
+
+    public override GetValue(pProperty: XProperty): unknown {
+        if (pProperty === XWriterTestElement.ThrowProp)
+            throw new Error("GetValue error");
+        return super.GetValue(pProperty);
     }
 }
 XWriterTestElement.AttrProp.Default.AsAttribute = true;
 XWriterTestElement.DesignProp.Default.Group = XPropertyGroup.Design;
 XWriterTestElement.CultureProp.Default.CultureSensitive = true;
 XWriterTestElement.LinkProp.Default.IsLinked = true;
+XWriterTestElement.AttrNotRegistered.Default.AsAttribute = true; // AsAttribute but NOT registered
 
 describe("XmlWriter", () => {
     let context: XSerializationContext;
@@ -113,5 +124,11 @@ describe("XmlWriter", () => {
         writer.WriteStartElement("Tag");
         writer.Clear();
         expect(writer.GetOutput()).toBe("");
+    });
+
+    it("should handle GetValue throwing exception (Line 272)", () => {
+        const el = new XWriterTestElement();
+        // ThrowProp will throw when GetValue is called, but should be caught and continue
+        expect(() => writer.WriteElement(el)).not.toThrow();
     });
 });

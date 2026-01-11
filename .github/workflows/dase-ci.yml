@@ -20,6 +20,8 @@ jobs:
   build-and-test:
     name: Build and Test DASE
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     strategy:
       matrix:
@@ -66,6 +68,15 @@ jobs:
       - name: Test DASE with coverage
         run: npm run test:coverage
         working-directory: DASE
+
+      - name: Update README with coverage and test stats
+        run: node scripts/update-readme.js
+
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "docs: update DASE test stats in README [skip ci]"
+          file_pattern: README.md
 
       - name: Upload DASE coverage report
         uses: actions/upload-artifact@v4

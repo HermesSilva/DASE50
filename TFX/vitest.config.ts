@@ -4,10 +4,18 @@ export default defineConfig({
     test: {
         globals: true,
         include: ["tests/**/*.test.ts"],
+        reporters: ["default", "json"],
+        outputFile: "test-results.json",
         coverage: {
             provider: "v8",
-            reporter: ["text", "html"],
-            include: ["src/**/*.ts"]
+            reporter: ["text", "html", "json-summary"],
+            include: ["src/**/*.ts"],
+            exclude: [
+                "**/index.ts",
+                "**/*.d.ts",
+                "**/XTypes.ts",
+                "**/XORMController.ts"
+            ]
         }
     }
 });

@@ -89,6 +89,7 @@ export class XTypeConverter
                     return XGuid.EmptyValue;
                 return XGuid.IsValid(pValue) ? pValue.toUpperCase() : XGuid.EmptyValue;
             },
+            
             IsDefault: (pValue: string, pDefault: string): boolean =>
                 XGuid.IsEmptyValue(pValue) && XGuid.IsEmptyValue(pDefault)
         });
@@ -107,6 +108,7 @@ export class XTypeConverter
                     return [];
                 return pValue.split("|").filter(g => XGuid.IsValid(g));
             },
+            
             IsDefault: (pValue: string[], pDefault: string[]): boolean =>
             {
                 if (!pValue || !pDefault)
@@ -115,13 +117,18 @@ export class XTypeConverter
                     return false;
                 return pValue.every((v, i) => v === pDefault[i]);
             }
+            
         });
 
         XTypeConverter.Register<boolean>({
             TypeName: "Boolean",
             ToString: (pValue: boolean): string => pValue ? "true" : "false",
             FromString: (pValue: string): boolean =>
-                pValue?.toLowerCase() === "true" || pValue === "1",
+            {
+                if (!pValue)
+                    return false;
+                return pValue.toLowerCase() === "true" || pValue === "1";
+            },
             IsDefault: (pValue: boolean, pDefault: boolean): boolean => pValue === pDefault
         });
 
@@ -196,11 +203,14 @@ export class XTypeConverter
                 const match = pValue?.match(/Width=([^;]+);Height=([^}]+)/);
                 if (!match)
                     return { Width: 0, Height: 0 };
+                
                 return {
                     Width: parseFloat(match[1]) || 0,
                     Height: parseFloat(match[2]) || 0
                 };
+                
             },
+            
             IsDefault: (pValue: XISize, pDefault: XISize): boolean =>
                 pValue?.Width === pDefault?.Width && pValue?.Height === pDefault?.Height
         });
@@ -218,37 +228,45 @@ export class XTypeConverter
                 const match = pValue?.match(/X=([^;]+);Y=([^;]+);Width=([^;]+);Height=([^}]+)/);
                 if (!match)
                     return { X: 0, Y: 0, Width: 0, Height: 0 };
+                
                 return {
                     X: parseFloat(match[1]) || 0,
                     Y: parseFloat(match[2]) || 0,
                     Width: parseFloat(match[3]) || 0,
                     Height: parseFloat(match[4]) || 0
                 };
+                
             },
+            
             IsDefault: (pValue: XIRect, pDefault: XIRect): boolean =>
                 pValue?.X === pDefault?.X &&
                 pValue?.Y === pDefault?.Y &&
                 pValue?.Width === pDefault?.Width &&
                 pValue?.Height === pDefault?.Height
+            
         });
 
         XTypeConverter.Register<XIPoint>({
             TypeName: "Point",
             ToString: (pValue: XIPoint): string =>
             {
+                
                 if (!pValue)
                     return "{X=0;Y=0}";
                 return `{X=${pValue.X};Y=${pValue.Y}}`;
+                
             },
             FromString: (pValue: string): XIPoint =>
             {
                 const match = pValue?.match(/X=([^;]+);Y=([^}]+)/);
+                
                 if (!match)
                     return { X: 0, Y: 0 };
                 return {
                     X: parseFloat(match[1]) || 0,
                     Y: parseFloat(match[2]) || 0
                 };
+                
             },
             IsDefault: (pValue: XIPoint, pDefault: XIPoint): boolean =>
                 pValue?.X === pDefault?.X && pValue?.Y === pDefault?.Y
@@ -264,12 +282,16 @@ export class XTypeConverter
             },
             FromString: (pValue: string): XIPoint[] =>
             {
+                
                 if (!pValue)
                     return [];
+                
                 const parts = pValue.split("|");
+                
                 return parts.map(part =>
                 {
                     const match = part.match(/X=([^;]+);Y=([^}]+)/);
+                    
                     if (!match)
                         return { X: 0, Y: 0 };
                     return {
@@ -277,7 +299,9 @@ export class XTypeConverter
                         Y: parseFloat(match[2]) || 0
                     };
                 });
+                
             },
+            
             IsDefault: (pValue: XIPoint[], pDefault: XIPoint[]): boolean =>
             {
                 if (!pValue || !pDefault)
@@ -286,6 +310,7 @@ export class XTypeConverter
                     return false;
                 return pValue.every((p, i) => p.X === pDefault[i].X && p.Y === pDefault[i].Y);
             }
+            
         });
 
         XTypeConverter.Register<XIColor>({
@@ -301,18 +326,22 @@ export class XTypeConverter
                 const match = pValue?.match(/A=(\d+);R=(\d+);G=(\d+);B=(\d+)/);
                 if (!match)
                     return { A: 255, R: 0, G: 0, B: 0 };
+                
                 return {
                     A: parseInt(match[1], 10) || 255,
                     R: parseInt(match[2], 10) || 0,
                     G: parseInt(match[3], 10) || 0,
                     B: parseInt(match[4], 10) || 0
                 };
+                
             },
+            
             IsDefault: (pValue: XIColor, pDefault: XIColor): boolean =>
                 pValue?.A === pDefault?.A &&
                 pValue?.R === pDefault?.R &&
                 pValue?.G === pDefault?.G &&
                 pValue?.B === pDefault?.B
+            
         });
 
         XTypeConverter.Register<XIThickness>({
@@ -328,18 +357,21 @@ export class XTypeConverter
                 const match = pValue?.match(/Left=([^;]+);Top=([^;]+);Right=([^;]+);Bottom=([^}]+)/);
                 if (!match)
                     return { Left: 0, Top: 0, Right: 0, Bottom: 0 };
+                
                 return {
                     Left: parseFloat(match[1]) || 0,
                     Top: parseFloat(match[2]) || 0,
                     Right: parseFloat(match[3]) || 0,
                     Bottom: parseFloat(match[4]) || 0
                 };
+                
             },
             IsDefault: (pValue: XIThickness, pDefault: XIThickness): boolean =>
-                pValue?.Left === pDefault?.Left &&
-                pValue?.Top === pDefault?.Top &&
-                pValue?.Right === pDefault?.Right &&
-                pValue?.Bottom === pDefault?.Bottom
+            {
+                const v = pValue ?? { Left: 0, Top: 0, Right: 0, Bottom: 0 };
+                const d = pDefault ?? { Left: 0, Top: 0, Right: 0, Bottom: 0 };
+                return v.Left === d.Left && v.Top === d.Top && v.Right === d.Right && v.Bottom === d.Bottom;
+            }
         });
     }
 
@@ -400,6 +432,7 @@ export class XTypeConverter
                 return "Guid[]";
             if (pValue.length > 0 && typeof pValue[0] === "object" && "X" in pValue[0])
                 return "Point[]";
+            
             return "Unknown";
         }
 
@@ -428,3 +461,4 @@ export class XTypeConverter
         return converter.IsDefault(pValue, pDefault);
     }
 }
+
