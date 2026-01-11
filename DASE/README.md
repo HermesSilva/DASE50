@@ -131,7 +131,7 @@ npm run test:watch
 
 ### Coverage Reports
 
-Coverage reports are generated in [coverage/](./coverage/):
+Coverage reports are generated in `coverage/`:
 - HTML report: `coverage/index.html`
 - LCOV format: `coverage/lcov.info`
 
