@@ -1,5 +1,7 @@
 # DASE - Design-Aided Software Engineering
 
+[![CI](https://github.com/tootega/DASE50/actions/workflows/ci.yml/badge.svg)](https://github.com/tootega/DASE50/actions/workflows/ci.yml)
+
 Visual design environment for modeling and generating multi-tier, multi-platform, multi-database, and multi-paradigm web applications.
 
 ## Overview

@@ -393,7 +393,7 @@ export class XTFXBridge
                         const field = new tfxMod.XORMField();
                         field.ID = fData.ID || tfxMod.XGuid.NewValue();
                         field.Name = fData.Name || "";
-                        field.DataType = fData.DataType || tfxMod.XORMFieldDataType?.String || "String";
+                        field.DataType = fData.DataType || "String";
                         field.Length = fData.Length || 0;
                         field.IsPrimaryKey = fData.IsPrimaryKey || false;
                         field.IsNullable = fData.IsNullable !== false;
