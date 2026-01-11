@@ -378,6 +378,18 @@ describe("XTypeConverter", () =>
             expect(parsed[0].X).toBe(0);
             expect(parsed[0].Y).toBe(0);
         });
+
+        it("should check IsDefault for Point[] with different lengths", () =>
+        {
+            const pts1: XIPoint[] = [{ X: 1, Y: 2 }];
+            const pts2: XIPoint[] = [{ X: 1, Y: 2 }, { X: 3, Y: 4 }];
+            // Different lengths - covers line 308 branch
+            expect(XTypeConverter.IsDefaultValue(pts1, pts2, "Point[]")).toBe(false);
+            // Same length, same values
+            expect(XTypeConverter.IsDefaultValue(pts1, [{ X: 1, Y: 2 }], "Point[]")).toBe(true);
+            // Same length, different values
+            expect(XTypeConverter.IsDefaultValue(pts1, [{ X: 9, Y: 9 }], "Point[]")).toBe(false);
+        });
     });
 
     describe("Type inference", () =>

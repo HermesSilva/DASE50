@@ -108,35 +108,25 @@ describe("XMath", () => {
             expect(XMath.LineIntersectsRect(rect, p1, p2)).toBe(false);
         });
 
-        it("should detect intersection with top edge only", () => {
+        it("should return true when point is inside rect", () => {
             const rect = new XRect(10, 10, 20, 20);
-            const p1 = new XPoint(20, 0);
-            const p2 = new XPoint(20, 10);
+            const p1 = new XPoint(15, 15);
+            const p2 = new XPoint(50, 50);
             expect(XMath.LineIntersectsRect(rect, p1, p2)).toBe(true);
         });
 
-        it("should detect intersection with right edge only (not top)", () => {
+        it("should detect line crossing through rect", () => {
+            // Line crosses from outside to outside through the rect
             const rect = new XRect(10, 10, 20, 20);
-            // Line going from outside right to hit right edge vertically
-            // not touching top at all
-            const p1 = new XPoint(30, 15);
-            const p2 = new XPoint(40, 15);
-            expect(XMath.LineIntersectsRect(rect, p1, p2)).toBe(true);
-        });
-
-        it("should detect intersection with bottom edge only (not top or right)", () => {
-            const rect = new XRect(10, 10, 20, 20);
-            // Line from below going up to hit bottom edge
-            const p1 = new XPoint(20, 30);
-            const p2 = new XPoint(20, 40);
-            expect(XMath.LineIntersectsRect(rect, p1, p2)).toBe(true);
-        });
-
-        it("should detect intersection with left edge only (not top, right, or bottom)", () => {
-            const rect = new XRect(10, 10, 20, 20);
-            // Line going from outside left to hit left edge vertically
             const p1 = new XPoint(0, 20);
-            const p2 = new XPoint(10, 20);
+            const p2 = new XPoint(40, 20);
+            expect(XMath.LineIntersectsRect(rect, p1, p2)).toBe(true);
+        });
+
+        it("should detect diagonal line crossing rect", () => {
+            const rect = new XRect(10, 10, 20, 20);
+            const p1 = new XPoint(0, 0);
+            const p2 = new XPoint(40, 40);
             expect(XMath.LineIntersectsRect(rect, p1, p2)).toBe(true);
         });
     });

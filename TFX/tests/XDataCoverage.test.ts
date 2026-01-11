@@ -481,17 +481,23 @@ describe("Additional Data Coverage", () => {
     });
 
     it("XSerializationEngine: SerializeToDocument with properties (Lines 366-377)", () => {
+        const attrPropID = XGuid.NewValue();
+        const docPropID = XGuid.NewValue();
         class XDocPropElem extends XPersistableElement {
             public static readonly AttrProp = XProperty.Register<XDocPropElem, string>(
-                (p: XDocPropElem) => "attr", XGuid.NewValue(), "AttrProp", "Attr Prop", "", { AsAttribute: true }
+                (p: XDocPropElem) => "attr", attrPropID, "AttrProp", "Attr Prop", ""
             );
             public static readonly DocProp = XProperty.Register<XDocPropElem, string>(
-                (p: XDocPropElem) => "val", XGuid.NewValue(), "DocProp", "Doc Prop", "def", { AsAttribute: false }
+                (p: XDocPropElem) => "val", docPropID, "DocProp", "Doc Prop", "def"
             );
             public override GetSerializableProperties(): XProperty[] {
-                return [XDocPropElem.AttrProp, XDocPropElem.DocProp]; // AttrProp first to hit return false
+                return [XDocPropElem.AttrProp, XDocPropElem.DocProp];
             }
         }
+        XDocPropElem.AttrProp.Default.AsAttribute = true;
+        XDocPropElem.AttrProp.Default.IsPersistable = true;
+        XDocPropElem.DocProp.Default.AsAttribute = false;
+        XDocPropElem.DocProp.Default.IsPersistable = true;
         XElementRegistry.Instance.Register({ TagName: "XDocPropElem", Constructor: XDocPropElem });
         
         const el = new XDocPropElem();
@@ -505,21 +511,24 @@ describe("Additional Data Coverage", () => {
     });
 
     it("XSerializationEngine: SerializeDocumentContent with only AsAttribute properties (Line 367)", () => {
+        const attrPropID = XGuid.NewValue();
         class XAttrOnlyElem extends XPersistableElement {
             public static readonly OnlyAttr = XProperty.Register<XAttrOnlyElem, string>(
-                (p: XAttrOnlyElem) => "", XGuid.NewValue(), "OnlyAttr", "Only Attr", "", { AsAttribute: true }
+                (p: XAttrOnlyElem) => "", attrPropID, "OnlyAttr", "Only Attr", ""
             );
             public override GetSerializableProperties(): XProperty[] {
                 return [XAttrOnlyElem.OnlyAttr];
             }
         }
+        XAttrOnlyElem.OnlyAttr.Default.AsAttribute = true;
+        XAttrOnlyElem.OnlyAttr.Default.IsPersistable = true;
         XElementRegistry.Instance.Register({ TagName: "XAttrOnlyElem", Constructor: XAttrOnlyElem });
         
         const el = new XAttrOnlyElem();
         el.ID = XGuid.NewValue();
+        el.SetValue(XAttrOnlyElem.OnlyAttr, "SomeValue");
         
         const engine = XSerializationEngine.Instance;
-        // This will iterate through properties and hit "return false" for the AsAttribute property
         const res = engine.SerializeToDocument(el, "AttrOnly", XGuid.NewValue());
         expect(res.Success).toBe(true);
         expect(res.XmlOutput).not.toContain("<Properties>");
@@ -604,12 +613,15 @@ describe("Additional Data Coverage", () => {
     });
 
     it("XmlWriter: Property value error", () => {
+        const fPropID = XGuid.NewValue();
         class XFElement extends XPersistableElement {
             public static readonly FProp = XProperty.Register<XFElement, string>(
-                (p: XFElement) => p.F, XGuid.NewValue(), "F", "F", "", { AsAttribute: false }
+                (p: XFElement) => p.F, fPropID, "F", "F", ""
             );
             public get F(): string { throw new Error("FAIL"); }
         }
+        XFElement.FProp.Default.IsPersistable = true;
+        XFElement.FProp.Default.AsAttribute = false;
         XElementRegistry.Instance.Register({ TagName: "FE", Constructor: XFElement });
         XElementRegistry.Instance.RegisterProperty("FE", XFElement.FProp, false);
         const context = new XSerializationContext(XSerializationDirection.Serialize);
@@ -619,12 +631,15 @@ describe("Additional Data Coverage", () => {
     });
 
     it("XmlWriter: Default value continue", () => {
+        const dPropID = XGuid.NewValue();
         class XDElem extends XPersistableElement {
             public static readonly DProp = XProperty.Register<XDElem, string>(
-                (p: XDElem) => p.D, XGuid.NewValue(), "D", "D", "DEF", { AsAttribute: false }
+                (p: XDElem) => p.D, dPropID, "D", "D", "DEF"
             );
             public get D(): string { return this.GetValue(XDElem.DProp) as string; }
         }
+        XDElem.DProp.Default.IsPersistable = true;
+        XDElem.DProp.Default.AsAttribute = false;
         XElementRegistry.Instance.Register({ TagName: "DE", Constructor: XDElem });
         XElementRegistry.Instance.RegisterProperty("DE", XDElem.DProp, false);
         const el = new XDElem();

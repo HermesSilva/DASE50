@@ -137,17 +137,14 @@ export class XMath {
         const bottomRight = new XPoint(right, bottom);
 
         // Verifica se algum endpoint está dentro do retângulo
-        if (XMath.PointInRect(rect, p1) || XMath.PointInRect(rect, p2)) {
+        if (XMath.PointInRect(rect, p1) || XMath.PointInRect(rect, p2))
             return true;
-        }
 
-        // Verifica interseção com cada lado
-        if (!isNaN(XMath.LineIntersection(p1, p2, topLeft, topRight).X)) return true;
-        if (!isNaN(XMath.LineIntersection(p1, p2, topRight, bottomRight).X)) return true;
-        if (!isNaN(XMath.LineIntersection(p1, p2, bottomRight, bottomLeft).X)) return true;
-        if (!isNaN(XMath.LineIntersection(p1, p2, bottomLeft, topLeft).X)) return true;
-
-        return false;
+        // Verifica interseção com qualquer lado
+        return !isNaN(XMath.LineIntersection(p1, p2, topLeft, topRight).X) ||
+               !isNaN(XMath.LineIntersection(p1, p2, topRight, bottomRight).X) ||
+               !isNaN(XMath.LineIntersection(p1, p2, bottomRight, bottomLeft).X) ||
+               !isNaN(XMath.LineIntersection(p1, p2, bottomLeft, topLeft).X);
     }
 
     /**
