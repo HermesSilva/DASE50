@@ -106,7 +106,7 @@ describe("XElement", () =>
             const elem = new TestElement();
             expect(elem.ID).toBe(XGuid.EmptyValue);
             expect(elem.Name).toBe("");
-            expect(elem.ClassName).toBe("");
+            expect(elem.ClassName).toBe("TestElement");
             expect(elem.ParentNode).toBeNull();
             expect(elem.ChildNodes).toEqual([]);
         });
@@ -129,8 +129,7 @@ describe("XElement", () =>
         it("should set and get ClassName", () =>
         {
             const elem = new TestElement();
-            elem.ClassName = "TestClass";
-            expect(elem.ClassName).toBe("TestClass");
+            expect(elem.ClassName).toBe("TestElement");
         });
     });
 

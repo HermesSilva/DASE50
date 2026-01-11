@@ -1,4 +1,4 @@
-export class XLine extends XDesignElement
+export class XDesignElement extends XPersistableElement
 {
     public constructor()
     {

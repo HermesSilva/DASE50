@@ -89,7 +89,7 @@ function TryExtractPropertyKey<T, TType>(pSelector: XPropertySelector<T, TType> 
         pSelector(probe.Proxy as T);
         if (probe.ReadKeys.length === 0)
             return null;
-        return probe.ReadKeys[0] ?? null;
+        return probe.ReadKeys[0] as string;
     }
     catch
     {

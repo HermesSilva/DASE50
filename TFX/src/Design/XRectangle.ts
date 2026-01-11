@@ -1,6 +1,4 @@
-import { XPersistableElement } from "../Core/index.js";
-
-export class XRectangle extends XPersistableElement
+export class XRectangle extends XDesignElement
 {
     public constructor()
     {

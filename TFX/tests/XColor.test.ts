@@ -22,6 +22,15 @@ describe("XColor", () =>
             expect(color.G).toBe(128);
             expect(color.B).toBe(64);
         });
+
+        it("should default missing channels when called with fewer args", () =>
+        {
+            const color = new (XColor as unknown as { new(pA: number, pR: number): XColor })(1, 2);
+            expect(color.A).toBe(255);
+            expect(color.R).toBe(1);
+            expect(color.G).toBe(2);
+            expect(color.B).toBe(0);
+        });
     });
 
     describe("static colors", () =>
@@ -84,9 +93,9 @@ describe("XColor", () =>
             expect(() => XColor.Parse("FF10203040")).toThrow();
         });
 
-        it("should throw on odd length hex string", () =>
+        it("should throw on odd-length hex inside decoder", () =>
         {
-            expect(() => XColor.Parse("FF1")).toThrow();
+            expect(() => (XColor as unknown as { DecodeHex(pValue: string): number }).DecodeHex("ABC")).toThrow(/Invalid hex/i);
         });
     });
 
@@ -301,6 +310,35 @@ describe("XHSLColor", () =>
             const rgb = XHSLColor.ToRgb(0, 0, 0.5);
             expect(rgb.R).toBe(rgb.G);
             expect(rgb.G).toBe(rgb.B);
+        });
+
+        it("should wrap hue below 0 (internal t<0 path)", () =>
+        {
+            const rgb = XHSLColor.ToRgb(0.1, 1, 0.5);
+            expect(rgb.R).toBeGreaterThanOrEqual(0);
+            expect(rgb.R).toBeLessThanOrEqual(255);
+            expect(rgb.G).toBeGreaterThanOrEqual(0);
+            expect(rgb.G).toBeLessThanOrEqual(255);
+            expect(rgb.B).toBeGreaterThanOrEqual(0);
+            expect(rgb.B).toBeLessThanOrEqual(255);
+        });
+
+        it("should wrap hue above 1 (internal t>1 path)", () =>
+        {
+            const rgb = XHSLColor.ToRgb(0.9, 1, 0.5);
+            expect(rgb.R).toBeGreaterThanOrEqual(0);
+            expect(rgb.R).toBeLessThanOrEqual(255);
+            expect(rgb.G).toBeGreaterThanOrEqual(0);
+            expect(rgb.G).toBeLessThanOrEqual(255);
+            expect(rgb.B).toBeGreaterThanOrEqual(0);
+            expect(rgb.B).toBeLessThanOrEqual(255);
+        });
+
+        it("should use the pL<0.5 q-branch", () =>
+        {
+            const rgb = XHSLColor.ToRgb(0.25, 1, 0.25);
+            expect(rgb.R).toBeGreaterThanOrEqual(0);
+            expect(rgb.R).toBeLessThanOrEqual(255);
         });
     });
 

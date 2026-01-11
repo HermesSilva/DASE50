@@ -47,6 +47,8 @@ Padrões para orientar a escrita de código C# (.NET9 / C#13) e TypeScript neste
  - Ex.: `lstua` (lista de usuários ativos), `frsrt` (first read table).
 - Quando o nome original é abreviado ou siglas, comp CEP, CPF, ID, URL, HTTP, JSON, XML, SQL, DB, UI, UX, deve manter caixa alta
  - Ex.: `pUserID`, `GetByURL`, `LoadFromDB`,`ORM=Object-Relational Mapping`, `TCP=transmission control protocol`.
+- Todas as propriedades do package TFX devem ser do tipo TFXProperty (usando GetValue e SetValue )
+ - Ex.: `public get CanDelete(): boolean {return this.GetValue(XPersistableElement.CanDeleteProp) as boolean;}`, `public set CanDelete(pValue: boolean){this.SetValue(XPersistableElement.CanDeleteProp, pValue);}`
 
 - Nomes sempre em inglês para tipos, membros e arquivos.
 Esta é uma ampliação das suas instruções, focada em C# (.NET 8+), para que o Copilot (e qualquer desenvolvedor) siga padrões **extremamente rigorosos** de qualidade, performance, segurança, coerência e elegância.

@@ -154,6 +154,47 @@ describe("XPropertyDefault", () =>
         });
     });
 
+    it("should infer 'Unknown' for non-object defaults", () =>
+    {
+        const id = XGuid.NewValue();
+        const defaultValue = Symbol("s") as unknown;
+
+        const prop = XProperty.Register(
+            (p: { Sym: unknown }) => p.Sym,
+            id,
+            "Sym",
+            "Sym Title",
+            defaultValue
+        );
+
+        expect(prop.Default.Type.Name).toBe("Unknown");
+    });
+
+    describe("XPersistableElementBase optional methods", () =>
+    {
+        it("should provide default GetValueByKey and SetValueByKey implementations", () =>
+        {
+            class BarePersistable extends XPersistableElementBase
+            {
+                public override ID: string = XGuid.NewValue();
+                public override Name: string = "Bare";
+                public override IsLoaded: boolean = true;
+
+                public override GetValue(_pProperty: XProperty): unknown
+                {
+                    return undefined;
+                }
+
+                public override SetValue(_pProperty: XProperty, _pValue: unknown): void
+                {
+                }
+            }
+
+            const elem = new BarePersistable();
+            expect(elem.GetValueByKey?.("k")).toBeUndefined();
+            expect(() => elem.SetValueByKey?.("k", 1)).not.toThrow();
+        });
+    });
     describe("EditType", () =>
     {
         it("should return Type when EditType not set", () =>
@@ -414,6 +455,228 @@ describe("XProperty", () =>
 
             expect(prop1).toBe(prop2);
         });
+
+        it("should tolerate selectors that don't read keys (PropertyKey=null)", () =>
+        {
+            const id = XGuid.NewValue();
+            const prop = XProperty.Register(
+                (_p: { Anything: string }) => Symbol("x") as unknown as string,
+                id,
+                "NoKey",
+                "No Key Title"
+            );
+
+            expect(prop.PropertyKey).toBeNull();
+            expect(prop.Default.Type.Name).toBe("Unknown");
+        });
+
+        it("should infer 'Object' for objects without constructor", () =>
+        {
+            const id = XGuid.NewValue();
+            const defaultValue = Object.create(null) as unknown;
+
+            const prop = XProperty.Register(
+                (p: { Obj: unknown }) => p.Obj,
+                id,
+                "Obj",
+                "Obj Title",
+                defaultValue
+            );
+
+            expect(prop.Default.Type.Name).toBe("Object");
+        });
+
+        it("should infer type name from object constructor name", () =>
+        {
+            const id = XGuid.NewValue();
+            const defaultValue = { constructor: { name: "MyType" } } as unknown;
+
+            const prop = XProperty.Register(
+                (p: { Obj2: unknown }) => p.Obj2,
+                id,
+                "Obj2",
+                "Obj2 Title",
+                defaultValue
+            );
+
+            expect(prop.Default.Type.Name).toBe("MyType");
+        });
+
+        it("should fall back to 'Object' when ctor name is undefined", () =>
+        {
+            const id = XGuid.NewValue();
+            const defaultValue = { constructor: { name: undefined } } as unknown;
+
+            const prop = XProperty.Register(
+                (p: { Obj3: unknown }) => p.Obj3,
+                id,
+                "Obj3",
+                "Obj3 Title",
+                defaultValue
+            );
+
+            expect(prop.Default.Type.Name).toBe("Object");
+        });
+
+        it("should tolerate selectors that throw (PropertyKey=null)", () =>
+        {
+            const id = XGuid.NewValue();
+            const prop = XProperty.Register(
+                (_p: { Boom: string }) =>
+                {
+                    throw new Error("boom");
+                },
+                id,
+                "ThrowingSelector",
+                "Throwing Selector Title",
+                "ignored"
+            );
+
+            expect(prop.PropertyKey).toBeNull();
+        });
+
+        it("should ignore symbol property access in selector probe", () =>
+        {
+            const sym = Symbol("s");
+            const id = XGuid.NewValue();
+            const prop = XProperty.Register(
+                (p: unknown) => (p as unknown as Record<symbol, unknown>)[sym] as unknown as string,
+                id,
+                "SymbolKey",
+                "Symbol Key Title",
+                "x"
+            );
+
+            expect(prop.PropertyKey).toBeNull();
+        });
+
+        it("should generate OwnerCID from declaring type name when Guid missing", () =>
+        {
+            class TypeNoGuid { }
+
+            const id = XGuid.NewValue();
+            const selector = ((p: { Some: string }) => p.Some) as unknown as { (p: { Some: string }): string; DeclaringType?: unknown };
+            selector.DeclaringType = TypeNoGuid;
+
+            const prop = XProperty.Register(selector, id, "Some", "Some Title", "x");
+            expect(prop.OwnerCID.startsWith("00000000-0000-0000-0000-")).toBe(true);
+            expect(XGuid.IsValid(prop.OwnerCID)).toBe(true);
+        });
+
+        it("should use 'Unknown' when DeclaringType is not a constructor", () =>
+        {
+            const id = XGuid.NewValue();
+            const selector = ((p: { Prop: string }) => p.Prop) as unknown as { (p: { Prop: string }): string; DeclaringType?: unknown };
+            selector.DeclaringType = {};
+
+            const prop = XProperty.Register(selector, id, "Prop", "Prop Title", "x");
+            expect(prop.PropertyKey).toBe("Unknown.Prop");
+        });
+
+        it("should handle null selector in InternalRegister", () =>
+        {
+            const all = (XProperty as unknown as { _AllProperties: Map<string, XProperty> })._AllProperties;
+            const byKey = (XProperty as unknown as { _AllPropertiesByKey: Map<string, XProperty> })._AllPropertiesByKey;
+            const propsByOwner = (XProperty as unknown as { _Properties: Map<string, XProperty[]> })._Properties;
+
+            const snapAll = new Map(all);
+            const snapByKey = new Map(byKey);
+            const snapPropsByOwner = new Map<string, XProperty[]>(
+                [...propsByOwner.entries()].map(([k, v]) => [k, [...v]])
+            );
+
+            try
+            {
+                const id = XGuid.NewValue();
+                const prop = (XProperty as unknown as {
+                    InternalRegister: (
+                        pSelector: unknown,
+                        pID: string,
+                        pName: string,
+                        pTitle: string,
+                        pConstraintType: XConstraintType | null,
+                        pSetMethod: unknown,
+                        pDefaultValue: unknown,
+                        pIsRequired: boolean,
+                        pCultureSensitive: boolean,
+                        pIsLinked: boolean
+                    ) => XProperty;
+                }).InternalRegister(
+                    null,
+                    id,
+                    "NullSelector",
+                    "Null Selector Title",
+                    null,
+                    null,
+                    123,
+                    false,
+                    false,
+                    false
+                );
+
+                expect(prop.ID).toBe(id);
+                expect(prop.PropertyKey).toBeNull();
+                expect(prop.OwnerCID).toBe(XGuid.EmptyValue);
+            }
+            finally
+            {
+                all.clear();
+                for (const [k, v] of snapAll)
+                    all.set(k, v);
+
+                byKey.clear();
+                for (const [k, v] of snapByKey)
+                    byKey.set(k, v);
+
+                propsByOwner.clear();
+                for (const [k, v] of snapPropsByOwner)
+                    propsByOwner.set(k, [...v]);
+            }
+        });
+
+        it("should throw when registering duplicate ID within owner list", () =>
+        {
+            const all = (XProperty as unknown as { _AllProperties: Map<string, XProperty> })._AllProperties;
+            const byKey = (XProperty as unknown as { _AllPropertiesByKey: Map<string, XProperty> })._AllPropertiesByKey;
+            const propsByOwner = (XProperty as unknown as { _Properties: Map<string, XProperty[]> })._Properties;
+
+            const snapAll = new Map(all);
+            const snapByKey = new Map(byKey);
+            const snapPropsByOwner = new Map<string, XProperty[]>(
+                [...propsByOwner.entries()].map(([k, v]) => [k, [...v]])
+            );
+
+            try
+            {
+                class DupType { public static Guid: string = XGuid.NewValue(); }
+
+                const id = XGuid.NewValue();
+                const selector = ((p: { Dup: string }) => p.Dup) as unknown as { (p: { Dup: string }): string; DeclaringType?: unknown };
+                selector.DeclaringType = DupType;
+
+                const first = XProperty.Register(selector, id, "Dup", "Dup Title", "x");
+                expect(first.OwnerCID).toBe(DupType.Guid);
+
+                all.delete(id);
+
+                expect(() => XProperty.Register(selector, id, "Dup", "Dup Title", "x"))
+                    .toThrow(/duplicate id/i);
+            }
+            finally
+            {
+                all.clear();
+                for (const [k, v] of snapAll)
+                    all.set(k, v);
+
+                byKey.clear();
+                for (const [k, v] of snapByKey)
+                    byKey.set(k, v);
+
+                propsByOwner.clear();
+                for (const [k, v] of snapPropsByOwner)
+                    propsByOwner.set(k, [...v]);
+            }
+        });
     });
 
     describe("static RegisterLink", () =>
@@ -621,6 +884,93 @@ describe("XProperty", () =>
 
             expect(props instanceof Map).toBe(true);
         });
+
+        it("should handle null element", () =>
+        {
+            const props = new Map<string, XProperty>();
+            expect(() => XProperty.LoadProperties(null as unknown as XPersistableElementBase, props)).not.toThrow();
+            expect(props.size).toBe(0);
+        });
+
+        it("should handle element without constructor property", () =>
+        {
+            const elem = Object.create(null);
+            const props = new Map<string, XProperty>();
+            expect(() => XProperty.LoadProperties(elem as unknown as XPersistableElementBase, props)).not.toThrow();
+            expect(props.size).toBe(0);
+        });
+
+        it("should stop when element constructor is not a function", () =>
+        {
+            const elem = new MockPersistableElement() as unknown as { constructor: unknown };
+            elem.constructor = {};
+
+            const props = new Map<string, XProperty>();
+            XProperty.LoadProperties(elem as unknown as MockPersistableElement, props);
+            expect(props.size).toBe(0);
+        });
+
+        it("should stop when constructor prototype chain has null proto", () =>
+        {
+            function NoProtoCtor() { }
+            NoProtoCtor.prototype = Object.create(null);
+
+            const elem = new MockPersistableElement() as unknown as { constructor: unknown };
+            elem.constructor = NoProtoCtor;
+
+            const props = new Map<string, XProperty>();
+            XProperty.LoadProperties(elem as unknown as MockPersistableElement, props);
+            expect(props.size).toBe(0);
+        });
+
+        it("should use 'Unknown' when constructor name is undefined", () =>
+        {
+            const all = (XProperty as unknown as { _AllProperties: Map<string, XProperty> })._AllProperties;
+            const byKey = (XProperty as unknown as { _AllPropertiesByKey: Map<string, XProperty> })._AllPropertiesByKey;
+            const propsByOwner = (XProperty as unknown as { _Properties: Map<string, XProperty[]> })._Properties;
+
+            const snapAll = new Map(all);
+            const snapByKey = new Map(byKey);
+            const snapPropsByOwner = new Map<string, XProperty[]>(
+                [...propsByOwner.entries()].map(([k, v]) => [k, [...v]])
+            );
+
+            try
+            {
+                const declaringType = new Proxy(
+                    function DeclType() { },
+                    {
+                        get: (pTarget, pProp) =>
+                        {
+                            if (pProp === "name")
+                                return undefined;
+                            return (pTarget as unknown as Record<string | symbol, unknown>)[pProp];
+                        }
+                    }
+                );
+
+                const id = XGuid.NewValue();
+                const selector = ((p: { Key: string }) => p.Key) as unknown as { (p: { Key: string }): string; DeclaringType?: unknown };
+                selector.DeclaringType = declaringType;
+
+                const prop = XProperty.Register(selector, id, "Key", "Key Title", "x");
+                expect(prop.PropertyKey).toBe("Unknown.Key");
+            }
+            finally
+            {
+                all.clear();
+                for (const [k, v] of snapAll)
+                    all.set(k, v);
+
+                byKey.clear();
+                for (const [k, v] of snapByKey)
+                    byKey.set(k, v);
+
+                propsByOwner.clear();
+                for (const [k, v] of snapPropsByOwner)
+                    propsByOwner.set(k, [...v]);
+            }
+        });
     });
 
     describe("GetValue", () =>
@@ -659,6 +1009,38 @@ describe("XProperty", () =>
 
             expect(value).toBe("fallbackValue");
         });
+
+            it("should fall back to element GetValue when GetValueByKey is missing", () =>
+            {
+                class NoByKeyElement extends XPersistableElementBase
+                {
+                    public override ID: string = XGuid.NewValue();
+                    public override Name: string = "NoByKey";
+                    public override IsLoaded: boolean = true;
+
+                    public override GetValue(_pProperty: XProperty): unknown
+                    {
+                        return "from-getvalue";
+                    }
+
+                    public override SetValue(_pProperty: XProperty, _pValue: unknown): void
+                    {
+                    }
+                }
+
+                const prop = new XProperty(
+                    "MissingKey",
+                    XGuid.NewValue(),
+                    "MissingKey",
+                    "Title",
+                    { Name: "String" }
+                );
+
+                const elem = new NoByKeyElement() as unknown as NoByKeyElement & { GetValueByKey?: undefined };
+                (elem as unknown as { GetValueByKey?: undefined }).GetValueByKey = undefined;
+
+                expect(prop.GetValue(elem)).toBe("from-getvalue");
+            });
 
         it("should use GetValue when no PropertyKey", () =>
         {
@@ -713,6 +1095,42 @@ describe("XProperty", () =>
 
             expect((elem as unknown as Record<string, unknown>)["_fallbackValue"]).toBe("fallback set");
         });
+
+            it("should fall back to element SetValue when SetValueByKey is missing", () =>
+            {
+                let didSet = false;
+
+                class NoByKeyElement extends XPersistableElementBase
+                {
+                    public override ID: string = XGuid.NewValue();
+                    public override Name: string = "NoByKey";
+                    public override IsLoaded: boolean = true;
+
+                    public override GetValue(_pProperty: XProperty): unknown
+                    {
+                        return undefined;
+                    }
+
+                    public override SetValue(_pProperty: XProperty, _pValue: unknown): void
+                    {
+                        didSet = true;
+                    }
+                }
+
+                const prop = new XProperty(
+                    "MissingKey",
+                    XGuid.NewValue(),
+                    "MissingKey",
+                    "Title",
+                    { Name: "String" }
+                );
+
+                const elem = new NoByKeyElement() as unknown as NoByKeyElement & { SetValueByKey?: undefined };
+                (elem as unknown as { SetValueByKey?: undefined }).SetValueByKey = undefined;
+
+                prop.SetValue(elem, "x");
+                expect(didSet).toBe(true);
+            });
 
         it("should use SetValue when no PropertyKey", () =>
         {
@@ -893,6 +1311,13 @@ describe("XProperty", () =>
         {
             const prop = new XProperty(null, XGuid.NewValue(), "ToStringTest", "Title", { Name: "Number" });
             expect(prop.ToString()).toBe("ToStringTest (Number)");
+        });
+
+        it("should fall back to 'Unknown' when type name is undefined", () =>
+        {
+            const prop = new XProperty(null, XGuid.NewValue(), "ToStringTest", "Title", { Name: "Number" });
+            prop.Default.ExternalType = () => ({ Name: undefined as unknown as string });
+            expect(prop.ToString()).toBe("ToStringTest (Unknown)");
         });
 
         it("should handle missing type", () =>

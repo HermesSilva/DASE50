@@ -176,14 +176,6 @@ export abstract class XPersistableElement extends XElement
         XGuid.EmptyValue
     );
 
-    public static readonly ClassNameProp = XProperty.Register<XPersistableElement, string>(
-        (p: XPersistableElement) => p.ClassName,
-        "00000001-0001-0001-0001-00000000000D",
-        "ClassName",
-        "Class Name",
-        ""
-    );
-
     private _Values: XValues | null = null;
     private _Document: XDesignerDocument | null = null;
     private _PropertyBindingList: XPropertyBindingList | null = null;
@@ -335,17 +327,6 @@ export abstract class XPersistableElement extends XElement
     public set ParentID(pValue: string)
     {
         this.SetValue(XPersistableElement.ParentIDProp, pValue);
-    }
-
-    public override get ClassName(): string
-    {
-        const val = this.GetValue(XPersistableElement.ClassNameProp) as string;
-        return val || this.constructor.name;
-    }
-
-    public override set ClassName(pValue: string)
-    {
-        this.SetValue(XPersistableElement.ClassNameProp, pValue);
     }
 
     public get Document(): XDesignerDocument | null

@@ -1,6 +1,4 @@
-import { XPersistableElement } from "../Core/index.js";
-
-export class XDocument extends XPersistableElement
+export class XDocument extends XDesignElement
 {
     public constructor()
     {

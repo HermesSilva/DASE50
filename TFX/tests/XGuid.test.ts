@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { XGuid, XGuidFormat } from "../src/Core/XGuid.js";
 
 describe("XGuid", () =>
@@ -174,6 +174,39 @@ describe("XGuid", () =>
             const guid = XGuid.New();
             expect(["8", "9", "a", "b"]).toContain(guid.Value[19]);
         });
+
+        it("should prefer crypto.randomUUID when available", () =>
+        {
+            const originalCrypto = globalThis.crypto;
+            vi.stubGlobal("crypto", { randomUUID: () => "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" } as unknown as Crypto);
+
+            try
+            {
+                const guid = XGuid.New();
+                expect(guid.Value).toBe("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
+            }
+            finally
+            {
+                vi.stubGlobal("crypto", originalCrypto as unknown as Crypto);
+            }
+        });
+
+        it("should fall back when crypto.randomUUID is missing", () =>
+        {
+            const originalCrypto = globalThis.crypto;
+            vi.stubGlobal("crypto", {} as unknown as Crypto);
+
+            try
+            {
+                const guid = XGuid.New();
+                expect(XGuid.IsValid(guid.Value)).toBe(true);
+                expect(guid.IsEmpty).toBe(false);
+            }
+            finally
+            {
+                vi.stubGlobal("crypto", originalCrypto as unknown as Crypto);
+            }
+        });
     });
 
     describe("XGuid.NewFallback", () =>
@@ -216,6 +249,32 @@ describe("XGuid", () =>
             expect(guid.Value[13]).toBe("-");
             expect(guid.Value[18]).toBe("-");
             expect(guid.Value[23]).toBe("-");
+        });
+
+        it("should use crypto.getRandomValues when available", () =>
+        {
+            const originalCrypto = globalThis.crypto;
+
+            vi.stubGlobal(
+                "crypto",
+                {
+                    getRandomValues: (pArr: Uint8Array) =>
+                    {
+                        pArr[0] = 0xab;
+                        return pArr;
+                    }
+                } as unknown as Crypto
+            );
+
+            try
+            {
+                const guid = XGuid.NewFallback();
+                expect(guid.Value).toBe("bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb");
+            }
+            finally
+            {
+                vi.stubGlobal("crypto", originalCrypto as unknown as Crypto);
+            }
         });
 
         it("should generate 100 unique GUIDs", () =>
@@ -733,6 +792,13 @@ describe("XGuid", () =>
                 expect(sorted[0].Value).toBe("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
                 expect(sorted[1].Value).toBe("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
                 expect(sorted[2].Value).toBe("cccccccc-cccc-cccc-cccc-cccccccccccc");
+            });
+
+            it("should compare against null and undefined", () =>
+            {
+                const guid = XGuid.Parse("12345678-1234-5678-9abc-def012345678");
+                expect(typeof guid.CompareTo(null)).toBe("number");
+                expect(typeof guid.CompareTo(undefined)).toBe("number");
             });
         });
 

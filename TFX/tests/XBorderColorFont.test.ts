@@ -32,6 +32,39 @@ describe("XBorderColor", () =>
             expect(border.Right.Equals(XColor.Black)).toBe(true);
             expect(border.Bottom.Equals(XColor.Black)).toBe(true);
         });
+
+        it("should treat missing args as uniform (2 args runtime call)", () =>
+        {
+            const border = new (XBorderColor as unknown as { new(pA: XColor, pB: XColor): XBorderColor })(XColor.Red, XColor.Green);
+            expect(border.Left.Equals(XColor.Red)).toBe(true);
+            expect(border.Top.Equals(XColor.Red)).toBe(true);
+            expect(border.Right.Equals(XColor.Red)).toBe(true);
+            expect(border.Bottom.Equals(XColor.Red)).toBe(true);
+        });
+
+        it("should treat missing args as uniform (3 args runtime call)", () =>
+        {
+            const border = new (XBorderColor as unknown as { new(pA: XColor, pB: XColor, pC: XColor): XBorderColor })(XColor.Red, XColor.Green, XColor.Blue);
+            expect(border.Left.Equals(XColor.Red)).toBe(true);
+            expect(border.Top.Equals(XColor.Red)).toBe(true);
+            expect(border.Right.Equals(XColor.Red)).toBe(true);
+            expect(border.Bottom.Equals(XColor.Red)).toBe(true);
+        });
+
+        it("should default left color when pA is nullish (4 args runtime call)", () =>
+        {
+            const border = new (XBorderColor as unknown as { new(pA: XColor | undefined, pB: XColor, pC: XColor, pD: XColor): XBorderColor })(
+                undefined,
+                XColor.Green,
+                XColor.Blue,
+                XColor.White
+            );
+
+            expect(border.Left.Equals(XColor.Black)).toBe(true);
+            expect(border.Top.Equals(XColor.Green)).toBe(true);
+            expect(border.Right.Equals(XColor.Blue)).toBe(true);
+            expect(border.Bottom.Equals(XColor.White)).toBe(true);
+        });
     });
 
     describe("Parse", () =>
@@ -246,6 +279,27 @@ describe("XFont", () =>
             const font = new XFont();
             font.FontStyle = XFontStyle.Italic;
             expect(font.FontStyle).toBe(XFontStyle.Italic);
+        });
+    });
+
+    describe("nullish internal defaults", () =>
+    {
+        it("should fall back when internal fields are nullish", () =>
+        {
+            const font = new XFont("Verdana", 8, XColor.Red, XTextAlignment.Center, XFontStyle.Bold) as unknown as {
+                _Color: XColor | null;
+                _Alignment: XTextAlignment | null;
+                _FontStyle: XFontStyle | null;
+            };
+
+            font._Color = null;
+            font._Alignment = null;
+            font._FontStyle = null;
+
+            const publicFont = font as unknown as XFont;
+            expect(publicFont.Color.Equals(XColor.Black)).toBe(true);
+            expect(publicFont.Alignment).toBe(XTextAlignment.TopLeft);
+            expect(publicFont.FontStyle).toBe(XFontStyle.Normal);
         });
     });
 

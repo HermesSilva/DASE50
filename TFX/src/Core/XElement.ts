@@ -25,8 +25,6 @@ export abstract class XElement
     protected _ParentNode: XElement | XDocumentBase | null = null;
     protected _ID: string = XGuid.EmptyValue;
     protected _Name: string = "";
-    protected _ClassName: string = "";
-
     public readonly ChildNodes: XElement[] = [];
 
     public get ID(): string
@@ -51,12 +49,7 @@ export abstract class XElement
 
     public get ClassName(): string
     {
-        return this._ClassName;
-    }
-
-    public set ClassName(pValue: string)
-    {
-        this._ClassName = pValue;
+        return this.constructor.name;
     }
 
     public get ParentNode(): XElement | XDocumentBase | null
