@@ -1,12 +1,11 @@
-// Importar mocks antes dos módulos reais
+// Mock vscode API (required because vscode is not available in test environment)
 jest.mock('vscode');
-jest.mock('@tootega/tfx');
 
 import { XTFXBridge } from '../../Services/TFXBridge';
 import { XIssueItem } from '../../Models/IssueItem';
 import { XPropertyItem } from '../../Models/PropertyItem';
 
-// Importar mock do TFX
+// Import real TFX library
 import * as tfx from '@tootega/tfx';
 
 describe('XTFXBridge', () => {
@@ -894,54 +893,6 @@ describe('XTFXBridge', () => {
             await (bridge as any).LoadFromJson(mockDoc, jsonData);
             
             expect(mockDoc.Tables.length).toBe(1);
-        });
-
-        it('should use fallback "String" when XORMFieldDataType is not available', async () => {
-            // Temporarily remove XORMFieldDataType to test the final fallback
-            const originalFieldDataType = (tfx as any).XORMFieldDataType;
-            (tfx as any).XORMFieldDataType = undefined;
-
-            const jsonData = {
-                Tables: [{
-                    Name: 'TableWithField',
-                    Fields: [{
-                        Name: 'FieldWithoutDataType',
-                        DataType: undefined
-                    }]
-                }]
-            };
-
-            await (bridge as any).LoadFromJson(mockDoc, jsonData);
-            
-            expect(mockDoc.Tables.length).toBe(1);
-            // Should use "String" as final fallback
-            
-            // Restore original
-            (tfx as any).XORMFieldDataType = originalFieldDataType;
-        });
-
-        it('should use XORMFieldDataType.String when DataType is undefined and enum exists', async () => {
-            // Ensure XORMFieldDataType exists and has String property
-            const originalFieldDataType = (tfx as any).XORMFieldDataType;
-            (tfx as any).XORMFieldDataType = { String: 'String' };
-
-            const jsonData = {
-                Tables: [{
-                    Name: 'TableWithField',
-                    Fields: [{
-                        Name: 'FieldWithoutDataType',
-                        DataType: undefined
-                    }]
-                }]
-            };
-
-            await (bridge as any).LoadFromJson(mockDoc, jsonData);
-            
-            expect(mockDoc.Tables.length).toBe(1);
-            // Should use XORMFieldDataType.String value
-            
-            // Restore original
-            (tfx as any).XORMFieldDataType = originalFieldDataType;
         });
     });
 

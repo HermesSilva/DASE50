@@ -1,6 +1,5 @@
-// Importar mocks antes dos módulos reais
+// Mock vscode API (required because vscode is not available in test environment)
 jest.mock('vscode');
-jest.mock('@tootega/tfx');
 
 import * as vscode from 'vscode';
 import { XDeleteSelectedCommand } from '../../Commands/DeleteSelectedCommand';

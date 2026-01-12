@@ -11,8 +11,7 @@ module.exports = {
     },
     moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
     moduleNameMapper: {
-        '^vscode$': '<rootDir>/src/__tests__/__mocks__/vscode.ts',
-        '^@tootega/tfx$': '<rootDir>/src/__tests__/__mocks__/tfx.ts'
+        '^vscode$': '<rootDir>/src/__tests__/__mocks__/vscode.ts'
     },
     collectCoverage: true,
     coverageDirectory: 'coverage',

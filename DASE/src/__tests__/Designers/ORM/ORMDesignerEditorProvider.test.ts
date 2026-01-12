@@ -1,6 +1,5 @@
-// Importar mocks antes dos módulos reais
+// Mock vscode API (required because vscode is not available in test environment)
 jest.mock('vscode');
-jest.mock('@tootega/tfx');
 
 // Mock do SelectionService para evitar chamadas ao GetProperties
 jest.mock('../../../Services/SelectionService', () => ({
@@ -532,6 +531,31 @@ describe('XORMDesignerEditorProvider', () => {
             expect(mockState.GetModelData).toHaveBeenCalled();
             expect(mockPanel.webview.postMessage).toHaveBeenCalled();
             expect(mockState.Save).toHaveBeenCalled();
+        });
+
+        it('should not post message or save when AddTable fails', async () => {
+            const uri = Uri.file('/test/model.dsorm');
+            const mockDoc = { uri, dispose: jest.fn() };
+            const mockPanel = createMockWebviewPanel();
+            mockPanel.active = true;
+            
+            const mockState = {
+                AddTable: jest.fn().mockReturnValue({ Success: false }),
+                GetModelData: jest.fn(),
+                Save: jest.fn(),
+                Document: { uri }
+            };
+
+            (provider as any)._States.set(uri.toString(), mockState);
+            (provider as any)._Webviews.set(uri.toString(), mockPanel);
+            (provider as any)._Documents.set(uri.toString(), mockDoc);
+
+            await provider.AddTableToActiveDesigner();
+
+            expect(mockState.AddTable).toHaveBeenCalledWith(100, 100, 'NewTable');
+            expect(mockState.GetModelData).not.toHaveBeenCalled();
+            expect(mockPanel.webview.postMessage).not.toHaveBeenCalled();
+            expect(mockState.Save).not.toHaveBeenCalled();
         });
     });
 

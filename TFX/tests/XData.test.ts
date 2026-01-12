@@ -896,10 +896,6 @@ describe("XValues", () =>
         {
             const values = new XValues();
             const propId = XGuid.NewValue();
-            vi.spyOn(values, "AppendChild").mockImplementation((pChild: XElement) =>
-            {
-                values.ChildNodes.push(pChild);
-            });
 
             const data = values.CreateChild<XData>(propId);
 
@@ -910,23 +906,17 @@ describe("XValues", () =>
         it("should call AppendChild", () =>
         {
             const values = new XValues();
-            const spy = vi.spyOn(values, "AppendChild").mockImplementation((pChild: XElement) =>
-            {
-                values.ChildNodes.push(pChild);
-            });
+            const spy = vi.spyOn(values, "AppendChild");
 
             values.CreateChild<XData>(XGuid.NewValue());
 
             expect(spy).toHaveBeenCalledTimes(1);
+            spy.mockRestore();
         });
 
         it("should set name when provided", () =>
         {
             const values = new XValues();
-            vi.spyOn(values, "AppendChild").mockImplementation((pChild: XElement) =>
-            {
-                values.ChildNodes.push(pChild);
-            });
 
             const data = values.CreateChild<XData>(XGuid.NewValue(), "CustomName");
 
@@ -936,10 +926,6 @@ describe("XValues", () =>
         it("should use empty string when name not provided", () =>
         {
             const values = new XValues();
-            vi.spyOn(values, "AppendChild").mockImplementation((pChild: XElement) =>
-            {
-                values.ChildNodes.push(pChild);
-            });
 
             const data = values.CreateChild<XData>(XGuid.NewValue());
 
@@ -949,10 +935,6 @@ describe("XValues", () =>
         it("should use empty string when name is undefined", () =>
         {
             const values = new XValues();
-            vi.spyOn(values, "AppendChild").mockImplementation((pChild: XElement) =>
-            {
-                values.ChildNodes.push(pChild);
-            });
 
             const data = values.CreateChild<XData>(XGuid.NewValue(), undefined);
 
@@ -966,10 +948,6 @@ describe("XValues", () =>
         {
             const values = new XValues();
             const propId = XGuid.NewValue();
-            vi.spyOn(values, "AppendChild").mockImplementation((pChild: XElement) =>
-            {
-                values.ChildNodes.push(pChild);
-            });
             const mockProp = {
                 ID: propId,
                 Name: "TestProp",
@@ -986,10 +964,6 @@ describe("XValues", () =>
         it("should create XLinkData for linked non-array property", () =>
         {
             const values = new XValues();
-            vi.spyOn(values, "AppendChild").mockImplementation((pChild: XElement) =>
-            {
-                values.ChildNodes.push(pChild);
-            });
             const mockProp = {
                 ID: XGuid.NewValue(),
                 Name: "LinkedProp",
@@ -1004,10 +978,6 @@ describe("XValues", () =>
         it("should create XLinkArrayData for linked array property", () =>
         {
             const values = new XValues();
-            vi.spyOn(values, "AppendChild").mockImplementation((pChild: XElement) =>
-            {
-                values.ChildNodes.push(pChild);
-            });
             const mockProp = {
                 ID: XGuid.NewValue(),
                 Name: "ArrayProp",
@@ -1022,7 +992,7 @@ describe("XValues", () =>
         it("should call AppendChild with data", () =>
         {
             const values = new XValues();
-            const spy = vi.spyOn(values, "AppendChild").mockImplementation(() => {});
+            const spy = vi.spyOn(values, "AppendChild");
             const mockProp = {
                 ID: XGuid.NewValue(),
                 Name: "Prop",
@@ -1032,15 +1002,12 @@ describe("XValues", () =>
             values.AddValue(mockProp, null);
 
             expect(spy).toHaveBeenCalledTimes(1);
+            spy.mockRestore();
         });
 
         it("should handle linked property without TypeName", () =>
         {
             const values = new XValues();
-            vi.spyOn(values, "AppendChild").mockImplementation((pChild: XElement) =>
-            {
-                values.ChildNodes.push(pChild);
-            });
             const mockProp = {
                 ID: XGuid.NewValue(),
                 Name: "Prop",
@@ -1056,10 +1023,6 @@ describe("XValues", () =>
         {
             const values = new XValues();
             const propId = XGuid.NewValue();
-            vi.spyOn(values, "AppendChild").mockImplementation((pChild: XElement) =>
-            {
-                values.ChildNodes.push(pChild);
-            });
             const mockProp = {
                 ID: propId,
                 Name: "PropName",
