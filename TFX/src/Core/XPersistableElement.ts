@@ -196,6 +196,7 @@ export abstract class XPersistableElement extends XElement
         super();
     }
 
+    
 
     public override get ID(): string
     {
@@ -848,4 +849,30 @@ export abstract class XPersistableElement extends XElement
                 this.SetValue(prop, pData[prop.Name]);
         }
     }
+
+    public CreateChild<T extends XPersistableElement>(pType: new () => T): T
+    {
+        const child = new pType();
+        child.ID = XGuid.NewValue();
+        child.Document = this._Document;
+        this.AppendChild(child as unknown as XElement);
+        return child;
+    }
+
+    public DeleteChild(pChild: XPersistableElement | string): boolean
+    {
+        let elem: XPersistableElement | null = null;
+
+        if (typeof pChild === "string")
+            elem = this.GetChild(c=> c.ID === pChild);
+        else
+            elem = pChild;
+
+        if (elem === null)
+            return false;
+
+        elem.Delete(true);
+        this.RemoveChild(elem as unknown as XElement);
+        return true;
+    }    
 }

@@ -7,6 +7,7 @@
 - **TFX** = the **framework/library** (shared core). Folder: `/TFX/`
 - **DASE** = the **VS Code Extension**. Folder: `/DASE/`  
   **DASE depends on TFX** (dependency direction is **DASE → TFX**, never the opposite).
+- **Never** never commit
 
 They live in the **same repository**, but they are **not** the same codebase, not the same scope, and not the same responsibility.
 
@@ -25,6 +26,103 @@ They live in the **same repository**, but they are **not** the same codebase, no
 5. **When you mention an API/class/module**, always clarify which side it belongs to:
    - “(TFX) …” or “(DASE) …”
 6. **When changing behavior**, ensure you are not silently applying a DASE requirement inside TFX (or vice versa).
+
+
+# TFX ORM Object Model Guidelines (Copilot Instructions)
+
+These guidelines define the expected usage and lifecycle rules for the **TFX ORM design objects**. They are **mandatory**.
+
+## Core Expectation
+
+The **TFX framework** is the sole authority responsible for creating, managing, and deleting ORM design elements.
+
+- The VS Code extension **MUST** act only as a user interface layer.
+- The VS Code extension **MUST NOT** implement business rules, validation rules, or domain-side creation/deletion logic.
+- All domain operations **MUST** be executed by TFX objects and methods.
+
+## Required Object Graph
+
+When a new ORM Design is created, the following object structure is expected:
+
+- `XORMDocument`
+  - internally creates and owns one `XORMDesign`
+    - contains `XORMTable`
+      - contains `XORMField`
+    - contains `XORMReference`
+
+### Mandatory creation entry point
+
+- Creating a new design **MUST** start by instantiating `XORMDocument`.
+- `XORMDocument` **MUST** internally create the corresponding `XORMDesign`.
+- External code **MUST NOT** bypass `XORMDocument` to create `XORMDesign` directly, unless TFX explicitly defines a supported factory method for it.
+
+## Parent-Owns-Children Rule (Factory + Ownership)
+
+Each object **MUST** be responsible for creating and removing its direct children. This preserves invariants, keeps rules centralized, and ensures consistent behavior across UI, scripts, and future automation.
+
+### Creation rules
+
+- `XORMDesign` **MUST** provide methods to:
+  - create and remove `XORMTable`
+  - create and remove `XORMReference`
+
+- `XORMTable` **MUST** provide methods to:
+  - create and remove `XORMField`
+
+### Prohibited patterns
+
+- Code **MUST NOT** instantiate child objects directly and then manually attach them to parents.
+  - Example of prohibited approach: `new XORMTable()` followed by pushing into an internal collection.
+- Code **MUST NOT** mutate parent-child collections directly.
+  - Collections, if exposed, **MUST** be read-only or controlled through methods.
+
+## Domain Control, Rules, and Consistency
+
+TFX will include control classes and rule enforcement. Therefore:
+
+- All create/update/delete operations **MUST** go through the TFX-defined methods.
+- All invariants (naming rules, reference integrity, field constraints, etc.) **MUST** be enforced inside TFX.
+- Deletion **MUST** be safe and consistent:
+  - Removing a parent **MUST** correctly handle its children (cascade, detach, or reject), according to TFX rules.
+  - `XORMReference` integrity **MUST** be preserved (no dangling references).
+
+## Extension Responsibilities
+
+The extension exists to enable user interaction, not domain logic.
+
+The extension **MUST**:
+- capture user intent (UI actions, context menus, property edits)
+- send commands/events to TFX
+- render the current state produced by TFX
+- display issues/diagnostics produced by TFX
+
+The extension **MUST NOT**:
+- create or delete ORM elements by direct object construction
+- replicate TFX validation logic
+- “fix” domain problems by manipulating internal collections or state
+
+## Practical Implementation Guidance
+
+When implementing features, follow this operational sequence:
+
+1. UI triggers an action (create table/reference/field, rename, delete, etc.)
+2. Extension calls the corresponding TFX method on the correct parent object:
+   - Tables/References: call methods on `XORMDesign`
+   - Fields: call methods on `XORMTable`
+3. TFX updates the model and returns/reflects the updated state
+4. Extension refreshes view and issues panel based on TFX output
+
+## Non-Negotiable Outcome
+
+TFX **MUST** be able to:
+- create
+- manipulate
+- validate
+- delete
+
+all ORM elements **without relying on UI-side logic**.
+
+The extension **MUST** remain a thin interface layer to guarantee that all functionality can also be driven by scripts, automation, tests, and future tooling.
 
 > If you are unsure which project a change belongs to, stop and determine it from the folder path and existing references before writing code.
 

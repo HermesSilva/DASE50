@@ -98,7 +98,7 @@ describe('XNewORMDesignerCommand', () => {
             expect(uri1.toString()).not.toBe(uri2.toString());
         });
 
-        it('should use .daseorm.json extension', async () => {
+        it('should use .dsorm extension', async () => {
             const command = new XNewORMDesignerCommand(mockProvider);
 
             await command.Execute();
@@ -106,7 +106,7 @@ describe('XNewORMDesignerCommand', () => {
             expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
                 'vscode.openWith',
                 expect.objectContaining({
-                    path: expect.stringContaining('.daseorm.json')
+                    path: expect.stringContaining('.dsorm')
                 }),
                 expect.any(String)
             );

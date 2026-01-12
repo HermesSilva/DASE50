@@ -33,7 +33,7 @@ export class XOpenORMDesignerCommand
         if (!targetUri)
         {
             const activeEditor = vscode.window.activeTextEditor;
-            if (activeEditor && activeEditor.document.fileName.endsWith(".daseorm.json"))
+            if (activeEditor && activeEditor.document.fileName.endsWith(".dsorm"))
                 targetUri = activeEditor.document.uri;
         }
 

@@ -13,7 +13,7 @@ describe('XORMDesignerState', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         
-        const uri = Uri.file('/test/model.daseorm.json');
+        const uri = Uri.file('/test/model.dsorm');
         mockDocument = createMockTextDocument(uri, '{}') as unknown as vscode.TextDocument;
         state = new XORMDesignerState(mockDocument);
     });
@@ -42,7 +42,7 @@ describe('XORMDesignerState', () => {
         });
 
         it('should return true for untitled scheme', () => {
-            const untitledUri = Uri.parse('untitled:Untitled-1.daseorm.json');
+            const untitledUri = Uri.parse('untitled:Untitled-1.dsorm');
             const untitledDoc = createMockTextDocument(untitledUri) as unknown as vscode.TextDocument;
             const untitledState = new XORMDesignerState(untitledDoc);
 
@@ -88,7 +88,7 @@ describe('XORMDesignerState', () => {
         });
 
         it('should mark untitled as dirty after load', async () => {
-            const untitledUri = Uri.parse('untitled:Untitled-1.daseorm.json');
+            const untitledUri = Uri.parse('untitled:Untitled-1.dsorm');
             const untitledDoc = createMockTextDocument(untitledUri) as unknown as vscode.TextDocument;
             const untitledState = new XORMDesignerState(untitledDoc);
 
@@ -121,7 +121,7 @@ describe('XORMDesignerState', () => {
         });
 
         it('should not write file for untitled documents', async () => {
-            const untitledUri = Uri.parse('untitled:Untitled-1.daseorm.json');
+            const untitledUri = Uri.parse('untitled:Untitled-1.dsorm');
             const untitledDoc = createMockTextDocument(untitledUri) as unknown as vscode.TextDocument;
             const untitledState = new XORMDesignerState(untitledDoc);
 
@@ -146,15 +146,15 @@ describe('XORMDesignerState', () => {
             state.Bridge.AddTable = jest.fn().mockReturnValue({ Success: true });
         });
 
-        it('should add table and mark dirty', () => {
-            const result = state.AddTable(100, 200, 'NewTable');
+        it('should add table and mark dirty', async () => {
+            const result = await state.AddTable(100, 200, 'NewTable');
 
             expect(result.Success).toBe(true);
             expect(state.IsDirty).toBe(true);
         });
 
-        it('should call Bridge.AddTable with correct params', () => {
-            state.AddTable(150, 250, 'TestTable');
+        it('should call Bridge.AddTable with correct params', async () => {
+            await state.AddTable(150, 250, 'TestTable');
 
             expect(state.Bridge.AddTable).toHaveBeenCalledWith(150, 250, 'TestTable');
         });
@@ -213,8 +213,8 @@ describe('XORMDesignerState', () => {
             Object.defineProperty(selectionService, 'SelectedIDs', { value: ['elem-1', 'elem-2'], writable: true });
             selectionService.Clear = jest.fn();
 
-            // Mock Bridge.DeleteElement
-            state.Bridge.DeleteElement = jest.fn().mockReturnValue(true);
+            // Mock Bridge.DeleteElement - returns XIOperationResult
+            state.Bridge.DeleteElement = jest.fn().mockReturnValue({ Success: true });
 
             const result = state.DeleteSelected();
 
@@ -232,8 +232,8 @@ describe('XORMDesignerState', () => {
             Object.defineProperty(selectionService, 'SelectedIDs', { value: ['elem-1'], writable: true });
             selectionService.Clear = jest.fn();
 
-            // Mock Bridge.DeleteElement to fail
-            state.Bridge.DeleteElement = jest.fn().mockReturnValue(false);
+            // Mock Bridge.DeleteElement to fail - returns XIOperationResult
+            state.Bridge.DeleteElement = jest.fn().mockReturnValue({ Success: false });
 
             const result = state.DeleteSelected();
 
@@ -272,8 +272,8 @@ describe('XORMDesignerState', () => {
             Object.defineProperty(selectionService, 'HasSelection', { value: true, writable: true });
             Object.defineProperty(selectionService, 'PrimaryID', { value: 'elem-1', writable: true });
 
-            // Mock Bridge.RenameElement
-            state.Bridge.RenameElement = jest.fn().mockReturnValue(true);
+            // Mock Bridge.RenameElement - returns XIOperationResult
+            state.Bridge.RenameElement = jest.fn().mockReturnValue({ Success: true });
 
             const result = state.RenameSelected('NewName');
 
@@ -288,8 +288,8 @@ describe('XORMDesignerState', () => {
             Object.defineProperty(selectionService, 'HasSelection', { value: true, writable: true });
             Object.defineProperty(selectionService, 'PrimaryID', { value: 'elem-1', writable: true });
 
-            // Mock Bridge.RenameElement to fail
-            state.Bridge.RenameElement = jest.fn().mockReturnValue(false);
+            // Mock Bridge.RenameElement to fail - returns XIOperationResult
+            state.Bridge.RenameElement = jest.fn().mockReturnValue({ Success: false });
 
             const result = state.RenameSelected('NewName');
 
@@ -301,7 +301,8 @@ describe('XORMDesignerState', () => {
         beforeEach(async () => {
             (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
             await state.Load();
-            state.Bridge.MoveElement = jest.fn().mockReturnValue(true);
+            // Mock Bridge.MoveElement - returns XIOperationResult
+            state.Bridge.MoveElement = jest.fn().mockReturnValue({ Success: true });
         });
 
         it('should move element and mark dirty', () => {
@@ -312,7 +313,7 @@ describe('XORMDesignerState', () => {
         });
 
         it('should not mark dirty when move fails', () => {
-            state.Bridge.MoveElement = jest.fn().mockReturnValue(false);
+            state.Bridge.MoveElement = jest.fn().mockReturnValue({ Success: false });
             
             const result = state.MoveElement('elem-1', 300, 400);
 
@@ -325,7 +326,8 @@ describe('XORMDesignerState', () => {
         beforeEach(async () => {
             (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
             await state.Load();
-            state.Bridge.UpdateProperty = jest.fn().mockReturnValue(true);
+            // Mock Bridge.UpdateProperty - returns XIOperationResult
+            state.Bridge.UpdateProperty = jest.fn().mockReturnValue({ Success: true });
         });
 
         it('should update property and mark dirty', () => {
@@ -336,7 +338,7 @@ describe('XORMDesignerState', () => {
         });
 
         it('should not mark dirty when update fails', () => {
-            state.Bridge.UpdateProperty = jest.fn().mockReturnValue(false);
+            state.Bridge.UpdateProperty = jest.fn().mockReturnValue({ Success: false });
             
             const result = state.UpdateProperty('elem-1', 'Name', 'NewName');
 

@@ -1,0 +1,74 @@
+{
+  "Name": "ORM Model",
+  "Tables": [
+    {
+      "ID": "bbf605ef-f54b-4da2-897d-10719cb042b8",
+      "Name": "NewTable",
+      "Schema": "dbo",
+      "Description": "",
+      "X": 112,
+      "Y": 112,
+      "Width": 200,
+      "Height": 150,
+      "Fields": []
+    },
+    {
+      "ID": "11075315-640c-4bc4-bf3f-9411a17943c8",
+      "Name": "NewTable",
+      "Schema": "dbo",
+      "Description": "",
+      "X": 828,
+      "Y": 30,
+      "Width": 200,
+      "Height": 150,
+      "Fields": []
+    },
+    {
+      "ID": "b6c2db1b-5d26-4f88-9809-19a14dc6ba56",
+      "Name": "NewTable",
+      "Schema": "dbo",
+      "Description": "",
+      "X": 629,
+      "Y": 298,
+      "Width": 200,
+      "Height": 150,
+      "Fields": []
+    }
+  ],
+  "References": [
+    {
+      "ID": "e90d0059-a370-4c41-949b-1fbfe85e28f6",
+      "Name": "",
+      "SourceID": "bbf605ef-f54b-4da2-897d-10719cb042b8",
+      "TargetID": "11075315-640c-4bc4-bf3f-9411a17943c8",
+      "Description": "",
+      "Points": [
+        {
+          "X": 312,
+          "Y": 187
+        },
+        {
+          "X": 828,
+          "Y": 105
+        }
+      ]
+    },
+    {
+      "ID": "8d4bcbd6-382e-43a9-84db-e5a30604f961",
+      "Name": "",
+      "SourceID": "b6c2db1b-5d26-4f88-9809-19a14dc6ba56",
+      "TargetID": "bbf605ef-f54b-4da2-897d-10719cb042b8",
+      "Description": "",
+      "Points": [
+        {
+          "X": 829,
+          "Y": 373
+        },
+        {
+          "X": 112,
+          "Y": 187
+        }
+      ]
+    }
+  ]
+}

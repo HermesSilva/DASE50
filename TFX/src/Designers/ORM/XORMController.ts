@@ -33,6 +33,7 @@ export interface XIAddTableData
     X: number;
     Y: number;
     Name?: string;
+    Schema?: string;
 }
 
 export interface XIAddReferenceData
@@ -138,12 +139,12 @@ export class XORMController
         if (this.Design === null)
             return { Success: false, Message: "No design loaded." };
 
-        const table = new XORMTable();
-        table.ID = XGuid.NewValue();
-        table.Name = pData.Name ?? this.GenerateTableName();
-        table.Bounds = new XRect(pData.X, pData.Y, 200, 150);
-
-        this.Design.AppendChild(table);
+        const table = this.Design.CreateTable({
+            X: pData.X,
+            Y: pData.Y,
+            Name: pData.Name,
+            Schema: pData.Schema
+        });
 
         return { Success: true, ElementID: table.ID };
     }
@@ -153,31 +154,21 @@ export class XORMController
         if (this.Design === null)
             return { Success: false, Message: "No design loaded." };
 
-        const sourceTable = this.GetTableByID(pData.SourceID);
-        const targetTable = this.GetTableByID(pData.TargetID);
+        try
+        {
+            const reference = this.Design.CreateReference({
+                SourceID: pData.SourceID,
+                TargetID: pData.TargetID,
+                Name: pData.Name
+            });
 
-        if (sourceTable === null)
-            return { Success: false, Message: "Source table not found." };
-
-        if (targetTable === null)
-            return { Success: false, Message: "Target table not found." };
-
-        const reference = new XORMReference();
-        reference.ID = XGuid.NewValue();
-        reference.Name = pData.Name ?? this.GenerateReferenceName(sourceTable, targetTable);
-        reference.Source = sourceTable.ID;
-        reference.Target = targetTable.ID;
-
-        const srcBounds = sourceTable.Bounds;
-        const tgtBounds = targetTable.Bounds;
-        reference.Points = [
-            new XPoint(srcBounds.Left + srcBounds.Width, srcBounds.Top + srcBounds.Height / 2),
-            new XPoint(tgtBounds.Left, tgtBounds.Top + tgtBounds.Height / 2)
-        ];
-
-        this.Design.AppendChild(reference);
-
-        return { Success: true, ElementID: reference.ID };
+            return { Success: true, ElementID: reference.ID };
+        }
+        catch (error)
+        {
+            const message = error instanceof Error ? error.message : "Failed to create reference.";
+            return { Success: false, Message: message };
+        }
     }
 
     public AddField(pData: XIAddFieldData): XIOperationResult
@@ -186,11 +177,9 @@ export class XORMController
         if (table === null)
             return { Success: false, Message: "Table not found." };
 
-        const field = new XORMField();
-        field.ID = XGuid.NewValue();
-        field.Name = pData.Name ?? this.GenerateFieldName(table);
-
-        table.AppendChild(field);
+        const field = table.CreateField({
+            Name: pData.Name
+        });
 
         return { Success: true, ElementID: field.ID };
     }
@@ -208,12 +197,34 @@ export class XORMController
             return { Success: false, Message: "Element cannot be deleted." };
 
         if (element instanceof XORMTable)
-            this.RemoveReferencesForTable(pElementID);
+        {
+            const deleted = this.Design.DeleteTable(element);
+            if (!deleted)
+                return { Success: false, Message: "Failed to delete table." };
+            return { Success: true, ElementID: pElementID };
+        }
 
-        if (element.ParentNode instanceof XElement)
-            element.ParentNode.RemoveChild(element);
+        if (element instanceof XORMReference)
+        {
+            const deleted = this.Design.DeleteReference(element);
+            if (!deleted)
+                return { Success: false, Message: "Failed to delete reference." };
+            return { Success: true, ElementID: pElementID };
+        }
 
-        return { Success: true, ElementID: pElementID };
+        if (element instanceof XORMField)
+        {
+            const table = element.ParentNode;
+            if (table instanceof XORMTable)
+            {
+                const deleted = table.DeleteField(element);
+                if (!deleted)
+                    return { Success: false, Message: "Failed to delete field." };
+                return { Success: true, ElementID: pElementID };
+            }
+        }
+
+        return { Success: false, Message: "Unknown element type." };
     }
 
     public UpdateProperty(pData: XIUpdatePropertyData): XIOperationResult
@@ -274,14 +285,23 @@ export class XORMController
     {
         if (this.Design === null)
             return [];
-        return this.Design.GetChildrenOfType(XORMTable);
+        return this.Design.GetTables();
     }
 
     public GetReferences(): XORMReference[]
     {
         if (this.Design === null)
             return [];
-        return this.Design.GetChildrenOfType(XORMReference);
+        return this.Design.GetReferences();
+    }
+
+    public RouteAllLines(): boolean
+    {
+        if (this.Design === null)
+            return false;
+
+        this.Design.RouteAllLines();
+        return true;
     }
 
     private FindElementRecursive(pElement: XPersistableElement, pID: string): XPersistableElement | null
@@ -299,19 +319,6 @@ export class XORMController
         return null;
     }
 
-    private RemoveReferencesForTable(pTableID: string): void
-    {
-        if (this.Design === null)
-            return;
-
-        const references = this.GetReferences();
-        for (const ref of references)
-        {
-            if (ref.SourceID === pTableID || ref.TargetID === pTableID)
-                this.Design.RemoveChild(ref);
-        }
-    }
-
     private UpdateReferencesForTable(pTable: XORMTable): void
     {
         if (this.Design === null)
@@ -322,7 +329,7 @@ export class XORMController
 
         for (const ref of references)
         {
-            if (ref.SourceID === pTable.ID)
+            if (ref.Source === pTable.ID)
             {
                 const points = [...ref.Points];
                 if (points.length > 0)
@@ -335,7 +342,7 @@ export class XORMController
                 }
             }
 
-            if (ref.TargetID === pTable.ID)
+            if (ref.Target === pTable.ID)
             {
                 const points = [...ref.Points];
                 if (points.length > 1)
@@ -348,40 +355,5 @@ export class XORMController
                 }
             }
         }
-    }
-
-    private GenerateTableName(): string
-    {
-        const tables = this.GetTables();
-        let idx = tables.length + 1;
-        let name = `Table${idx}`;
-
-        while (tables.some(t => t.Name.toLowerCase() === name.toLowerCase()))
-        {
-            idx++;
-            name = `Table${idx}`;
-        }
-
-        return name;
-    }
-
-    private GenerateReferenceName(pSource: XORMTable, pTarget: XORMTable): string
-    {
-        return `${pSource.Name}_${pTarget.Name}`;
-    }
-
-    private GenerateFieldName(pTable: XORMTable): string
-    {
-        const fields = pTable.GetChildrenOfType(XORMField);
-        let idx = fields.length + 1;
-        let name = `Field${idx}`;
-
-        while (fields.some(f => f.Name.toLowerCase() === name.toLowerCase()))
-        {
-            idx++;
-            name = `Field${idx}`;
-        }
-
-        return name;
     }
 }

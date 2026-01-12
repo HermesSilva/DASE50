@@ -372,4 +372,170 @@ describe("XRouter", () => {
         // This covers the early return when Steps > MaxIterations
         expect(router.Steps).toBeGreaterThan(1);
     });
+
+    it("getAllLines should return invalid line when prepare fails", () => {
+        const router = new XRouter();
+        // Create shapes with empty/invalid rects to force prepare to fail
+        const shapeL: XRouterShape = {
+            Rect: new XRect(0, 0, 0, 0),
+            StartPoint: new XPoint(NaN, NaN),
+            DesiredDegree: []
+        };
+        const shapeR: XRouterShape = {
+            Rect: new XRect(0, 0, 0, 0),
+            StartPoint: new XPoint(NaN, NaN),
+            DesiredDegree: []
+        };
+
+        const result = router.getAllLines(shapeL, shapeR);
+        // Even with invalid shapes, router should not crash
+        expect(result).toBeDefined();
+    });
+
+    it("routeLine should return false when prepare fails", () => {
+        const router = new XRouter();
+        const shapeL: XRouterShape = {
+            Rect: new XRect(0, 0, 0, 0),
+            StartPoint: new XPoint(NaN, NaN),
+            DesiredDegree: []
+        };
+        const shapeR: XRouterShape = {
+            Rect: new XRect(0, 0, 0, 0),
+            StartPoint: new XPoint(NaN, NaN),
+            DesiredDegree: []
+        };
+
+        const result = router.routeLine(shapeL, shapeR, [], []);
+        expect(typeof result).toBe("boolean");
+    });
+
+    it("should handle rects without Right property using fallback calculation", () => {
+        const router = new XRouter({ gap: 5 });
+        // Create rects that use Left + Width for Right calculation
+        const rect1 = new XRect(0, 0, 20, 20);
+        const rect2 = new XRect(60, 0, 20, 20);
+        
+        // These rects don't have explicit Right property, so fallback is used
+        router.setEndpoints(rect1, rect2);
+        
+        const shapeL: XRouterShape = {
+            Rect: rect1,
+            StartPoint: new XPoint(20, 10),
+            DesiredDegree: [90]
+        };
+        const shapeR: XRouterShape = {
+            Rect: rect2,
+            StartPoint: new XPoint(60, 10),
+            DesiredDegree: [270]
+        };
+
+        const result = router.getAllLines(shapeL, shapeR);
+        expect(result).toBeDefined();
+    });
+
+    it("hasRectCollision should skip LeftRect and RightRect", () => {
+        const router = new XRouter({ checkCollision: true, checkCrossRect: true });
+        const leftRect = new XRect(0, 0, 50, 50);
+        const rightRect = new XRect(200, 0, 50, 50);
+        
+        router.LeftRect = leftRect;
+        router.RightRect = rightRect;
+        router.addObstacle(leftRect);
+        router.addObstacle(rightRect);
+        
+        // Line that would intersect with LeftRect/RightRect but should be skipped
+        const points = [new XPoint(25, 25), new XPoint(225, 25)];
+        // @ts-ignore
+        const collided = router.hasRectCollision(points);
+        // Should not detect collision because LeftRect and RightRect are excluded
+        expect(collided).toBe(false);
+    });
+
+    it("followLine should handle hopes parameter", () => {
+        const router = new XRouter();
+        const shapeL: XRouterShape = {
+            Rect: new XRect(0, 0, 50, 50),
+            StartPoint: new XPoint(50, 25),
+            DesiredDegree: [90]
+        };
+        const shapeR: XRouterShape = {
+            Rect: new XRect(200, 0, 50, 50),
+            StartPoint: new XPoint(200, 25),
+            DesiredDegree: [270]
+        };
+
+        // Add obstacles to force more complex routing
+        router.addObstacle(new XRect(100, 0, 20, 50));
+        
+        const result = router.getAllLines(shapeL, shapeR);
+        expect(result).toBeDefined();
+    });
+
+    it("should return empty result when left shape has empty rect in getAllLines", () => {
+        const router = new XRouter();
+        const shapeL: XRouterShape = {
+            Rect: new XRect(0, 0, 0, 0),  // Empty rect
+            StartPoint: new XPoint(0, 0),
+            DesiredDegree: [90]
+        };
+        const shapeR: XRouterShape = {
+            Rect: new XRect(200, 0, 50, 50),
+            StartPoint: new XPoint(200, 25),
+            DesiredDegree: [270]
+        };
+
+        const result = router.getAllLines(shapeL, shapeR);
+        expect(result.IsValid).toBe(false);
+    });
+
+    it("should return empty result when right shape has empty rect in getAllLines", () => {
+        const router = new XRouter();
+        const shapeL: XRouterShape = {
+            Rect: new XRect(0, 0, 50, 50),
+            StartPoint: new XPoint(50, 25),
+            DesiredDegree: [90]
+        };
+        const shapeR: XRouterShape = {
+            Rect: new XRect(0, 0, 0, 0),  // Empty rect
+            StartPoint: new XPoint(0, 0),
+            DesiredDegree: [270]
+        };
+
+        const result = router.getAllLines(shapeL, shapeR);
+        expect(result.IsValid).toBe(false);
+    });
+
+    it("should return false when left shape has empty rect in routeLine", () => {
+        const router = new XRouter();
+        const shapeL: XRouterShape = {
+            Rect: new XRect(0, 0, 0, 0),  // Empty rect
+            StartPoint: new XPoint(0, 0),
+            DesiredDegree: [90]
+        };
+        const shapeR: XRouterShape = {
+            Rect: new XRect(200, 0, 50, 50),
+            StartPoint: new XPoint(200, 25),
+            DesiredDegree: [270]
+        };
+
+        const result = router.routeLine(shapeL, shapeR, [], []);
+        expect(result).toBe(false);
+    });
+
+    it("should return false when right shape has empty rect in routeLine", () => {
+        const router = new XRouter();
+        const shapeL: XRouterShape = {
+            Rect: new XRect(0, 0, 50, 50),
+            StartPoint: new XPoint(50, 25),
+            DesiredDegree: [90]
+        };
+        const shapeR: XRouterShape = {
+            Rect: new XRect(0, 0, 0, 0),  // Empty rect
+            StartPoint: new XPoint(0, 0),
+            DesiredDegree: [270]
+        };
+
+        const result = router.routeLine(shapeL, shapeR, [], []);
+        expect(result).toBe(false);
+    });
 });

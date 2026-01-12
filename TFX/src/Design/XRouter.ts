@@ -246,6 +246,9 @@ export class XRouter {
         pCreateLeft: boolean, 
         pCreateRight: boolean
     ): boolean {
+        if (isEmptyRect(pLeft.Rect) || isEmptyRect(pRight.Rect))
+            return false;
+
         this._LR = normalizeRect(pLeft.Rect);
         this._RR = normalizeRect(pRight.Rect);
 
@@ -263,14 +266,14 @@ export class XRouter {
 
         // Adiciona linhas verticais de conexão se houver espaço
         const vy = Math.max(this._LR.Left, this._RR.Left) - Math.min(
-            this._LR.Right ?? this._LR.Left + this._LR.Width, 
-            this._RR.Right ?? this._RR.Left + this._RR.Width
+            this._LR.Right, 
+            this._RR.Right
         );
         
         if (vy > 2 * this.Gap) {
             const xPos = Math.min(
-                this._LR.Right ?? this._LR.Left + this._LR.Width, 
-                this._RR.Right ?? this._RR.Left + this._RR.Width
+                this._LR.Right, 
+                this._RR.Right
             ) + vy / 2;
             
             this.AllLines.push(createRouterLine([
@@ -379,8 +382,6 @@ export class XRouter {
 
             // Verifica se alguma linha final pode ser alcançada diretamente
             for (const endln of pEndLines) {
-                if (endln.ID === rln.ID) continue;
-
                 const pcrEnd = XMath.LineIntersection(p1, p2, endln.Points[0], endln.Points[1]);
                 if (isNaN(pcrEnd.X)) continue;
 

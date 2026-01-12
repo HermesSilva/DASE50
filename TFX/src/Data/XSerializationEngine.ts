@@ -361,19 +361,11 @@ export class XSerializationEngine
 
         const props = pElement.GetSerializableProperties();
         
-        let hasProperties = false;
-        for (const p of props)
-        {
-            if (p.Default.IsPersistable && !p.Default.AsAttribute)
-            {
-                const val = pElement.GetValue(p);
-                if (val !== p.Default.DefaultValue)
-                {
-                    hasProperties = true;
-                    break;
-                }
-            }
-        }
+        const hasProperties = props.some(p => 
+            p.Default.IsPersistable && 
+            !p.Default.AsAttribute && 
+            pElement.GetValue(p) !== p.Default.DefaultValue
+        );
         
         
         if (hasProperties)
@@ -443,7 +435,7 @@ export class XSerializationEngine
 
     private ValidateNode(pNode: XIXmlNode, pContext: XSerializationContext): void
     {
-        if (!XElementRegistry.Instance.HasTag(pNode.TagName) && pNode.TagName !== "Properties" && pNode.TagName !== "XData" && pNode.TagName !== "XLinkData" && pNode.TagName !== "XLinkedShape" && pNode.TagName !== "XLanguage")
+        if (!XElementRegistry.Instance.HasTag(pNode.TagName) && pNode.TagName !== "XValues" && pNode.TagName !== "XData" && pNode.TagName !== "XLinkData" && pNode.TagName !== "XLinkedShape" && pNode.TagName !== "XLanguage")
         {
             pContext.AddError(pContext.CreateError(
                 pNode.Attributes.get("ID") ?? "",

@@ -3,49 +3,32 @@ import { XPropertyItem, XPropertyType } from "../Models/PropertyItem";
 import { XIssueItem, XIssueSeverity, TIssueSeverity } from "../Models/IssueItem";
 import { GetLogService } from "./LogService";
 
-// TFX is an ESM module, dynamically imported
-let tfx: any = null;
+// TFX imports - direct CommonJS import
+import * as tfx from "@tootega/tfx";
+import {
+    XIAddTableData,
+    XIAddReferenceData,
+    XIAddFieldData,
+    XIMoveElementData,
+    XIUpdatePropertyData,
+    XIRenameElementData,
+    XIOperationResult,
+    XORMDocument,
+    XORMTable,
+    XORMField,
+    XORMFieldDataType,
+    XORMReference,
+    XORMController,
+    XORMValidator,
+    XPoint,
+    XRect,
+    XGuid,
+    XSerializationEngine,
+    RegisterORMElements
+} from "@tootega/tfx";
 
-async function LoadTFX(): Promise<any>
-{
-    if (tfx === null)
-        tfx = await import("@tootega/tfx");
-    return tfx;
-}
-
-interface IAddTableParams
-{
-    X: number;
-    Y: number;
-    Name: string;
-}
-
-interface IAddReferenceParams
-{
-    SourceID: string;
-    TargetID: string;
-    Name: string;
-}
-
-interface IRenameParams
-{
-    ElementID: string;
-    NewName: string;
-}
-
-interface IMoveParams
-{
-    ElementID: string;
-    X: number;
-    Y: number;
-}
-
-interface IUpdatePropertyParams
-{
-    ElementID: string;
-    PropertyKey: string;
-    Value: any;
-}
+// Data interfaces for webview communication (JSON-serializable)
+// These mirror TFX types but are plain objects for webview transfer
 
 interface IFieldData
 {
@@ -98,28 +81,28 @@ interface IJsonData
 
 export class XTFXBridge
 {
-    private _Controller: any;
-    private _Validator: any;
-    private _Engine: any;
+    private _Controller: XORMController;
+    private _Validator: XORMValidator;
+    private _Engine: XSerializationEngine;
     private _Initialized: boolean;
 
     constructor()
     {
-        this._Controller = null;
-        this._Validator = null;
-        this._Engine = null;
+        this._Controller = null!;
+        this._Validator = null!;
+        this._Engine = null!;
         this._Initialized = false;
     }
 
-    async Initialize(): Promise<void>
+    Initialize(): void
     {
         if (this._Initialized)
             return;
         
-        const tfxMod = await LoadTFX();
-        this._Controller = new tfxMod.XORMController();
-        this._Validator = new tfxMod.XORMValidator();
-        this._Engine = tfxMod.XSerializationEngine.Instance;
+        RegisterORMElements();
+        this._Controller = new XORMController();
+        this._Validator = new XORMValidator();
+        this._Engine = XSerializationEngine.Instance;
         this._Initialized = true;
     }
 
@@ -133,21 +116,33 @@ export class XTFXBridge
         return this._Controller?.Document;
     }
 
-    async LoadOrmModelFromText(pJsonText: string): Promise<any>
+    LoadOrmModelFromText(pText: string): XORMDocument
     {
-        await this.Initialize();
-        const tfxMod = await LoadTFX();
+        this.Initialize();
 
         try
         {
-            const doc = new tfxMod.XORMDocument();
-            doc.ID = tfxMod.XGuid.NewValue();
+            const doc = new XORMDocument();
+            doc.ID = XGuid.NewValue();
             doc.Name = "ORM Model";
 
-            if (pJsonText && pJsonText.trim().length > 0)
+            if (pText && pText.trim().length > 0)
             {
-                const data = JSON.parse(pJsonText) as IJsonData;
-                await this.LoadFromJson(doc, data);
+                const trimmedText = pText.trim();
+                if (trimmedText.startsWith("<?xml") || trimmedText.startsWith("<"))
+                {
+                    const result = this._Engine.Deserialize<XORMDocument>(pText);
+                    if (result.Success && result.Data)
+                    {
+                        this._Controller.Document = result.Data;
+                        return result.Data;
+                    }
+                }
+                else
+                {
+                    const data = JSON.parse(pText) as IJsonData;
+                    this.LoadFromJson(doc, data);
+                }
             }
 
             this._Controller.Document = doc;
@@ -156,8 +151,8 @@ export class XTFXBridge
         catch (err)
         {
             console.error("LoadOrmModelFromText error:", err);
-            const doc = new tfxMod.XORMDocument();
-            doc.ID = tfxMod.XGuid.NewValue();
+            const doc = new XORMDocument();
+            doc.ID = XGuid.NewValue();
             doc.Name = "ORM Model";
             this._Controller.Document = doc;
             return doc;
@@ -169,26 +164,28 @@ export class XTFXBridge
         try
         {
             const doc = this._Controller?.Document;
-            if (doc === null)
-                return "{}";
+            if (!doc)
+                return '<?xml version="1.0" encoding="utf-8"?>\n<XORMDocument />';
 
-            const data = this.SaveToJson(doc);
-            return JSON.stringify(data, null, 2);
+            const result = this._Engine.Serialize(doc);
+            if (result.Success && result.XmlOutput)
+                return result.XmlOutput;
+
+            return '<?xml version="1.0" encoding="utf-8"?>\n<XORMDocument />';
         }
         catch (err)
         {
             console.error("SaveOrmModelToText error:", err);
-            return "{}";
+            return '<?xml version="1.0" encoding="utf-8"?>\n<XORMDocument />';
         }
     }
 
-    async ValidateOrmModel(): Promise<XIssueItem[]>
+    ValidateOrmModel(): XIssueItem[]
     {
-        await this.Initialize();
-        const tfxMod = await LoadTFX();
+        this.Initialize();
 
         const doc = this._Controller?.Document;
-        if (doc === null)
+        if (!doc)
             return [];
 
         const tfxIssues = this._Validator.Validate(doc);
@@ -196,7 +193,7 @@ export class XTFXBridge
 
         for (const issue of tfxIssues)
         {
-            const severity: TIssueSeverity = issue.Severity === tfxMod.XDesignerErrorSeverity?.Error 
+            const severity: TIssueSeverity = issue.Severity === tfx.XDesignerErrorSeverity?.Error 
                 ? XIssueSeverity.Error 
                 : XIssueSeverity.Warning;
             issues.push(new XIssueItem(
@@ -216,66 +213,110 @@ export class XTFXBridge
         return this._Controller?.ApplyOperation(pOperation);
     }
 
-    AddTable(pX: number, pY: number, pName: string): any
+    AddTable(pX: number, pY: number, pName: string): XIOperationResult
     {
-        const params: IAddTableParams = { X: pX, Y: pY, Name: pName };
-        return this._Controller?.AddTable(params);
+        this.Initialize();
+        
+        const addTableData: XIAddTableData = { X: pX, Y: pY, Name: pName };
+        const result = this._Controller?.AddTable(addTableData);
+        
+        return result || { Success: false, Message: "Failed to add table." };
     }
 
-    AddReference(pSourceID: string, pTargetID: string, pName: string): any
+    AddReference(pSourceID: string, pTargetID: string, pName: string): XIOperationResult
     {
         GetLogService().Info(`TFXBridge.AddReference: Source=${pSourceID}, Target=${pTargetID}, Name=${pName}`);
-        const params: IAddReferenceParams = {
+        
+        // Get the target table to build the FK field name
+        const targetTable = this._Controller?.GetElementByID(pTargetID) as XORMTable | null;
+        const targetName = targetTable?.Name || "Target";
+        
+        // Add the reference using TFX interface
+        const addRefData: XIAddReferenceData = {
             SourceID: pSourceID,
             TargetID: pTargetID,
-            Name: pName
+            Name: pName || `FK_${targetName}`
         };
-        const result = this._Controller?.AddReference(params);
+        const result: XIOperationResult = this._Controller?.AddReference(addRefData) || { Success: false };
         GetLogService().Info(`Controller.AddReference result: ${JSON.stringify(result)}`);
+        
+        // If reference was added successfully, create a FK field in the source table
+        if (result?.Success)
+        {
+            const fkFieldName = `${targetName}ID`;
+            GetLogService().Info(`Creating FK field: ${fkFieldName} in table ${pSourceID}`);
+            
+            const addFieldData: XIAddFieldData = {
+                TableID: pSourceID,
+                Name: fkFieldName
+            };
+            const fieldResult = this._Controller?.AddField(addFieldData);
+            GetLogService().Info(`FK field creation result: ${JSON.stringify(fieldResult)}`);
+        }
+        
         return result;
     }
 
-    DeleteElement(pElementID: string): boolean
+    AddField(pTableID: string, pName: string, _pDataType: string): XIOperationResult
     {
-        return this._Controller?.RemoveElement(pElementID);
+        GetLogService().Info(`TFXBridge.AddField: TableID=${pTableID}, Name=${pName}`);
+        const addFieldData: XIAddFieldData = {
+            TableID: pTableID,
+            Name: pName
+        };
+        const result: XIOperationResult = this._Controller?.AddField(addFieldData) || { Success: false };
+        GetLogService().Info(`Controller.AddField result: ${JSON.stringify(result)}`);
+        return result;
     }
 
-    RenameElement(pElementID: string, pNewName: string): boolean
+    AlignLines(): boolean
     {
-        const params: IRenameParams = {
+        GetLogService().Info('TFXBridge.AlignLines called');
+        const result = this._Controller?.RouteAllLines?.();
+        GetLogService().Info(`Controller.RouteAllLines result: ${result}`);
+        return result ?? false;
+    }
+
+    DeleteElement(pElementID: string): XIOperationResult
+    {
+        return this._Controller?.RemoveElement(pElementID) || { Success: false };
+    }
+
+    RenameElement(pElementID: string, pNewName: string): XIOperationResult
+    {
+        const renameData: XIRenameElementData = {
             ElementID: pElementID,
             NewName: pNewName
         };
-        return this._Controller?.RenameElement(params);
+        return this._Controller?.RenameElement(renameData) || { Success: false };
     }
 
-    MoveElement(pElementID: string, pX: number, pY: number): boolean
+    MoveElement(pElementID: string, pX: number, pY: number): XIOperationResult
     {
-        const params: IMoveParams = {
+        const moveData: XIMoveElementData = {
             ElementID: pElementID,
             X: pX,
             Y: pY
         };
-        return this._Controller?.MoveElement(params);
+        return this._Controller?.MoveElement(moveData) || { Success: false };
     }
 
-    UpdateProperty(pElementID: string, pPropertyKey: string, pValue: any): boolean
+    UpdateProperty(pElementID: string, pPropertyKey: string, pValue: unknown): XIOperationResult
     {
-        const params: IUpdatePropertyParams = {
+        const updateData: XIUpdatePropertyData = {
             ElementID: pElementID,
             PropertyKey: pPropertyKey,
             Value: pValue
         };
-        return this._Controller?.UpdateProperty(params);
+        return this._Controller?.UpdateProperty(updateData) || { Success: false };
     }
 
-    async GetProperties(pElementID: string): Promise<XPropertyItem[]>
+    GetProperties(pElementID: string): XPropertyItem[]
     {
-        await this.Initialize();
-        const tfxMod = await LoadTFX();
+        this.Initialize();
 
         const element = this._Controller?.GetElementByID(pElementID);
-        if (element === null)
+        if (!element)
             return [];
 
         const props: XPropertyItem[] = [];
@@ -283,7 +324,7 @@ export class XTFXBridge
         props.push(new XPropertyItem("ID", "ID", element.ID, XPropertyType.String));
         props.push(new XPropertyItem("Name", "Name", element.Name, XPropertyType.String));
 
-        if (element instanceof tfxMod.XORMTable)
+        if (element instanceof XORMTable)
         {
             props.push(new XPropertyItem("Schema", "Schema", element.Schema, XPropertyType.String));
             props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String));
@@ -294,13 +335,13 @@ export class XTFXBridge
             props.push(new XPropertyItem("Width", "Width", bounds.Width, XPropertyType.Number));
             props.push(new XPropertyItem("Height", "Height", bounds.Height, XPropertyType.Number));
         }
-        else if (element instanceof tfxMod.XORMReference)
+        else if (element instanceof XORMReference)
         {
             props.push(new XPropertyItem("Source", "Source", element.Source, XPropertyType.String));
             props.push(new XPropertyItem("Target", "Target", element.Target, XPropertyType.String));
             props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String));
         }
-        else if (element instanceof tfxMod.XORMField)
+        else if (element instanceof XORMField)
         {
             props.push(new XPropertyItem("DataType", "Data Type", element.DataType, XPropertyType.Enum, ["String", "Integer", "Long", "Decimal", "Boolean", "DateTime", "Guid", "Binary", "Text"]));
             props.push(new XPropertyItem("Length", "Length", element.Length, XPropertyType.Number));
@@ -314,13 +355,12 @@ export class XTFXBridge
         return props;
     }
 
-    async GetModelData(): Promise<IModelData>
+    GetModelData(): IModelData
     {
-        await this.Initialize();
-        const tfxMod = await LoadTFX();
+        this.Initialize();
 
         const doc = this._Controller?.Document;
-        if (doc === null || doc.Design === null)
+        if (!doc || !doc.Design)
             return { Tables: [], References: [] };
 
         const tables = this._Controller.GetTables();
@@ -328,21 +368,31 @@ export class XTFXBridge
 
         GetLogService().Debug(`GetModelData: Found ${tables?.length || 0} tables, ${references?.length || 0} references`);
 
-        const tablesData: ITableData[] = tables.map((t: any) => ({
-            ID: t.ID,
-            Name: t.Name,
-            X: t.Bounds.Left,
-            Y: t.Bounds.Top,
-            Width: t.Bounds.Width,
-            Height: t.Bounds.Height,
-            Fields: t.GetChildrenOfType(tfxMod.XORMField).map((f: any) => ({
-                ID: f.ID,
-                Name: f.Name,
-                DataType: f.DataType,
-                IsPrimaryKey: f.IsPrimaryKey,
-                IsNullable: f.IsNullable
-            }))
-        }));
+        const tablesData: ITableData[] = tables.map((t: any) => {
+            // Get fields using GetChildrenOfType or directly from Fields array
+            let fields = [];
+            if (t.GetChildrenOfType) {
+                fields = t.GetChildrenOfType(XORMField) || [];
+            } else if (t.Fields) {
+                fields = t.Fields || [];
+            }
+            
+            return {
+                ID: t.ID,
+                Name: t.Name,
+                X: t.Bounds.Left,
+                Y: t.Bounds.Top,
+                Width: t.Bounds.Width,
+                Height: t.Bounds.Height,
+                Fields: fields.map((f: any) => ({
+                    ID: f.ID,
+                    Name: f.Name,
+                    DataType: f.DataType,
+                    IsPrimaryKey: f.IsPrimaryKey,
+                    IsNullable: f.IsNullable
+                }))
+            };
+        });
 
         const refsData: IReferenceData[] = references.map((r: any) => {
             GetLogService().Debug(`Reference: ID=${r.ID}, Name=${r.Name}, SourceID=${r.SourceID}, TargetID=${r.TargetID}, Source=${r.Source}, Target=${r.Target}`);
@@ -358,10 +408,8 @@ export class XTFXBridge
         return { Tables: tablesData, References: refsData };
     }
 
-    async LoadFromJson(pDoc: any, pData: IJsonData): Promise<void>
+    LoadFromJson(pDoc: any, pData: IJsonData): void
     {
-        const tfxMod = await LoadTFX();
-
         if (!pData || !pDoc.Design)
             return;
 
@@ -374,37 +422,41 @@ export class XTFXBridge
         {
             for (const tData of pData.Tables)
             {
-                const table = new tfxMod.XORMTable();
-                table.ID = tData.ID || tfxMod.XGuid.NewValue();
-                table.Name = tData.Name || "";
-                table.Schema = tData.Schema || "dbo";
-                table.Description = tData.Description || "";
-                table.Bounds = new tfxMod.XRect(
-                    tData.X || 0,
-                    tData.Y || 0,
-                    tData.Width || 200,
-                    tData.Height || 150
-                );
+                const table = design.CreateTable({
+                    X: tData.X || 0,
+                    Y: tData.Y || 0,
+                    Width: tData.Width || 200,
+                    Height: tData.Height || 150,
+                    Name: tData.Name || "",
+                    Schema: tData.Schema || "dbo"
+                });
+
+                if (tData.ID)
+                    table.ID = tData.ID;
+                if (tData.Description)
+                    table.Description = tData.Description;
 
                 if (tData.Fields && Array.isArray(tData.Fields))
                 {
                     for (const fData of tData.Fields)
                     {
-                        const field = new tfxMod.XORMField();
-                        field.ID = fData.ID || tfxMod.XGuid.NewValue();
-                        field.Name = fData.Name || "";
-                        field.DataType = fData.DataType || "String";
-                        field.Length = fData.Length || 0;
-                        field.IsPrimaryKey = fData.IsPrimaryKey || false;
-                        field.IsNullable = fData.IsNullable !== false;
-                        field.IsAutoIncrement = fData.IsAutoIncrement || false;
-                        field.DefaultValue = fData.DefaultValue || "";
-                        field.Description = fData.Description || "";
-                        table.AppendChild(field);
+                        const defaultDataType = XORMFieldDataType?.String ?? "String";
+                        const field = table.CreateField({
+                            Name: fData.Name || "",
+                            DataType: (fData.DataType as XORMFieldDataType) || defaultDataType,
+                            Length: fData.Length || 0,
+                            IsPrimaryKey: fData.IsPrimaryKey || false,
+                            IsNullable: fData.IsNullable !== false,
+                            IsAutoIncrement: fData.IsAutoIncrement || false,
+                            DefaultValue: fData.DefaultValue || ""
+                        });
+
+                        if (fData.ID)
+                            field.ID = fData.ID;
+                        if (fData.Description)
+                            field.Description = fData.Description;
                     }
                 }
-
-                design.AppendChild(table);
             }
         }
 
@@ -412,17 +464,26 @@ export class XTFXBridge
         {
             for (const rData of pData.References)
             {
-                const ref = new tfxMod.XORMReference();
-                ref.ID = rData.ID || tfxMod.XGuid.NewValue();
-                ref.Name = rData.Name || "";
-                ref.Source = rData.SourceID || "";
-                ref.Target = rData.TargetID || "";
-                ref.Description = rData.Description || "";
+                try
+                {
+                    const ref = design.CreateReference({
+                        SourceID: rData.SourceID || "",
+                        TargetID: rData.TargetID || "",
+                        Name: rData.Name || ""
+                    });
 
-                if (rData.Points && Array.isArray(rData.Points))
-                    ref.Points = rData.Points.map((p: any) => new tfxMod.XPoint(p.X, p.Y));
+                    if (rData.ID)
+                        ref.ID = rData.ID;
+                    if (rData.Description)
+                        ref.Description = rData.Description;
 
-                design.AppendChild(ref);
+                    if (rData.Points && Array.isArray(rData.Points))
+                        ref.Points = rData.Points.map((p: any) => new XPoint(p.X, p.Y));
+                }
+                catch (error)
+                {
+                    GetLogService().Warn(`Failed to create reference: ${rData.Name} - ${error}`);
+                }
             }
         }
     }
@@ -437,32 +498,42 @@ export class XTFXBridge
 
         return {
             Name: pDoc.Name,
-            Tables: tables.map((t: any) => ({
-                ID: t.ID,
-                Name: t.Name,
-                Schema: t.Schema,
-                Description: t.Description,
-                X: t.Bounds.Left,
-                Y: t.Bounds.Top,
-                Width: t.Bounds.Width,
-                Height: t.Bounds.Height,
-                Fields: t.GetChildrenOfType?.(null)?.map((f: any) => ({
-                    ID: f.ID,
-                    Name: f.Name,
-                    DataType: f.DataType,
-                    Length: f.Length,
-                    IsPrimaryKey: f.IsPrimaryKey,
-                    IsNullable: f.IsNullable,
-                    IsAutoIncrement: f.IsAutoIncrement,
-                    DefaultValue: f.DefaultValue,
-                    Description: f.Description
-                })) || []
-            })),
+            Tables: tables.map((t: any) => {
+                // Get fields using GetChildrenOfType or directly from Fields array
+                let fields = [];
+                if (t.GetChildrenOfType) {
+                    fields = t.GetChildrenOfType(null) || [];
+                } else if (t.Fields) {
+                    fields = t.Fields || [];
+                }
+                
+                return {
+                    ID: t.ID,
+                    Name: t.Name,
+                    Schema: t.Schema,
+                    Description: t.Description,
+                    X: t.Bounds.Left,
+                    Y: t.Bounds.Top,
+                    Width: t.Bounds.Width,
+                    Height: t.Bounds.Height,
+                    Fields: fields.map((f: any) => ({
+                        ID: f.ID,
+                        Name: f.Name,
+                        DataType: f.DataType,
+                        Length: f.Length,
+                        IsPrimaryKey: f.IsPrimaryKey,
+                        IsNullable: f.IsNullable,
+                        IsAutoIncrement: f.IsAutoIncrement,
+                        DefaultValue: f.DefaultValue,
+                        Description: f.Description
+                    }))
+                };
+            }),
             References: references.map((r: any) => ({
                 ID: r.ID,
                 Name: r.Name,
-                SourceID: r.SourceID,
-                TargetID: r.TargetID,
+                SourceID: r.SourceID || r.Source,
+                TargetID: r.TargetID || r.Target,
                 Description: r.Description,
                 Points: r.Points?.map((p: any) => ({ X: p.X, Y: p.Y })) || []
             }))

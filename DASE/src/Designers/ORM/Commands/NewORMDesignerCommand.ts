@@ -29,10 +29,8 @@ export class XNewORMDesignerCommand
 
     async Execute(): Promise<void>
     {
-        // Create an untitled URI for the new ORM model
-        const untitledUri = vscode.Uri.parse(`untitled:Untitled-${XNewORMDesignerCommand._UntitledCounter++}.daseorm.json`);
+        const untitledUri = vscode.Uri.parse(`untitled:Untitled-${XNewORMDesignerCommand._UntitledCounter++}.dsorm`);
 
-        // Open the untitled file with the ORM Designer
         await vscode.commands.executeCommand(
             "vscode.openWith",
             untitledUri,

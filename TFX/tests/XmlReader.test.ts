@@ -119,11 +119,11 @@ describe("XmlReader", () => {
     it("should handle ReadProperties loop (Lines 421-432)", () => {
         const xml = `
             <Root>
-                <Properties>
+                <XValues>
                     <XData Name="d1" ID="${XGuid.NewValue()}">v1</XData>
                     <XLinkData Name="l1" ID="${XGuid.NewValue()}" ElementID="${XGuid.NewValue()}">v2</XLinkData>
                     <XLinkedShape Name="s1" ID="${XGuid.NewValue()}">v3</XLinkedShape>
-                </Properties>
+                </XValues>
             </Root>
         `;
         const node = reader.Parse(xml);
@@ -149,9 +149,9 @@ describe("XmlReader", () => {
         const readerNoIgnore = new XmlReader(context, { IgnoreUnknownProperties: false });
         const xml = `
             <XThrowElement>
-                <Properties>
+                <XValues>
                     <XData ID="UnknownPropID">Value</XData>
-                </Properties>
+                </XValues>
             </XThrowElement>
         `;
         const node = readerNoIgnore.Parse(xml);
@@ -163,9 +163,9 @@ describe("XmlReader", () => {
         const linkID = XGuid.NewValue();
         const xml = `
             <XTestReaderElement>
-                <Properties>
+                <XValues>
                     <XLinkData ID="${XTestReaderElement.PropA.ID}" ElementID="${linkID}">Link</XLinkData>
-                </Properties>
+                </XValues>
             </XTestReaderElement>
         `;
         const node = reader.Parse(xml);
@@ -176,9 +176,9 @@ describe("XmlReader", () => {
     it("should handle ApplyProperties with error in SetValue (Line 556)", () => {
         const xml = `
             <XThrowElement>
-                <Properties>
+                <XValues>
                     <XData ID="${XThrowElement.PropThrowProp.ID}">ThrowOnSet</XData>
-                </Properties>
+                </XValues>
             </XThrowElement>
         `;
         const node = reader.Parse(xml);
@@ -287,9 +287,9 @@ describe("XmlReader", () => {
         const ignoreReader = new XmlReader(context, { IgnoreUnknownProperties: true });
         const xml = `
             <XTestReaderElement>
-                <Properties>
+                <XValues>
                     <XData ID="UnknownPropID">Value</XData>
-                </Properties>
+                </XValues>
             </XTestReaderElement>
         `;
         const node = ignoreReader.Parse(xml);
@@ -301,7 +301,7 @@ describe("XmlReader", () => {
         const ignoreReader = new XmlReader(context, { IgnoreUnknownElements: true });
         const xml = `
             <XTestReaderElement>
-                <Properties />
+                <XValues />
                 <UnknownChild />
             </XTestReaderElement>
         `;
@@ -329,11 +329,11 @@ describe("XmlReader", () => {
     it("should handle ReadProperties with XData and XLinkData (Line 444-462)", () => {
         const xml = `
             <Root>
-                <Properties>
+                <XValues>
                     <XData ID="${XGuid.NewValue()}">DataValue</XData>
                     <XLinkData ID="${XGuid.NewValue()}" ElementID="${XGuid.NewValue()}">LinkValue</XLinkData>
                     <Other>Ignored</Other>
-                </Properties>
+                </XValues>
             </Root>
         `;
         const node = reader.Parse(xml);

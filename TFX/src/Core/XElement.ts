@@ -11,8 +11,6 @@ export function IsXDocumentBase(pValue: unknown): pValue is XDocumentBase
     return pValue instanceof XDocumentBase;
 }
 
-export type XElementCtor<T extends XElement> = new (...pArgs: unknown[]) => T;
-
 export type XElementPredicate<T extends XElement> = (pItem: T) => boolean;
 
 export function IsXElement(pValue: unknown): pValue is XElement
@@ -132,25 +130,25 @@ export abstract class XElement
         }
     }
 
-    public GetChild<T extends XElement>(pCtor: XElementCtor<T>, pPredicate: XElementPredicate<T> | null = null): T | null
+    public GetChild<T extends XElement>(pPredicate: XElementPredicate<T> | null = null): T | null
     {
         for (const node of this.ChildNodes)
         {
-            if (node instanceof pCtor && (!pPredicate || pPredicate(node)))
-                return node;
+            if (!pPredicate || pPredicate(<T>node))
+                return <T>node;
         }
 
         return null;
     }
 
-    public GetChildDeep<T extends XElement>(pCtor: XElementCtor<T>, pPredicate: XElementPredicate<T> | null = null): T | null
+    public GetChildDeep<T extends XElement>(pPredicate: XElementPredicate<T> | null = null): T | null
     {
         for (const node of this.ChildNodes)
         {
-            if (node instanceof pCtor && (!pPredicate || pPredicate(node)))
-                return node;
+            if (!pPredicate || pPredicate(<T>node))
+                return <T>node;
 
-            const found = node.GetChildDeep(pCtor, pPredicate);
+            const found = node.GetChildDeep(pPredicate);
             if (found)
                 return found;
         }
@@ -158,74 +156,72 @@ export abstract class XElement
         return null;
     }
 
-    public *GetChildren<T extends XElement>(pCtor: XElementCtor<T>, pPredicate: XElementPredicate<T> | null = null): IterableIterator<T>
+    public *GetChildren<T extends XElement>(pPredicate: XElementPredicate<T> | null = null): IterableIterator<T>
     {
         for (const node of this.ChildNodes)
         {
-            if (node instanceof pCtor && (!pPredicate || pPredicate(node)))
-                yield node;
+            if (!pPredicate || pPredicate(<T>node))
+                yield <T>node;
         }
     }
 
-    public *GetChildrenDeep<T extends XElement>(pCtor: XElementCtor<T>, pPredicate: XElementPredicate<T> | null = null): IterableIterator<T>
+    public *GetChildrenDeep<T extends XElement>(pPredicate: XElementPredicate<T> | null = null): IterableIterator<T>
     {
         for (const node of this.ChildNodes)
         {
-            if (node instanceof pCtor && (!pPredicate || pPredicate(node)))
-                yield node;
+            if (!pPredicate || pPredicate(<T>node))
+                yield <T>node;
 
-            yield* node.GetChildrenDeep(pCtor, pPredicate);
+            yield* node.GetChildrenDeep(pPredicate);
         }
     }
 
-    public HasChild<T extends XElement>(pCtor: XElementCtor<T>, pPredicate: XElementPredicate<T> | null = null): boolean
+    public HasChild<T extends XElement>(pPredicate: XElementPredicate<T> | null = null): boolean
     {
         for (const node of this.ChildNodes)
         {
-            if (node instanceof pCtor && (!pPredicate || pPredicate(node)))
+            if (!pPredicate || pPredicate(<T>node))
                 return true;
         }
 
         return false;
     }
 
-    public HasChildDeep<T extends XElement>(pCtor: XElementCtor<T>, pPredicate: XElementPredicate<T> | null = null): boolean
+    public HasChildDeep<T extends XElement>(pPredicate: XElementPredicate<T> | null = null): boolean
     {
         for (const node of this.ChildNodes)
         {
-            if (node instanceof pCtor && (!pPredicate || pPredicate(node)))
+            if (!pPredicate || pPredicate(<T>node))
                 return true;
 
-            if (node.HasChildDeep(pCtor, pPredicate))
+            if (node.HasChildDeep(pPredicate))
                 return true;
         }
 
         return false;
     }
 
-    public GetOwner<T extends XElement>(pCtor: XElementCtor<T>, pPredicate: XElementPredicate<T> | null = null): T | null
+    public GetOwner<T extends XElement>(pPredicate  : XElementPredicate<T> | null = null): T | null
     {
         const parent = this._ParentNode;
 
-        if (parent instanceof pCtor && (!pPredicate || pPredicate(parent)))
-            return parent;
+        if (parent instanceof XElement && (!pPredicate || pPredicate(<T>parent)))
+            return <T>parent;
 
         if (parent instanceof XElement)
-            return parent.GetOwner(pCtor, pPredicate);
-
+            return parent.GetOwner(pPredicate);
         return null;
     }
 
-    public HasOwner<T extends XElement>(pCtor: XElementCtor<T>, pPredicate: XElementPredicate<T> | null = null): boolean
+    public HasOwner<T extends XElement>(pPredicate: XElementPredicate<T> | null = null): boolean
     {
         const parent = this._ParentNode;
 
-        if (parent instanceof pCtor && (!pPredicate || pPredicate(parent)))
+        if (parent instanceof XElement && (!pPredicate || pPredicate(<T>parent)))
             return true;
 
         if (parent instanceof XElement)
-            return parent.HasOwner(pCtor, pPredicate);
-
+            return parent.HasOwner(pPredicate);
         return false;
     }
 

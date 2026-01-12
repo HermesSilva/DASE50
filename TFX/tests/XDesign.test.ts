@@ -490,6 +490,13 @@ describe("XDesign", () => {
             const dir = (design as any).GetDirectionFromPoint(rect, new XPoint(150, 50));
             expect(dir).toBe(XRouterDirection.North);
         });
+
+        it("should return West when point is left of center with greater horizontal distance", () => {
+            // rect center = (150, 125)
+            // Point at (50, 125) has dx = -100, dy = 0, |dx| > |dy|, dx < 0 → West
+            const dir = (design as any).GetDirectionFromPoint(rect, new XPoint(50, 125));
+            expect(dir).toBe(XRouterDirection.West);
+        });
     });
 
     describe("CreateRouterShape", () => {
@@ -655,6 +662,33 @@ describe("XDesign", () => {
             );
             // If result is false, it means router couldn't find a path - this is acceptable behavior
             // The important thing is that the code path for CheckCollision was exercised
+            expect(typeof result).toBe("boolean");
+        });
+
+        it("should skip collision check when CheckCollision is false", () => {
+            const rect1 = new XMockRectangle();
+            rect1.ID = XGuid.NewValue();
+            rect1.Bounds = new XRect(0, 0, 100, 50);
+            design.AppendChild(rect1);
+
+            const rect2 = new XMockRectangle();
+            rect2.ID = XGuid.NewValue();
+            rect2.Bounds = new XRect(200, 0, 100, 50);
+            design.AppendChild(rect2);
+
+            const line = new XMockLine();
+            line.ID = XGuid.NewValue();
+            line.Source = rect1.ID;
+            line.Target = rect2.ID;
+
+            // Route with CheckCollision false - obstacles should be ignored
+            const result = design.RouteLineFromPoints(
+                line,
+                new XPoint(100, 25),
+                new XPoint(200, 25),
+                [rect1, rect2],
+                { CheckCollision: false }
+            );
             expect(typeof result).toBe("boolean");
         });
 

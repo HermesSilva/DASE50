@@ -53,9 +53,9 @@ describe('XOpenORMDesignerCommand', () => {
         });
 
         it('should execute command when callback is invoked', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = createMockTextDocument(uri);
-            (mockDoc as any).fileName = '/test/model.daseorm.json';
+            (mockDoc as any).fileName = '/test/model.dsorm';
             
             (vscode.window as any).activeTextEditor = {
                 document: mockDoc
@@ -81,7 +81,7 @@ describe('XOpenORMDesignerCommand', () => {
     describe('Execute', () => {
         it('should open provided URI with ORM Designer', async () => {
             const command = new XOpenORMDesignerCommand(mockProvider);
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
 
             await command.Execute(uri as any);
 
@@ -94,9 +94,9 @@ describe('XOpenORMDesignerCommand', () => {
 
         it('should use active editor URI when no URI provided', async () => {
             const command = new XOpenORMDesignerCommand(mockProvider);
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = createMockTextDocument(uri);
-            (mockDoc as any).fileName = '/test/model.daseorm.json';
+            (mockDoc as any).fileName = '/test/model.dsorm';
             
             (vscode.window as any).activeTextEditor = {
                 document: mockDoc

@@ -6,6 +6,7 @@ export const XDesignerMessageType = {
     SelectElement: "SelectElement",
     SelectionChanged: "SelectionChanged",
     AddTable: "AddTable",
+    AddField: "AddField",
     MoveElement: "MoveElement",
     DragDropAddRelation: "DragDropAddRelation",
     DeleteSelected: "DeleteSelected",
@@ -15,7 +16,8 @@ export const XDesignerMessageType = {
     ValidateModel: "ValidateModel",
     IssuesChanged: "IssuesChanged",
     RequestRename: "RequestRename",
-    RenameCompleted: "RenameCompleted"
+    RenameCompleted: "RenameCompleted",
+    AlignLines: "AlignLines"
 } as const;
 
 export type TDesignerMessageType = typeof XDesignerMessageType[keyof typeof XDesignerMessageType];

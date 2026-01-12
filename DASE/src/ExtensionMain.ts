@@ -3,6 +3,8 @@ import { XORMDesignerEditorProvider } from "./Designers/ORM/ORMDesignerEditorPro
 import { XNewORMDesignerCommand } from "./Designers/ORM/Commands/NewORMDesignerCommand";
 import { XOpenORMDesignerCommand } from "./Designers/ORM/Commands/OpenORMDesignerCommand";
 import { XAddTableCommand } from "./Designers/ORM/Commands/AddTableCommand";
+import { XAddFieldCommand } from "./Designers/ORM/Commands/AddFieldCommand";
+import { XAlignLinesCommand } from "./Designers/ORM/Commands/AlignLinesCommand";
 import { XValidateORMModelCommand } from "./Designers/ORM/Commands/ValidateORMModelCommand";
 import { XDeleteSelectedCommand } from "./Commands/DeleteSelectedCommand";
 import { XRenameSelectedCommand } from "./Commands/RenameSelectedCommand";
@@ -22,6 +24,8 @@ export function activate(pContext: vscode.ExtensionContext): void
         XNewORMDesignerCommand.Register(pContext, designerProvider);
         XOpenORMDesignerCommand.Register(pContext, designerProvider);
         XAddTableCommand.Register(pContext, designerProvider);
+        XAddFieldCommand.Register(pContext, designerProvider);
+        XAlignLinesCommand.Register(pContext, designerProvider);
         XValidateORMModelCommand.Register(pContext, designerProvider);
         XDeleteSelectedCommand.Register(pContext, designerProvider);
         XRenameSelectedCommand.Register(pContext, designerProvider);

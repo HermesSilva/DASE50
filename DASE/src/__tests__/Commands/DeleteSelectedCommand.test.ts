@@ -53,7 +53,7 @@ describe('XDeleteSelectedCommand', () => {
         });
 
         it('should execute command when callback is invoked', async () => {
-            const activeUri = Uri.file('/test/model.daseorm.json');
+            const activeUri = Uri.file('/test/model.dsorm');
             mockProvider.GetActiveUri = jest.fn().mockReturnValue(activeUri);
             
             XDeleteSelectedCommand.Register(mockContext, mockProvider);
@@ -71,7 +71,7 @@ describe('XDeleteSelectedCommand', () => {
 
     describe('Execute', () => {
         it('should delete selected when active URI exists', async () => {
-            const activeUri = Uri.file('/test/model.daseorm.json');
+            const activeUri = Uri.file('/test/model.dsorm');
             mockProvider.GetActiveUri = jest.fn().mockReturnValue(activeUri);
             const command = new XDeleteSelectedCommand(mockProvider);
 

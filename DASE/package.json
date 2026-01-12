@@ -12,8 +12,7 @@
         "Visualization"
     ],
     "activationEvents": [
-        "onLanguage:json",
-        "workspaceContains:**/*.daseorm.json"
+        "*"
     ],
     "main": "./out/ExtensionMain.js",
     "contributes": {
@@ -21,32 +20,50 @@
             {
                 "command": "Dase.NewORMDesigner",
                 "title": "New ORM Designer",
-                "category": "DASE"
+                "category": "DASE",
+                "icon": "$(file-add)"
             },
             {
                 "command": "Dase.OpenORMDesigner",
                 "title": "Open ORM Designer",
-                "category": "DASE"
+                "category": "DASE",
+                "icon": "$(folder-opened)"
             },
             {
                 "command": "Dase.ValidateORMModel",
                 "title": "Validate ORM Model",
-                "category": "DASE"
+                "category": "DASE",
+                "icon": "$(check)"
             },
             {
                 "command": "Dase.DeleteSelected",
                 "title": "Delete Selected",
-                "category": "DASE"
+                "category": "DASE",
+                "icon": "$(trash)"
             },
             {
                 "command": "Dase.RenameSelected",
                 "title": "Rename Selected",
-                "category": "DASE"
+                "category": "DASE",
+                "icon": "$(edit)"
             },
             {
                 "command": "Dase.AddTable",
                 "title": "Add Table",
-                "category": "DASE"
+                "category": "DASE",
+                "icon": "$(table)"
+            },
+            {
+                "command": "Dase.AddField",
+                "title": "Add Field",
+                "category": "DASE",
+                "icon": "$(symbol-field)"
+            },
+            {
+                "command": "Dase.AlignLines",
+                "title": "Align Lines",
+                "category": "DASE",
+                "icon": "$(layout)"
             }
         ],
         "customEditors": [
@@ -55,7 +72,7 @@
                 "displayName": "ORM Designer",
                 "selector": [
                     {
-                        "filenamePattern": "*.daseorm.json"
+                        "filenamePattern": "*.dsorm"
                     }
                 ],
                 "priority": "default"
@@ -87,12 +104,12 @@
         "menus": {
             "explorer/context": [
                 {
-                    "when": "resourceExtname == .json && resourceFilename =~ /\\.daseorm\\.json$/",
+                    "when": "resourceExtname == .dsorm",
                     "command": "Dase.OpenORMDesigner",
                     "group": "dase@1"
                 },
                 {
-                    "when": "resourceExtname == .json && resourceFilename =~ /\\.daseorm\\.json$/",
+                    "when": "resourceExtname == .dsorm",
                     "command": "Dase.ValidateORMModel",
                     "group": "dase@2"
                 }
@@ -105,18 +122,28 @@
                 },
                 {
                     "when": "webviewId == 'Dase.ORMDesigner'",
-                    "command": "Dase.DeleteSelected",
+                    "command": "Dase.AddField",
                     "group": "dase@1"
                 },
                 {
                     "when": "webviewId == 'Dase.ORMDesigner'",
-                    "command": "Dase.RenameSelected",
+                    "command": "Dase.DeleteSelected",
                     "group": "dase@2"
                 },
                 {
                     "when": "webviewId == 'Dase.ORMDesigner'",
-                    "command": "Dase.ValidateORMModel",
+                    "command": "Dase.RenameSelected",
                     "group": "dase@3"
+                },
+                {
+                    "when": "webviewId == 'Dase.ORMDesigner'",
+                    "command": "Dase.ValidateORMModel",
+                    "group": "dase@4"
+                },
+                {
+                    "when": "webviewId == 'Dase.ORMDesigner'",
+                    "command": "Dase.AlignLines",
+                    "group": "dase@5"
                 }
             ]
         }

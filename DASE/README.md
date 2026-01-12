@@ -4,18 +4,18 @@
 
 ## Overview
 
-DASE is a VS Code extension that provides visual designers for software modeling. The current phase implements the **ORM Designer** for creating Entity-Relationship models using `.daseorm.json` files.
+DASE is a VS Code extension that provides visual designers for software modeling. The current phase implements the **ORM Designer** for creating Entity-Relationship models using `.dsorm` files.
 
 ## Features
 
 - 🎨 **Visual ORM Designer** — Design entity-relationship models visually
 - 📊 **Context Menu Driven** — All interactions via context menus
 - ✅ **Real-time Validation** — Instant feedback on model issues
-- 💾 **JSON Persistence** — Models stored as `.daseorm.json` files
+- 💾 **XML Persistence** — Models stored as `.dsorm` files
 
 ## Quick Start
 
-1. Create a new file with `.daseorm.json` extension
+1. Create a new file with `.dsorm` extension
 2. The ORM Designer opens automatically
 3. Right-click to add tables and references
 4. Save to persist your model

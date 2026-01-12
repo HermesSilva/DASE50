@@ -72,7 +72,7 @@ describe('XORMDesignerEditorProvider', () => {
 
     describe('openCustomDocument', () => {
         it('should return document with uri', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const openContext = {} as vscode.CustomDocumentOpenContext;
             const token = {} as vscode.CancellationToken;
 
@@ -83,7 +83,7 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should call dispose without error', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const openContext = {} as vscode.CustomDocumentOpenContext;
             const token = {} as vscode.CancellationToken;
 
@@ -95,7 +95,7 @@ describe('XORMDesignerEditorProvider', () => {
 
     describe('resolveCustomEditor', () => {
         it('should setup webview panel', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             const token = {} as vscode.CancellationToken;
@@ -109,7 +109,7 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should set local resource roots', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             const token = {} as vscode.CancellationToken;
@@ -122,7 +122,7 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should handle load error gracefully', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             const token = {} as vscode.CancellationToken;
@@ -136,7 +136,7 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should cleanup resources on panel dispose', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             const token = {} as vscode.CancellationToken;
@@ -157,7 +157,7 @@ describe('XORMDesignerEditorProvider', () => {
 
     describe('saveCustomDocument', () => {
         it('should save document', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             const token = {} as vscode.CancellationToken;
@@ -171,7 +171,7 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should do nothing when state not found', async () => {
-            const uri = Uri.file('/test/nonexistent.daseorm.json');
+            const uri = Uri.file('/test/nonexistent.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const token = {} as vscode.CancellationToken;
 
@@ -187,8 +187,8 @@ describe('XORMDesignerEditorProvider', () => {
 
     describe('saveCustomDocumentAs', () => {
         it('should save document to new location', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
-            const newUri = Uri.file('/test/model-copy.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
+            const newUri = Uri.file('/test/model-copy.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             const token = {} as vscode.CancellationToken;
@@ -205,8 +205,8 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should do nothing when state not found', async () => {
-            const uri = Uri.file('/test/unknown.daseorm.json');
-            const newUri = Uri.file('/test/unknown-copy.daseorm.json');
+            const uri = Uri.file('/test/unknown.dsorm');
+            const newUri = Uri.file('/test/unknown-copy.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const token = {} as vscode.CancellationToken;
 
@@ -219,7 +219,7 @@ describe('XORMDesignerEditorProvider', () => {
 
     describe('revertCustomDocument', () => {
         it('should reload document', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             const token = {} as vscode.CancellationToken;
@@ -235,7 +235,7 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should do nothing when state not found', async () => {
-            const uri = Uri.file('/test/unknown.daseorm.json');
+            const uri = Uri.file('/test/unknown.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const token = {} as vscode.CancellationToken;
 
@@ -248,11 +248,11 @@ describe('XORMDesignerEditorProvider', () => {
 
     describe('backupCustomDocument', () => {
         it('should create backup', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             const token = {} as vscode.CancellationToken;
-            const backupUri = Uri.file('/backup/model.daseorm.json');
+            const backupUri = Uri.file('/backup/model.dsorm');
             const backupContext = { destination: backupUri } as any;
 
             (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
@@ -266,11 +266,11 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should call delete function in backup', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             const token = {} as vscode.CancellationToken;
-            const backupUri = Uri.file('/backup/model.daseorm.json');
+            const backupUri = Uri.file('/backup/model.dsorm');
             const backupContext = { destination: backupUri } as any;
 
             (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
@@ -284,10 +284,10 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should do nothing when state not found', async () => {
-            const uri = Uri.file('/test/unknown.daseorm.json');
+            const uri = Uri.file('/test/unknown.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const token = {} as vscode.CancellationToken;
-            const backupUri = Uri.file('/backup/unknown.daseorm.json');
+            const backupUri = Uri.file('/backup/unknown.dsorm');
             const backupContext = { destination: backupUri } as any;
 
             (vscode.workspace.fs.writeFile as jest.Mock).mockClear();
@@ -307,7 +307,7 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should return state when active panel exists', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             mockPanel.active = true; // Make panel active
@@ -325,7 +325,7 @@ describe('XORMDesignerEditorProvider', () => {
 
         it('should iterate through multiple panels to find active state', async () => {
             // Create first inactive panel
-            const uri1 = Uri.file('/test/model1.daseorm.json');
+            const uri1 = Uri.file('/test/model1.dsorm');
             const mockDoc1 = { uri: uri1, dispose: jest.fn() };
             const mockPanel1 = createMockWebviewPanel();
             mockPanel1.active = false;
@@ -335,7 +335,7 @@ describe('XORMDesignerEditorProvider', () => {
             await provider.resolveCustomEditor(mockDoc1 as any, mockPanel1 as any, token);
 
             // Create second active panel
-            const uri2 = Uri.file('/test/model2.daseorm.json');
+            const uri2 = Uri.file('/test/model2.dsorm');
             const mockDoc2 = { uri: uri2, dispose: jest.fn() };
             const mockPanel2 = createMockWebviewPanel();
             mockPanel2.active = true;
@@ -371,7 +371,7 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should return panel when active panel exists', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             mockPanel.active = true; // Make panel active
@@ -389,7 +389,7 @@ describe('XORMDesignerEditorProvider', () => {
 
         it('should iterate through multiple panels to find active', async () => {
             // Create first inactive panel
-            const uri1 = Uri.file('/test/model1.daseorm.json');
+            const uri1 = Uri.file('/test/model1.dsorm');
             const mockDoc1 = { uri: uri1, dispose: jest.fn() };
             const mockPanel1 = createMockWebviewPanel();
             mockPanel1.active = false;
@@ -399,7 +399,7 @@ describe('XORMDesignerEditorProvider', () => {
             await provider.resolveCustomEditor(mockDoc1 as any, mockPanel1 as any, token);
 
             // Create second active panel
-            const uri2 = Uri.file('/test/model2.daseorm.json');
+            const uri2 = Uri.file('/test/model2.dsorm');
             const mockDoc2 = { uri: uri2, dispose: jest.fn() };
             const mockPanel2 = createMockWebviewPanel();
             mockPanel2.active = true;
@@ -421,7 +421,7 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should return URI when active panel exists', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             mockPanel.active = true; // Make panel active
@@ -438,7 +438,7 @@ describe('XORMDesignerEditorProvider', () => {
 
         it('should iterate through multiple panels to find active URI', async () => {
             // Create first inactive panel
-            const uri1 = Uri.file('/test/model1.daseorm.json');
+            const uri1 = Uri.file('/test/model1.dsorm');
             const mockDoc1 = { uri: uri1, dispose: jest.fn() };
             const mockPanel1 = createMockWebviewPanel();
             mockPanel1.active = false;
@@ -448,7 +448,7 @@ describe('XORMDesignerEditorProvider', () => {
             await provider.resolveCustomEditor(mockDoc1 as any, mockPanel1 as any, token);
 
             // Create second active panel
-            const uri2 = Uri.file('/test/model2.daseorm.json');
+            const uri2 = Uri.file('/test/model2.dsorm');
             const mockDoc2 = { uri: uri2, dispose: jest.fn() };
             const mockPanel2 = createMockWebviewPanel();
             mockPanel2.active = true;
@@ -470,7 +470,7 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should add table when active designer exists', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             mockPanel.active = true; // Make panel active
@@ -485,7 +485,7 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should post message and save when AddTable succeeds', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             mockPanel.active = true; // Make panel active
@@ -514,7 +514,7 @@ describe('XORMDesignerEditorProvider', () => {
 
     describe('DeleteSelected', () => {
         it('should do nothing when document not found', async () => {
-            const uri = Uri.file('/test/nonexistent.daseorm.json');
+            const uri = Uri.file('/test/nonexistent.dsorm');
 
             await provider.DeleteSelected(uri as any);
 
@@ -522,7 +522,7 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should call state delete method when document found', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             const token = {} as vscode.CancellationToken;
@@ -536,7 +536,7 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should post message and save when delete succeeds', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockPanel = createMockWebviewPanel();
             
             // Create mock state with successful delete
@@ -562,7 +562,7 @@ describe('XORMDesignerEditorProvider', () => {
 
     describe('RenameSelected', () => {
         it('should do nothing when document not found', async () => {
-            const uri = Uri.file('/test/nonexistent.daseorm.json');
+            const uri = Uri.file('/test/nonexistent.dsorm');
 
             await provider.RenameSelected(uri as any);
 
@@ -570,7 +570,7 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should show warning when no selection', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             const token = {} as vscode.CancellationToken;
@@ -600,7 +600,7 @@ describe('XORMDesignerEditorProvider', () => {
             // Create new provider with the updated mock
             const testProvider = new XORMDesignerEditorProvider(mockContext as any);
             
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             const token = {} as vscode.CancellationToken;
@@ -621,9 +621,145 @@ describe('XORMDesignerEditorProvider', () => {
         });
     });
 
+    describe('AddFieldToSelectedTable', () => {
+        it('should show warning when no active designer', async () => {
+            await provider.AddFieldToSelectedTable();
+
+            expect(vscode.window.showWarningMessage).toHaveBeenCalledWith('No active ORM Designer.');
+        });
+
+        it('should show warning when no selection', async () => {
+            const uri = Uri.file('/test/model.dsorm');
+            const mockPanel = createMockWebviewPanel();
+            mockPanel.active = true;
+            
+            const mockState = {
+                GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
+                Document: { uri }
+            };
+
+            (provider as any)._States.set(uri.toString(), mockState);
+            (provider as any)._Webviews.set(uri.toString(), mockPanel);
+
+            await provider.AddFieldToSelectedTable();
+
+            expect(vscode.window.showWarningMessage).toHaveBeenCalledWith('No table selected.');
+        });
+
+        it('should add field when selection exists and inputs provided', async () => {
+            (GetSelectionService as jest.Mock).mockReturnValue({
+                OnSelectionChanged: jest.fn(() => ({ dispose: jest.fn() })),
+                Clear: jest.fn(),
+                Select: jest.fn(),
+                ToggleSelection: jest.fn(),
+                AddToSelection: jest.fn(),
+                HasSelection: true,
+                PrimaryID: 'table-1',
+                SelectedIDs: ['table-1']
+            });
+
+            const testProvider = new XORMDesignerEditorProvider(mockContext as any);
+
+            const uri = Uri.file('/test/model.dsorm');
+            const mockPanel = createMockWebviewPanel();
+            mockPanel.active = true;
+            
+            const mockState = {
+                AddField: jest.fn().mockReturnValue({ Success: true }),
+                GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
+                Save: jest.fn().mockResolvedValue(undefined),
+                Document: { uri }
+            };
+
+            (testProvider as any)._States.set(uri.toString(), mockState);
+            (testProvider as any)._Webviews.set(uri.toString(), mockPanel);
+
+            (vscode.window.showInputBox as jest.Mock).mockResolvedValue('TestField');
+            (vscode.window.showQuickPick as jest.Mock).mockResolvedValue('String');
+
+            await testProvider.AddFieldToSelectedTable();
+
+            expect(mockState.AddField).toHaveBeenCalledWith('table-1', 'TestField', 'String');
+            expect(mockState.GetModelData).toHaveBeenCalled();
+            expect(mockPanel.webview.postMessage).toHaveBeenCalled();
+            expect(mockState.Save).toHaveBeenCalled();
+        });
+
+        it('should not add field when field name cancelled', async () => {
+            (GetSelectionService as jest.Mock).mockReturnValue({
+                OnSelectionChanged: jest.fn(() => ({ dispose: jest.fn() })),
+                Clear: jest.fn(),
+                Select: jest.fn(),
+                ToggleSelection: jest.fn(),
+                AddToSelection: jest.fn(),
+                HasSelection: true,
+                PrimaryID: 'table-1',
+                SelectedIDs: ['table-1']
+            });
+
+            const testProvider = new XORMDesignerEditorProvider(mockContext as any);
+
+            const uri = Uri.file('/test/model.dsorm');
+            const mockPanel = createMockWebviewPanel();
+            mockPanel.active = true;
+            
+            const mockState = {
+                AddField: jest.fn().mockReturnValue({ Success: true }),
+                GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
+                Save: jest.fn().mockResolvedValue(undefined),
+                Document: { uri }
+            };
+
+            (testProvider as any)._States.set(uri.toString(), mockState);
+            (testProvider as any)._Webviews.set(uri.toString(), mockPanel);
+
+            (vscode.window.showInputBox as jest.Mock).mockResolvedValue(undefined);
+
+            await testProvider.AddFieldToSelectedTable();
+
+            expect(mockState.AddField).not.toHaveBeenCalled();
+        });
+
+        it('should not add field when data type cancelled', async () => {
+            (GetSelectionService as jest.Mock).mockReturnValue({
+                OnSelectionChanged: jest.fn(() => ({ dispose: jest.fn() })),
+                Clear: jest.fn(),
+                Select: jest.fn(),
+                ToggleSelection: jest.fn(),
+                AddToSelection: jest.fn(),
+                HasSelection: true,
+                PrimaryID: 'table-1',
+                SelectedIDs: ['table-1']
+            });
+
+            const testProvider = new XORMDesignerEditorProvider(mockContext as any);
+
+            const uri = Uri.file('/test/model.dsorm');
+            const mockPanel = createMockWebviewPanel();
+            mockPanel.active = true;
+            
+            const mockState = {
+                AddField: jest.fn().mockReturnValue({ Success: true }),
+                GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
+                Save: jest.fn().mockResolvedValue(undefined),
+                Document: { uri }
+            };
+
+            (testProvider as any)._States.set(uri.toString(), mockState);
+            (testProvider as any)._Webviews.set(uri.toString(), mockPanel);
+
+            (vscode.window.showInputBox as jest.Mock).mockResolvedValue('TestField');
+            (vscode.window.showQuickPick as jest.Mock).mockResolvedValue(undefined);
+
+            await testProvider.AddFieldToSelectedTable();
+
+            expect(mockState.AddField).not.toHaveBeenCalled();
+        });
+    });
+
     describe('ValidateModel', () => {
         it('should do nothing when document not found', async () => {
-            const uri = Uri.file('/test/nonexistent.daseorm.json');
+            const uri = Uri.file('/test/nonexistent.dsorm');
 
             await provider.ValidateModel(uri as any);
 
@@ -631,7 +767,7 @@ describe('XORMDesignerEditorProvider', () => {
         });
 
         it('should validate when document found', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             const token = {} as vscode.CancellationToken;
@@ -688,6 +824,33 @@ describe('XORMDesignerEditorProvider', () => {
             expect(html).toContain('add-table');
         });
 
+        it('should include table context menu with add field option', () => {
+            const mockWebview = {
+                asWebviewUri: jest.fn((uri: any) => uri),
+                cspSource: 'mock-csp'
+            } as any;
+
+            const html = provider.GetWebviewContent(mockWebview);
+
+            expect(html).toContain('table-context-menu');
+            expect(html).toContain('add-field');
+        });
+
+        it('should include icons in context menu items', () => {
+            const mockWebview = {
+                asWebviewUri: jest.fn((uri: any) => uri),
+                cspSource: 'mock-csp'
+            } as any;
+
+            const html = provider.GetWebviewContent(mockWebview);
+
+            expect(html).toContain('class="icon"');
+            expect(html).toContain('📊'); // Add Table icon
+            expect(html).toContain('➕'); // Add Field icon
+            expect(html).toContain('🗑️'); // Delete icon
+            expect(html).toContain('✏️'); // Rename icon
+        });
+
         it('should include CSP header', () => {
             const mockWebview = {
                 asWebviewUri: jest.fn((uri: any) => uri),
@@ -703,7 +866,7 @@ describe('XORMDesignerEditorProvider', () => {
 
     describe('NotifyDocumentChanged (via OnAddTable)', () => {
         it('should fire document change event when document is registered', async () => {
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
             const mockDoc = { uri, dispose: jest.fn() };
             const mockPanel = createMockWebviewPanel();
             
@@ -750,7 +913,7 @@ describe('XORMDesignerEditorProvider', () => {
                 UpdateProperty: jest.fn().mockReturnValue({ Success: true }),
                 GetProperties: jest.fn().mockResolvedValue([]),
                 IsDirty: false,
-                Document: { uri: Uri.file('/test/model.daseorm.json') },
+                Document: { uri: Uri.file('/test/model.dsorm') },
                 IssueService: { SetIssues: jest.fn(), OnIssuesChanged: jest.fn() },
                 SelectionService: { HasSelection: false, PrimaryID: null }
             };

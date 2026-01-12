@@ -390,6 +390,19 @@ describe("XTypeConverter", () =>
             // Same length, different values
             expect(XTypeConverter.IsDefaultValue(pts1, [{ X: 9, Y: 9 }], "Point[]")).toBe(false);
         });
+
+        it("should check IsDefault for Point[] with null/undefined values", () =>
+        {
+            // Both null - should be true (both empty)
+            expect(XTypeConverter.IsDefaultValue(null as unknown as XIPoint[], null as unknown as XIPoint[], "Point[]")).toBe(true);
+            // One null, one empty - should be true
+            expect(XTypeConverter.IsDefaultValue(null as unknown as XIPoint[], [], "Point[]")).toBe(true);
+            expect(XTypeConverter.IsDefaultValue([], null as unknown as XIPoint[], "Point[]")).toBe(true);
+            // One null, one with values - should be false
+            expect(XTypeConverter.IsDefaultValue(null as unknown as XIPoint[], [{ X: 1, Y: 2 }], "Point[]")).toBe(false);
+            // One undefined, one empty - should be true
+            expect(XTypeConverter.IsDefaultValue(undefined as unknown as XIPoint[], [], "Point[]")).toBe(true);
+        });
     });
 
     describe("Type inference", () =>
@@ -624,11 +637,11 @@ describe("XSerializationEngine", () =>
         const xml = `
             <?xml version="1.0" encoding="utf-8"?>
             <XTestElement ID="12345678-1234-1234-1234-123456789012" Name="TestName">
-                <Properties>
+                <XValues>
                     <XData Name="Title" ID="TEST0001-0001-0001-0001-000000000001" Type="String">Deserialized Title</XData>
                     <XData Name="Count" ID="TEST0001-0001-0001-0001-000000000002" Type="Int32">99</XData>
                     <XData Name="IsActive" ID="TEST0001-0001-0001-0001-000000000003" Type="Boolean">true</XData>
-                </Properties>
+                </XValues>
             </XTestElement>
         `;
 

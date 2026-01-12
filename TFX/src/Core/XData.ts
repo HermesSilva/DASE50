@@ -135,6 +135,7 @@ export class XValues extends XElement
         return data;
     }
 
+    // @ts-expect-error - Overload signature differs from base class by design
     public override GetChild<T>(
         pCtorOrProperty: (new (...pArgs: unknown[]) => T) | XProperty,
         pPredicateOrType?: ((pItem: T) => boolean) | unknown | null

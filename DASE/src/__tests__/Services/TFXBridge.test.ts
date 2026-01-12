@@ -88,17 +88,18 @@ describe('XTFXBridge', () => {
     });
 
     describe('SaveOrmModelToText', () => {
-        it('should return empty JSON when no document', () => {
+        it('should return empty XML when no document', () => {
             const text = bridge.SaveOrmModelToText();
 
-            expect(text).toBe('{}');
+            expect(text).toContain('<?xml');
+            expect(text).toContain('XORMDocument');
         });
 
-        it('should save model to JSON after loading', async () => {
+        it('should save model to XML after loading', async () => {
             await bridge.LoadOrmModelFromText('{}');
             const text = bridge.SaveOrmModelToText();
 
-            expect(() => JSON.parse(text)).not.toThrow();
+            expect(text).toContain('<?xml');
         });
     });
 
@@ -117,10 +118,9 @@ describe('XTFXBridge', () => {
         it('should return array of issues', async () => {
             await bridge.LoadOrmModelFromText('{}');
             
-            // Mock do Validate para retornar array
             bridge['_Validator'] = {
                 Validate: jest.fn().mockReturnValue([])
-            };
+            } as any;
             
             const issues = await bridge.ValidateOrmModel();
 
@@ -130,7 +130,6 @@ describe('XTFXBridge', () => {
         it('should convert TFX issues to XIssueItem', async () => {
             await bridge.LoadOrmModelFromText('{}');
             
-            // Mock do Validate para retornar issues
             bridge['_Validator'] = {
                 Validate: jest.fn().mockReturnValue([
                     {
@@ -141,7 +140,7 @@ describe('XTFXBridge', () => {
                         PropertyID: 'prop-1'
                     }
                 ])
-            };
+            } as any;
             
             const issues = await bridge.ValidateOrmModel();
 
@@ -153,7 +152,6 @@ describe('XTFXBridge', () => {
         it('should convert warning severity', async () => {
             await bridge.LoadOrmModelFromText('{}');
             
-            // Mock do Validate para retornar issues com Warning
             bridge['_Validator'] = {
                 Validate: jest.fn().mockReturnValue([
                     {
@@ -164,7 +162,7 @@ describe('XTFXBridge', () => {
                         PropertyID: 'prop-1'
                     }
                 ])
-            };
+            } as any;
             
             const issues = await bridge.ValidateOrmModel();
 
@@ -178,11 +176,11 @@ describe('XTFXBridge', () => {
             await bridge.LoadOrmModelFromText('{}');
         });
 
-        it('should add table with coordinates and name', () => {
+        it('should add table with coordinates and name', async () => {
             const mockAddTable = jest.fn().mockReturnValue({ Success: true });
             bridge.Controller.AddTable = mockAddTable;
 
-            const result = bridge.AddTable(100, 200, 'NewTable');
+            const result = await bridge.AddTable(100, 200, 'NewTable');
 
             expect(mockAddTable).toHaveBeenCalledWith({
                 X: 100,
@@ -432,7 +430,7 @@ describe('XTFXBridge', () => {
                 this.Fields.push(child);
             });
             
-            // Create a proper mock document with Design.AppendChild
+            // Create a proper mock document with Design factory methods
             mockDoc = {
                 ID: 'test-doc',
                 Name: 'Initial',
@@ -447,6 +445,51 @@ describe('XTFXBridge', () => {
                         } else if (child.Source !== undefined) {
                             mockDoc.References.push(child);
                         }
+                    }),
+                    CreateTable: jest.fn((options: any) => {
+                        const table: any = {
+                            ID: options.ID || tfx.XGuid.NewValue(),
+                            Name: options.Name || '',
+                            Schema: options.Schema || 'dbo',
+                            Description: options.Description || '',
+                            X: options.X || 0,
+                            Y: options.Y || 0,
+                            Width: options.Width || 200,
+                            Height: options.Height || 150,
+                            Bounds: new tfx.XRect(options.X || 0, options.Y || 0, options.Width || 200, options.Height || 150),
+                            Fields: [],
+                            CreateField: jest.fn((fieldOpts: any) => {
+                                const field: any = {
+                                    ID: fieldOpts.ID || tfx.XGuid.NewValue(),
+                                    Name: fieldOpts.Name || '',
+                                    DataType: fieldOpts.DataType || 'String',
+                                    Length: fieldOpts.Length || 0,
+                                    IsPrimaryKey: fieldOpts.IsPrimaryKey || false,
+                                    IsNullable: fieldOpts.IsNullable !== false,
+                                    IsAutoIncrement: fieldOpts.IsAutoIncrement || false,
+                                    DefaultValue: fieldOpts.DefaultValue || '',
+                                    Description: fieldOpts.Description || ''
+                                };
+                                table.Fields.push(field);
+                                return field;
+                            })
+                        };
+                        mockDoc.Tables.push(table);
+                        return table;
+                    }),
+                    CreateReference: jest.fn((options: any) => {
+                        const ref: any = {
+                            ID: options.ID || tfx.XGuid.NewValue(),
+                            Name: options.Name || '',
+                            SourceID: options.SourceID || '',
+                            TargetID: options.TargetID || '',
+                            Source: options.SourceID || '',
+                            Target: options.TargetID || '',
+                            Description: options.Description || '',
+                            Points: options.Points || []
+                        };
+                        mockDoc.References.push(ref);
+                        return ref;
                     })
                 }
             };
@@ -502,7 +545,7 @@ describe('XTFXBridge', () => {
             await (bridge as any).LoadFromJson(mockDoc, jsonData);
             
             expect(mockDoc.Name).toBe('Test Model');
-            expect(mockDoc.Design.AppendChild).toHaveBeenCalled();
+            expect(mockDoc.Design.CreateTable).toHaveBeenCalled();
             expect(mockDoc.Tables.length).toBe(1);
             expect(mockDoc.Tables[0].Name).toBe('Users');
             expect(mockDoc.Tables[0].Schema).toBe('dbo');
@@ -522,7 +565,7 @@ describe('XTFXBridge', () => {
 
             await (bridge as any).LoadFromJson(mockDoc, jsonData);
             
-            expect(mockDoc.Design.AppendChild).toHaveBeenCalled();
+            expect(mockDoc.Design.CreateReference).toHaveBeenCalled();
             expect(mockDoc.References.length).toBe(1);
             expect(mockDoc.References[0].Name).toBe('FK_Test');
         });
@@ -1084,28 +1127,22 @@ describe('XTFXBridge', () => {
     });
 
     describe('SaveOrmModelToText error handling', () => {
-        it('should return empty JSON when Document is null', () => {
+        it('should return empty XML when Document is null', () => {
             (bridge as any)._Controller = { Document: null };
             
             const result = bridge.SaveOrmModelToText();
             
-            expect(result).toBe('{}');
+            expect(result).toBe('<?xml version="1.0" encoding="utf-8"?>\n<XORMDocument />');
         });
 
-        it('should return empty JSON on error', async () => {
+        it('should return empty XML on error', async () => {
             await bridge.LoadOrmModelFromText('{}');
-            // Force SaveToJson to throw
-            const originalSaveToJson = (bridge as any).SaveToJson;
-            (bridge as any).SaveToJson = jest.fn().mockImplementation(() => {
-                throw new Error('Test error');
-            });
+            // Force SaveToXml to throw by setting Engine to null
+            (bridge as any)._Engine = { SaveToXml: () => { throw new Error('Test error'); } };
 
             const result = bridge.SaveOrmModelToText();
             
-            expect(result).toBe('{}');
-            
-            // Restore
-            (bridge as any).SaveToJson = originalSaveToJson;
+            expect(result).toBe('<?xml version="1.0" encoding="utf-8"?>\n<XORMDocument />');
         });
     });
 

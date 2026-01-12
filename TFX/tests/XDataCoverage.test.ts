@@ -471,13 +471,13 @@ describe("Additional Data Coverage", () => {
         el.P = "not-def";
         const engine = XSerializationEngine.Instance;
         const res = engine.Serialize(el);
-        expect(res.XmlOutput).toContain("<Properties>");
+        expect(res.XmlOutput).toContain("<XValues>");
         expect(res.XmlOutput).toContain("not-def");
 
         const el2 = new XPropElem();
         el2.P = "def";
         const res2 = engine.Serialize(el2);
-        expect(res2.XmlOutput).not.toContain("<Properties>");
+        expect(res2.XmlOutput).not.toContain("<XValues>");
     });
 
     it("XSerializationEngine: SerializeToDocument with properties (Lines 366-377)", () => {
@@ -507,7 +507,7 @@ describe("Additional Data Coverage", () => {
         const engine = XSerializationEngine.Instance;
         const res = engine.SerializeToDocument(el, "TestDoc", XGuid.NewValue());
         expect(res.Success).toBe(true);
-        expect(res.XmlOutput).toContain("Properties");
+        expect(res.XmlOutput).toContain("XValues");
     });
 
     it("XSerializationEngine: SerializeDocumentContent with only AsAttribute properties (Line 367)", () => {
@@ -531,7 +531,7 @@ describe("Additional Data Coverage", () => {
         const engine = XSerializationEngine.Instance;
         const res = engine.SerializeToDocument(el, "AttrOnly", XGuid.NewValue());
         expect(res.Success).toBe(true);
-        expect(res.XmlOutput).not.toContain("<Properties>");
+        expect(res.XmlOutput).not.toContain("<XValues>");
     });
 
     it("XSerializationEngine: Factory methods", () => {
@@ -1055,7 +1055,7 @@ describe("Final Coverage Gaps", () => {
 
     it("XmlReader: ReadXData without child XLanguage nodes", () =>
     {
-        const xml = `<?xml version="1.0"?><Root><Properties><XData Name="test" ID="${XGuid.NewValue()}" Type="String"></XData></Properties></Root>`;
+        const xml = `<?xml version="1.0"?><Root><XValues><XData Name="test" ID="${XGuid.NewValue()}" Type="String"></XData></XValues></Root>`;
         const ctx = new XSerializationContext(XSerializationDirection.Deserialize, { IgnoreUnknownElements: true });
         const reader = new XmlReader(ctx);
         const doc = new XDocument();
@@ -1090,7 +1090,7 @@ describe("Final Coverage Gaps", () => {
     it("XmlReader: ReadProperties with unknown property and IgnoreUnknownProperties=true", () =>
     {
         const unknownPropID = XGuid.NewValue();
-        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><Properties><XData ID="${unknownPropID}" Name="unknown" Type="String">value</XData></Properties></XDocument>`;
+        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><XValues><XData ID="${unknownPropID}" Name="unknown" Type="String">value</XData></XValues></XDocument>`;
         const ctx = new XSerializationContext(XSerializationDirection.Deserialize, { IgnoreUnknownProperties: true });
         const reader = new XmlReader(ctx);
         const doc = new XDocument();
@@ -1101,7 +1101,7 @@ describe("Final Coverage Gaps", () => {
     it("XmlReader: ReadProperties with unknown property and IgnoreUnknownProperties=false", () =>
     {
         const unknownPropID = XGuid.NewValue();
-        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><Properties><XData ID="${unknownPropID}" Name="unknown" Type="String">value</XData></Properties></XDocument>`;
+        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><XValues><XData ID="${unknownPropID}" Name="unknown" Type="String">value</XData></XValues></XDocument>`;
         const ctx = new XSerializationContext(XSerializationDirection.Deserialize, { IgnoreUnknownProperties: false });
         const reader = new XmlReader(ctx);
         const doc = new XDocument();
@@ -1114,7 +1114,7 @@ describe("Final Coverage Gaps", () => {
     {
         const linkPropID = XGuid.NewValue();
         const elemID = XGuid.NewValue();
-        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><Properties><XLinkData ID="${linkPropID}" Name="link" ElementID="${elemID}">default</XLinkData></Properties></XDocument>`;
+        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><XValues><XLinkData ID="${linkPropID}" Name="link" ElementID="${elemID}">default</XLinkData></XValues></XDocument>`;
         const ctx = new XSerializationContext(XSerializationDirection.Deserialize, { IgnoreUnknownProperties: true });
         const reader = new XmlReader(ctx);
         const doc = new XDocument();
@@ -1124,7 +1124,7 @@ describe("Final Coverage Gaps", () => {
 
     it("XmlReader: ReadChildElements with Properties node skip", () =>
     {
-        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><Properties></Properties></XDocument>`;
+        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><XValues></XValues></XDocument>`;
         const ctx = new XSerializationContext(XSerializationDirection.Deserialize, {});
         const reader = new XmlReader(ctx);
         const doc = new XDocument();
@@ -1137,7 +1137,7 @@ describe("Final Coverage Gaps", () => {
         const ctx = new XSerializationContext(XSerializationDirection.Deserialize, {});
         const reader = new XmlReader(ctx);
         // Access private method through test XML with wrong tag
-        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><Properties><WrongTag Name="test" ID="${XGuid.NewValue()}" Type="String">value</WrongTag></Properties></XDocument>`;
+        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><XValues><WrongTag Name="test" ID="${XGuid.NewValue()}" Type="String">value</WrongTag></XValues></XDocument>`;
         const doc = new XDocument();
         reader.Parse(xml, doc);
         // Should handle gracefully
@@ -1273,7 +1273,7 @@ describe("Final Coverage Gaps", () => {
     {
         // XData with child that is NOT XLanguage - tests line 339 false branch
         const id = XGuid.NewValue();
-        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><Properties><XData Name="test" ID="${id}" Type="String"><OtherChild>content</OtherChild></XData></Properties></XDocument>`;
+        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><XValues><XData Name="test" ID="${id}" Type="String"><OtherChild>content</OtherChild></XData></XValues></XDocument>`;
         const ctx = new XSerializationContext(XSerializationDirection.Deserialize, {});
         const reader = new XmlReader(ctx);
         const doc = new XDocument();
@@ -1286,7 +1286,7 @@ describe("Final Coverage Gaps", () => {
     {
         // XData without Name attribute - tests line 332 ?? "" branch
         const id = XGuid.NewValue();
-        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><Properties><XData ID="${id}" Type="String">value</XData></Properties></XDocument>`;
+        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><XValues><XData ID="${id}" Type="String">value</XData></XValues></XDocument>`;
         const ctx = new XSerializationContext(XSerializationDirection.Deserialize, {});
         const reader = new XmlReader(ctx);
         const doc = new XDocument();
@@ -1297,7 +1297,7 @@ describe("Final Coverage Gaps", () => {
     it("XmlReader: Attributes with missing ID defaults to EmptyValue", () =>
     {
         // XData without ID attribute - tests line 333 ?? XGuid.EmptyValue branch
-        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><Properties><XData Name="test" Type="String">value</XData></Properties></XDocument>`;
+        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><XValues><XData Name="test" Type="String">value</XData></XValues></XDocument>`;
         const ctx = new XSerializationContext(XSerializationDirection.Deserialize, {});
         const reader = new XmlReader(ctx);
         const doc = new XDocument();
@@ -1309,7 +1309,7 @@ describe("Final Coverage Gaps", () => {
     {
         // XData without Type attribute - tests line 334 ?? "String" branch
         const id = XGuid.NewValue();
-        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><Properties><XData Name="test" ID="${id}">value</XData></Properties></XDocument>`;
+        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><XValues><XData Name="test" ID="${id}">value</XData></XValues></XDocument>`;
         const ctx = new XSerializationContext(XSerializationDirection.Deserialize, {});
         const reader = new XmlReader(ctx);
         const doc = new XDocument();
@@ -1321,7 +1321,7 @@ describe("Final Coverage Gaps", () => {
     {
         // XLanguage without IETFCode - tests line 341 ?? "" branch
         const id = XGuid.NewValue();
-        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><Properties><XData Name="test" ID="${id}" Type="String"><XLanguage>value</XLanguage></XData></Properties></XDocument>`;
+        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><XValues><XData Name="test" ID="${id}" Type="String"><XLanguage>value</XLanguage></XData></XValues></XDocument>`;
         const ctx = new XSerializationContext(XSerializationDirection.Deserialize, {});
         const reader = new XmlReader(ctx);
         const doc = new XDocument();
@@ -1332,7 +1332,7 @@ describe("Final Coverage Gaps", () => {
     it("XmlReader: ReadXData/XLinkData/XLinkedShape return null when data creation fails", () =>
     {
         // Tests lines 434, 440, 446 - if (data) branches when ReadX methods return null
-        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><Properties><InvalidData>content</InvalidData></Properties></XDocument>`;
+        const xml = `<?xml version="1.0"?><XDocument ID="${XGuid.NewValue()}"><XValues><InvalidData>content</InvalidData></XValues></XDocument>`;
         const ctx = new XSerializationContext(XSerializationDirection.Deserialize, {});
         const reader = new XmlReader(ctx);
         const doc = new XDocument();

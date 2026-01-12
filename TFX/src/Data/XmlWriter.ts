@@ -232,13 +232,13 @@ export class XmlWriter
         if (props.length === 0)
             return;
 
-        this.WriteStartElement("Properties");
+        this.WriteStartElement("XValues");
         this.CloseOpenTag(true);
 
         for (const propData of props)
             this.WritePropertyData(propData);
 
-        this.WriteEndElement("Properties");
+        this.WriteEndElement("XValues");
     }
 
     private CollectSerializableProperties(pElement: XPersistableElement): XIPropertySerializationData[]

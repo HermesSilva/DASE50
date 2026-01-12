@@ -53,7 +53,7 @@ describe('XValidateORMModelCommand', () => {
         });
 
         it('should execute command when callback is invoked', async () => {
-            const activeUri = Uri.file('/test/model.daseorm.json');
+            const activeUri = Uri.file('/test/model.dsorm');
             mockProvider.GetActiveUri = jest.fn().mockReturnValue(activeUri);
             
             XValidateORMModelCommand.Register(mockContext, mockProvider);
@@ -72,7 +72,7 @@ describe('XValidateORMModelCommand', () => {
     describe('Execute', () => {
         it('should validate provided URI', async () => {
             const command = new XValidateORMModelCommand(mockProvider);
-            const uri = Uri.file('/test/model.daseorm.json');
+            const uri = Uri.file('/test/model.dsorm');
 
             await command.Execute(uri as any);
 
@@ -80,7 +80,7 @@ describe('XValidateORMModelCommand', () => {
         });
 
         it('should use active URI when no URI provided', async () => {
-            const activeUri = Uri.file('/test/active.daseorm.json');
+            const activeUri = Uri.file('/test/active.dsorm');
             mockProvider.GetActiveUri = jest.fn().mockReturnValue(activeUri);
             const command = new XValidateORMModelCommand(mockProvider);
 

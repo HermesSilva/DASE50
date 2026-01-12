@@ -6,11 +6,8 @@ import { GetLogService } from "../../Services/LogService";
 import { XPropertyItem } from "../../Models/PropertyItem";
 import { XIssueItem } from "../../Models/IssueItem";
 
-interface IOperationResult
-{
-    Success: boolean;
-    Message?: string;
-}
+// TFX types - import for type checking only
+import type { XIOperationResult } from "@tootega/tfx";
 
 interface IModelData
 {
@@ -41,6 +38,11 @@ export class XORMDesignerState
     get Document(): vscode.TextDocument
     {
         return this._Document;
+    }
+
+    get DocumentUri(): string
+    {
+        return this._Document.uri.toString();
     }
 
     get Bridge(): XTFXBridge
@@ -92,7 +94,7 @@ export class XORMDesignerState
             // Handle untitled files
             if (uri.scheme === "untitled")
             {
-                await this._Bridge.LoadOrmModelFromText("{}");
+                this._Bridge.LoadOrmModelFromText("{}");
                 this._IsDirty = true; // Mark as dirty so user is prompted to save
                 GetLogService().Info("Created new empty ORM model");
                 return;
@@ -100,7 +102,7 @@ export class XORMDesignerState
 
             const bytes = await vscode.workspace.fs.readFile(uri);
             const text = Buffer.from(bytes).toString("utf8");
-            await this._Bridge.LoadOrmModelFromText(text);
+            this._Bridge.LoadOrmModelFromText(text);
             this._IsDirty = false;
             GetLogService().Info(`ORM model loaded successfully: ${uri.fsPath}`);
         }
@@ -138,19 +140,19 @@ export class XORMDesignerState
         }
     }
 
-    async GetModelData(): Promise<IModelData>
+    GetModelData(): IModelData
     {
-        return await this._Bridge.GetModelData();
+        return this._Bridge.GetModelData();
     }
 
-    async Validate(): Promise<XIssueItem[]>
+    Validate(): XIssueItem[]
     {
-        const issues = await this._Bridge.ValidateOrmModel();
+        const issues = this._Bridge.ValidateOrmModel();
         this.IssueService.SetIssues(issues);
         return issues;
     }
 
-    AddTable(pX: number, pY: number, pName: string): IOperationResult
+    AddTable(pX: number, pY: number, pName: string): XIOperationResult
     {
         const result = this._Bridge.AddTable(pX, pY, pName);
         if (result?.Success)
@@ -158,7 +160,7 @@ export class XORMDesignerState
         return result || { Success: false };
     }
 
-    AddReference(pSourceTableID: string, pTargetTableID: string, pName: string): IOperationResult
+    AddReference(pSourceTableID: string, pTargetTableID: string, pName: string): XIOperationResult
     {
         GetLogService().Info(`ORMDesignerState.AddReference: Source=${pSourceTableID}, Target=${pTargetTableID}, Name=${pName}`);
         const result = this._Bridge.AddReference(pSourceTableID, pTargetTableID, pName);
@@ -168,7 +170,26 @@ export class XORMDesignerState
         return result || { Success: false };
     }
 
-    DeleteSelected(): IOperationResult
+    AddField(pTableID: string, pName: string, pDataType: string): XIOperationResult
+    {
+        GetLogService().Info(`ORMDesignerState.AddField: TableID=${pTableID}, Name=${pName}, DataType=${pDataType}`);
+        const result = this._Bridge.AddField(pTableID, pName, pDataType);
+        GetLogService().Info(`Bridge.AddField result: ${JSON.stringify(result)}`);
+        if (result?.Success)
+            this.IsDirty = true;
+        return result || { Success: false };
+    }
+
+    AlignLines(): XIOperationResult
+    {
+        GetLogService().Info('ORMDesignerState.AlignLines called');
+        const result = this._Bridge.AlignLines();
+        if (result)
+            this.IsDirty = true;
+        return { Success: result };
+    }
+
+    DeleteSelected(): XIOperationResult
     {
         const selection = this.SelectionService;
         if (!selection.HasSelection)
@@ -180,7 +201,7 @@ export class XORMDesignerState
         for (const id of ids)
         {
             const result = this._Bridge.DeleteElement(id);
-            if (!result)
+            if (!result?.Success)
                 success = false;
         }
 
@@ -193,37 +214,37 @@ export class XORMDesignerState
         return { Success: success };
     }
 
-    RenameSelected(pNewName: string): IOperationResult
+    RenameSelected(pNewName: string): XIOperationResult
     {
         const selection = this.SelectionService;
         if (!selection.HasSelection || !selection.PrimaryID)
             return { Success: false, Message: "No selection." };
 
         const result = this._Bridge.RenameElement(selection.PrimaryID, pNewName);
-        if (result)
+        if (result?.Success)
             this.IsDirty = true;
-        return { Success: !!result };
+        return result || { Success: false };
     }
 
-    MoveElement(pElementID: string, pX: number, pY: number): IOperationResult
+    MoveElement(pElementID: string, pX: number, pY: number): XIOperationResult
     {
         const result = this._Bridge.MoveElement(pElementID, pX, pY);
-        if (result)
+        if (result?.Success)
             this.IsDirty = true;
-        return { Success: !!result };
+        return result || { Success: false };
     }
 
-    UpdateProperty(pElementID: string, pPropertyKey: string, pValue: unknown): IOperationResult
+    UpdateProperty(pElementID: string, pPropertyKey: string, pValue: unknown): XIOperationResult
     {
         const result = this._Bridge.UpdateProperty(pElementID, pPropertyKey, pValue);
-        if (result)
+        if (result?.Success)
             this.IsDirty = true;
-        return { Success: !!result };
+        return result || { Success: false };
     }
 
-    async GetProperties(pElementID: string): Promise<XPropertyItem[]>
+    GetProperties(pElementID: string): XPropertyItem[]
     {
-        return await this._Bridge.GetProperties(pElementID);
+        return this._Bridge.GetProperties(pElementID);
     }
 
     Dispose(): void

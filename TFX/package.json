@@ -6,19 +6,19 @@
     "types": "dist/index.d.ts",
     "exports": {
         ".": {
+            "types": "./dist/index.d.ts",
             "require": "./dist/index.js",
-            "import": "./dist/index.js",
-            "types": "./dist/index.d.ts"
+            "import": "./dist/index.js"
         },
         "./Core": {
+            "types": "./dist/Core/index.d.ts",
             "require": "./dist/Core/index.js",
-            "import": "./dist/Core/index.js",
-            "types": "./dist/Core/index.d.ts"
+            "import": "./dist/Core/index.js"
         },
         "./Design": {
+            "types": "./dist/Design/index.d.ts",
             "require": "./dist/Design/index.js",
-            "import": "./dist/Design/index.js",
-            "types": "./dist/Design/index.d.ts"
+            "import": "./dist/Design/index.js"
         }
     },
     "files": [

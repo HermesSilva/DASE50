@@ -29,6 +29,13 @@ interface IAddRelationPayload
     Name?: string;
 }
 
+interface IAddFieldPayload
+{
+    TableID: string;
+    Name: string;
+    DataType: string;
+}
+
 interface IMoveElementPayload
 {
     ElementID: string;
@@ -240,6 +247,10 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 await this.OnAddTable(pPanel, pState, payload as IAddTablePayload);
                 break;
 
+            case XDesignerMessageType.AddField:
+                await this.OnAddField(pPanel, pState, payload as IAddFieldPayload);
+                break;
+
             case XDesignerMessageType.MoveElement:
                 await this.OnMoveElement(pPanel, pState, payload as IMoveElementPayload);
                 break;
@@ -262,6 +273,10 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
             case XDesignerMessageType.RenameCompleted:
                 await this.OnRenameCompleted(pPanel, pState, payload as IRenamePayload);
+                break;
+
+            case XDesignerMessageType.AlignLines:
+                await this.OnAlignLines(pPanel, pState);
                 break;
 
             default:
@@ -365,6 +380,87 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         );
 
         GetLogService().Info(`AddReference result: Success=${result.Success}, Message=${result.Message || "none"}`);
+
+        if (result.Success)
+        {
+            const modelData = await pState.GetModelData();
+            pPanel.webview.postMessage({
+                Type: XDesignerMessageType.LoadModel,
+                Payload: modelData
+            });
+
+            this.NotifyDocumentChanged(pState);
+        }
+    }
+
+    async OnAddField(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IAddFieldPayload): Promise<void>
+    {
+        let tableID = pPayload.TableID;
+        let fieldName: string | undefined = pPayload.Name;
+        let dataType: string | undefined = pPayload.DataType;
+
+        if (!tableID)
+        {
+            const selection = GetSelectionService();
+            if (!selection.HasSelection)
+            {
+                vscode.window.showWarningMessage("No table selected.");
+                return;
+            }
+            tableID = selection.PrimaryID!;
+        }
+
+        if (!fieldName)
+        {
+            fieldName = await vscode.window.showInputBox({
+                prompt: "Enter field name",
+                value: "NewField"
+            });
+
+            if (!fieldName)
+                return;
+        }
+
+        if (!dataType)
+        {
+            dataType = await vscode.window.showQuickPick(
+                ["String", "Int32", "Int64", "Boolean", "DateTime", "Decimal", "Guid"],
+                { placeHolder: "Select data type" }
+            );
+
+            if (!dataType)
+                return;
+        }
+
+        GetLogService().Info(`Adding field: TableID=${tableID}, Name=${fieldName}, DataType=${dataType}`);
+        
+        const result = pState.AddField(
+            tableID,
+            fieldName,
+            dataType
+        );
+
+        GetLogService().Info(`AddField result: Success=${result.Success}, Message=${result.Message || "none"}`);
+
+        if (result.Success)
+        {
+            const modelData = await pState.GetModelData();
+            pPanel.webview.postMessage({
+                Type: XDesignerMessageType.LoadModel,
+                Payload: modelData
+            });
+
+            this.NotifyDocumentChanged(pState);
+        }
+    }
+
+    async OnAlignLines(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void>
+    {
+        GetLogService().Info('OnAlignLines called');
+        
+        const result = pState.AlignLines();
+
+        GetLogService().Info(`AlignLines result: Success=${result.Success}, Message=${result.Message || "none"}`);
 
         if (result.Success)
         {
@@ -558,6 +654,82 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
+    async AddFieldToSelectedTable(): Promise<void>
+    {
+        const state = this.GetActiveState();
+        const panel = this.GetActivePanel();
+
+        if (!state || !panel)
+        {
+            vscode.window.showWarningMessage("No active ORM Designer.");
+            return;
+        }
+
+        const selection = GetSelectionService();
+        if (!selection.HasSelection)
+        {
+            vscode.window.showWarningMessage("No table selected.");
+            return;
+        }
+
+        const fieldName = await vscode.window.showInputBox({
+            prompt: "Enter field name",
+            value: "NewField"
+        });
+
+        if (!fieldName)
+            return;
+
+        const dataType = await vscode.window.showQuickPick(
+            ["String", "Int32", "Int64", "Boolean", "DateTime", "Decimal", "Guid"],
+            { placeHolder: "Select data type" }
+        );
+
+        if (!dataType)
+            return;
+
+        const result = state.AddField(selection.PrimaryID!, fieldName, dataType);
+        if (result.Success)
+        {
+            const modelData = await state.GetModelData();
+            panel.webview.postMessage({
+                Type: XDesignerMessageType.LoadModel,
+                Payload: modelData
+            });
+
+            await state.Save();
+        }
+    }
+
+    async AlignLinesInActiveDesigner(): Promise<void>
+    {
+        const state = this.GetActiveState();
+        const panel = this.GetActivePanel();
+
+        if (!state || !panel)
+        {
+            vscode.window.showWarningMessage("No active ORM Designer.");
+            return;
+        }
+
+        const result = state.AlignLines();
+        if (result.Success)
+        {
+            const modelData = await state.GetModelData();
+            panel.webview.postMessage({
+                Type: XDesignerMessageType.LoadModel,
+                Payload: modelData
+            });
+
+            await state.Save();
+            vscode.window.showInformationMessage("Lines aligned successfully.");
+        }
+        else
+        {
+            vscode.window.showWarningMessage("Failed to align lines.");
+        }
+    }
+
     GetWebviewContent(pWebview: vscode.Webview): string
     {
         const mediaPath = path.join(this._Context.extensionPath, "media");
@@ -591,10 +763,19 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         </div>
     </div>
     <div id="context-menu" class="context-menu">
-        <div class="context-menu-item" data-action="add-table">Add Table</div>
+        <div class="context-menu-item" data-action="add-table"><span class="icon">📊</span>Add Table</div>
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="delete-selected">Delete Selected</div>
-        <div class="context-menu-item" data-action="rename-selected">Rename Selected</div>
+        <div class="context-menu-item" data-action="delete-selected"><span class="icon">🗑️</span>Delete Selected</div>
+        <div class="context-menu-item" data-action="rename-selected"><span class="icon">✏️</span>Rename Selected</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="validate-model"><span class="icon">✅</span>Validate Model</div>
+        <div class="context-menu-item" data-action="align-lines"><span class="icon">📐</span>Align Lines</div>
+    </div>
+    <div id="table-context-menu" class="context-menu">
+        <div class="context-menu-item" data-action="add-field"><span class="icon">➕</span>Add Field</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" data-action="delete-table"><span class="icon">🗑️</span>Delete Table</div>
+        <div class="context-menu-item" data-action="rename-table"><span class="icon">✏️</span>Rename Table</div>
     </div>
     <script src="${jsUri}"></script>
 </body>

@@ -4,7 +4,6 @@ import {
     XDocumentBase,
     IsXDocumentBase,
     IsXElement,
-    type XElementCtor,
     type XElementPredicate
 } from "../src/Core/XElement.js";
 import { XGuid } from "../src/Core/XGuid.js";
@@ -315,7 +314,7 @@ describe("XElement", () =>
             const child = new ChildElement();
             parent.AppendChild(child);
 
-            const found = parent.GetChild(ChildElement);
+            const found = parent.GetChild<ChildElement>(e => e instanceof ChildElement);
 
             expect(found).toBe(child);
         });
@@ -326,7 +325,7 @@ describe("XElement", () =>
             const child = new ChildElement();
             parent.AppendChild(child);
 
-            const found = parent.GetChild(GrandChildElement);
+            const found = parent.GetChild<GrandChildElement>(e => e instanceof GrandChildElement);
 
             expect(found).toBeNull();
         });
@@ -341,7 +340,7 @@ describe("XElement", () =>
             parent.AppendChild(child1);
             parent.AppendChild(child2);
 
-            const found = parent.GetChild(ChildElement, c => c.Value === 20);
+            const found = parent.GetChild<ChildElement>(c => c instanceof ChildElement && c.Value === 20);
 
             expect(found).toBe(child2);
         });
@@ -353,7 +352,7 @@ describe("XElement", () =>
             child.Value = 10;
             parent.AppendChild(child);
 
-            const found = parent.GetChild(ChildElement, c => c.Value === 99);
+            const found = parent.GetChild<ChildElement>(c => c instanceof ChildElement && c.Value === 99);
 
             expect(found).toBeNull();
         });
@@ -367,7 +366,7 @@ describe("XElement", () =>
             const child = new ChildElement();
             parent.AppendChild(child);
 
-            const found = parent.GetChildDeep(ChildElement);
+            const found = parent.GetChildDeep<ChildElement>(e => e instanceof ChildElement);
 
             expect(found).toBe(child);
         });
@@ -380,7 +379,7 @@ describe("XElement", () =>
             parent.AppendChild(child);
             child.AppendChild(grandChild);
 
-            const found = parent.GetChildDeep(GrandChildElement);
+            const found = parent.GetChildDeep<GrandChildElement>(e => e instanceof GrandChildElement);
 
             expect(found).toBe(grandChild);
         });
@@ -391,7 +390,7 @@ describe("XElement", () =>
             const child = new ChildElement();
             parent.AppendChild(child);
 
-            const found = parent.GetChildDeep(GrandChildElement);
+            const found = parent.GetChildDeep<GrandChildElement>(e => e instanceof GrandChildElement);
 
             expect(found).toBeNull();
         });
@@ -406,7 +405,7 @@ describe("XElement", () =>
             parent.AppendChild(child1);
             child1.AppendChild(child2);
 
-            const found = parent.GetChildDeep(ChildElement, c => c.Value === 20);
+            const found = parent.GetChildDeep<ChildElement>(c => c instanceof ChildElement && c.Value === 20);
 
             expect(found).toBe(child2);
         });
@@ -424,7 +423,7 @@ describe("XElement", () =>
             parent.AppendChild(child2);
             parent.AppendChild(child3);
 
-            const found = [...parent.GetChildren(ChildElement)];
+            const found = [...parent.GetChildren<ChildElement>(e => e instanceof ChildElement)];
 
             expect(found.length).toBe(2);
             expect(found).toContain(child1);
@@ -437,7 +436,7 @@ describe("XElement", () =>
             const child = new ChildElement();
             parent.AppendChild(child);
 
-            const found = [...parent.GetChildren(GrandChildElement)];
+            const found = [...parent.GetChildren<GrandChildElement>(e => e instanceof GrandChildElement)];
 
             expect(found.length).toBe(0);
         });
@@ -452,7 +451,7 @@ describe("XElement", () =>
             parent.AppendChild(child1);
             parent.AppendChild(child2);
 
-            const found = [...parent.GetChildren(ChildElement, c => c.Value > 15)];
+            const found = [...parent.GetChildren<ChildElement>(c => c instanceof ChildElement && c.Value > 15)];
 
             expect(found.length).toBe(1);
             expect(found[0]).toBe(child2);
@@ -471,7 +470,7 @@ describe("XElement", () =>
             parent.AppendChild(child2);
             child1.AppendChild(nested);
 
-            const found = [...parent.GetChildrenDeep(ChildElement)];
+            const found = [...parent.GetChildrenDeep<ChildElement>(e => e instanceof ChildElement)];
 
             expect(found.length).toBe(3);
         });
@@ -489,7 +488,7 @@ describe("XElement", () =>
             parent.AppendChild(child2);
             child1.AppendChild(nested);
 
-            const found = [...parent.GetChildrenDeep(ChildElement, c => c.Value >= 20)];
+            const found = [...parent.GetChildrenDeep<ChildElement>(c => c instanceof ChildElement && c.Value >= 20)];
 
             expect(found.length).toBe(2);
         });
@@ -503,14 +502,14 @@ describe("XElement", () =>
             const child = new ChildElement();
             parent.AppendChild(child);
 
-            expect(parent.HasChild(ChildElement)).toBe(true);
+            expect(parent.HasChild<ChildElement>(e => e instanceof ChildElement)).toBe(true);
         });
 
         it("should return false if no child exists", () =>
         {
             const parent = new TestElement();
 
-            expect(parent.HasChild(ChildElement)).toBe(false);
+            expect(parent.HasChild<ChildElement>(e => e instanceof ChildElement)).toBe(false);
         });
 
         it("should filter by predicate", () =>
@@ -520,8 +519,8 @@ describe("XElement", () =>
             child.Value = 10;
             parent.AppendChild(child);
 
-            expect(parent.HasChild(ChildElement, c => c.Value === 10)).toBe(true);
-            expect(parent.HasChild(ChildElement, c => c.Value === 99)).toBe(false);
+            expect(parent.HasChild<ChildElement>(c => c instanceof ChildElement && c.Value === 10)).toBe(true);
+            expect(parent.HasChild<ChildElement>(c => c instanceof ChildElement && c.Value === 99)).toBe(false);
         });
     });
 
@@ -533,7 +532,7 @@ describe("XElement", () =>
             const child = new ChildElement();
             parent.AppendChild(child);
 
-            expect(parent.HasChildDeep(ChildElement)).toBe(true);
+            expect(parent.HasChildDeep<ChildElement>(e => e instanceof ChildElement)).toBe(true);
         });
 
         it("should return true for nested child", () =>
@@ -544,7 +543,7 @@ describe("XElement", () =>
             parent.AppendChild(child);
             child.AppendChild(grandChild);
 
-            expect(parent.HasChildDeep(GrandChildElement)).toBe(true);
+            expect(parent.HasChildDeep<GrandChildElement>(e => e instanceof GrandChildElement)).toBe(true);
         });
 
         it("should return false if not found", () =>
@@ -553,7 +552,7 @@ describe("XElement", () =>
             const child = new ChildElement();
             parent.AppendChild(child);
 
-            expect(parent.HasChildDeep(GrandChildElement)).toBe(false);
+            expect(parent.HasChildDeep<GrandChildElement>(e => e instanceof GrandChildElement)).toBe(false);
         });
 
         it("should filter by predicate", () =>
@@ -566,8 +565,8 @@ describe("XElement", () =>
             parent.AppendChild(child);
             child.AppendChild(nested);
 
-            expect(parent.HasChildDeep(ChildElement, c => c.Value === 20)).toBe(true);
-            expect(parent.HasChildDeep(ChildElement, c => c.Value === 99)).toBe(false);
+            expect(parent.HasChildDeep<ChildElement>(c => c instanceof ChildElement && c.Value === 20)).toBe(true);
+            expect(parent.HasChildDeep<ChildElement>(c => c instanceof ChildElement && c.Value === 99)).toBe(false);
         });
     });
 
@@ -579,7 +578,7 @@ describe("XElement", () =>
             const child = new ChildElement();
             parent.AppendChild(child);
 
-            const owner = child.GetOwner(TestElement);
+            const owner = child.GetOwner<TestElement>(e => e instanceof TestElement);
 
             expect(owner).toBe(parent);
         });
@@ -592,7 +591,7 @@ describe("XElement", () =>
             grandParent.AppendChild(parent);
             parent.AppendChild(child);
 
-            const owner = child.GetOwner(TestElement);
+            const owner = child.GetOwner<TestElement>(e => e instanceof TestElement);
 
             expect(owner).toBe(grandParent);
         });
@@ -603,7 +602,7 @@ describe("XElement", () =>
             const child = new ChildElement();
             parent.AppendChild(child);
 
-            const owner = child.GetOwner(GrandChildElement);
+            const owner = child.GetOwner<GrandChildElement>(e => e instanceof GrandChildElement);
 
             expect(owner).toBeNull();
         });
@@ -615,15 +614,15 @@ describe("XElement", () =>
             const child = new ChildElement();
             parent.AppendChild(child);
 
-            expect(child.GetOwner(TestElement, e => e.Name === "Parent")).toBe(parent);
-            expect(child.GetOwner(TestElement, e => e.Name === "Other")).toBeNull();
+            expect(child.GetOwner<TestElement>(e => e instanceof TestElement && e.Name === "Parent")).toBe(parent);
+            expect(child.GetOwner<TestElement>(e => e instanceof TestElement && e.Name === "Other")).toBeNull();
         });
 
         it("should return null if no parent", () =>
         {
             const elem = new TestElement();
 
-            const owner = elem.GetOwner(TestElement);
+            const owner = elem.GetOwner<TestElement>(e => e instanceof TestElement);
 
             expect(owner).toBeNull();
         });
@@ -637,7 +636,7 @@ describe("XElement", () =>
             const child = new ChildElement();
             parent.AppendChild(child);
 
-            expect(child.HasOwner(TestElement)).toBe(true);
+            expect(child.HasOwner<TestElement>(e => e instanceof TestElement)).toBe(true);
         });
 
         it("should return true for ancestor", () =>
@@ -648,7 +647,7 @@ describe("XElement", () =>
             grandParent.AppendChild(parent);
             parent.AppendChild(child);
 
-            expect(child.HasOwner(TestElement)).toBe(true);
+            expect(child.HasOwner<TestElement>(e => e instanceof TestElement)).toBe(true);
         });
 
         it("should return false if no matching owner", () =>
@@ -657,7 +656,7 @@ describe("XElement", () =>
             const child = new ChildElement();
             parent.AppendChild(child);
 
-            expect(child.HasOwner(GrandChildElement)).toBe(false);
+            expect(child.HasOwner<GrandChildElement>(e => e instanceof GrandChildElement)).toBe(false);
         });
 
         it("should filter by predicate", () =>
@@ -667,15 +666,15 @@ describe("XElement", () =>
             const child = new ChildElement();
             parent.AppendChild(child);
 
-            expect(child.HasOwner(TestElement, e => e.Name === "Parent")).toBe(true);
-            expect(child.HasOwner(TestElement, e => e.Name === "Other")).toBe(false);
+            expect(child.HasOwner<TestElement>(e => e instanceof TestElement && e.Name === "Parent")).toBe(true);
+            expect(child.HasOwner<TestElement>(e => e instanceof TestElement && e.Name === "Other")).toBe(false);
         });
 
         it("should return false if no parent", () =>
         {
             const elem = new TestElement();
 
-            expect(elem.HasOwner(TestElement)).toBe(false);
+            expect(elem.HasOwner<TestElement>(e => e instanceof TestElement)).toBe(false);
         });
     });
 

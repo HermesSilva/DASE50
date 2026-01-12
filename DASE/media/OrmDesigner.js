@@ -11,6 +11,7 @@
         SelectElement: "SelectElement",
         SelectionChanged: "SelectionChanged",
         AddTable: "AddTable",
+        AddField: "AddField",
         MoveElement: "MoveElement",
         DragDropAddRelation: "DragDropAddRelation",
         DeleteSelected: "DeleteSelected",
@@ -20,7 +21,8 @@
         ValidateModel: "ValidateModel",
         IssuesChanged: "IssuesChanged",
         RequestRename: "RequestRename",
-        RenameCompleted: "RenameCompleted"
+        RenameCompleted: "RenameCompleted",
+        AlignLines: "AlignLines"
     };
 
     let _Model = { Tables: [], References: [] };
@@ -28,12 +30,14 @@
     let _DragState = null;
     let _RelationDragState = null;
     let _ContextMenuPosition = { X: 0, Y: 0 };
+    let _ContextMenuTarget = null;
 
     const _Canvas = document.getElementById("canvas");
     const _TablesLayer = document.getElementById("tables-layer");
     const _RelationsLayer = document.getElementById("relations-layer");
     const _CanvasContainer = document.getElementById("canvas-container");
     const _ContextMenu = document.getElementById("context-menu");
+    const _TableContextMenu = document.getElementById("table-context-menu");
 
     function Initialize()
     {
@@ -101,11 +105,41 @@
                     if (_SelectedIDs.length > 0)
                         ShowRenameInput(_SelectedIDs[0]);
                     break;
+                case "validate-model":
+                    SendMessage(XMessageType.ValidateModel, {});
+                    break;
+                case "align-lines":
+                    SendMessage(XMessageType.AlignLines, {});
+                    break;
+            }
+        });
+
+        _TableContextMenu.addEventListener("click", function(e) {
+            const item = e.target.closest(".context-menu-item");
+            if (!item)
+                return;
+
+            const action = item.getAttribute("data-action");
+            HideContextMenu();
+
+            switch (action)
+            {
+                case "add-field":
+                    if (_ContextMenuTarget)
+                        SendMessage(XMessageType.AddField, { TableID: _ContextMenuTarget });
+                    break;
+                case "delete-table":
+                    SendMessage(XMessageType.DeleteSelected, {});
+                    break;
+                case "rename-table":
+                    if (_ContextMenuTarget)
+                        ShowRenameInput(_ContextMenuTarget);
+                    break;
             }
         });
 
         document.addEventListener("click", function(e) {
-            if (!_ContextMenu.contains(e.target))
+            if (!_ContextMenu.contains(e.target) && !_TableContextMenu.contains(e.target))
                 HideContextMenu();
         });
     }
@@ -114,6 +148,7 @@
     {
         _ContextMenuPosition.X = pCanvasX;
         _ContextMenuPosition.Y = pCanvasY;
+        _ContextMenuTarget = null;
 
         // Update menu items based on selection
         const deleteItem = _ContextMenu.querySelector('[data-action="delete-selected"]');
@@ -130,14 +165,26 @@
             renameItem.classList.remove("disabled");
         }
 
+        _TableContextMenu.classList.remove("visible");
         _ContextMenu.style.left = pX + "px";
         _ContextMenu.style.top = pY + "px";
         _ContextMenu.classList.add("visible");
     }
 
+    function ShowTableContextMenu(pX, pY, pTableID)
+    {
+        _ContextMenuTarget = pTableID;
+        _ContextMenu.classList.remove("visible");
+        _TableContextMenu.style.left = pX + "px";
+        _TableContextMenu.style.top = pY + "px";
+        _TableContextMenu.classList.add("visible");
+    }
+
     function HideContextMenu()
     {
         _ContextMenu.classList.remove("visible");
+        _TableContextMenu.classList.remove("visible");
+        _ContextMenuTarget = null;
     }
 
     function SetupCanvasEvents()
@@ -329,6 +376,13 @@
 
         pElement.addEventListener("dblclick", function(e) {
             ShowRenameInput(pTable.ID);
+        });
+
+        pElement.addEventListener("contextmenu", function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            SendMessage(XMessageType.SelectElement, { ElementID: pTable.ID });
+            ShowTableContextMenu(e.clientX, e.clientY, pTable.ID);
         });
     }
 

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<XORMDocument ID="00000000-0000-0000-0000-000000000001" Name="Sample ORM Model">
+    <XORMDesign ID="00000000-0000-0000-0000-000000000002" Name="Sample Design">
+        <XORMTable ID="00000000-0000-0000-0000-000000000003" Name="Customer" Schema="dbo" X="100" Y="100" Width="200" Height="150">
+            <XORMField ID="00000000-0000-0000-0000-000000000004" Name="CustomerID" DataType="Integer" IsPrimaryKey="true" />
+            <XORMField ID="00000000-0000-0000-0000-000000000005" Name="Name" DataType="String" Length="100" />
+            <XORMField ID="00000000-0000-0000-0000-000000000006" Name="Email" DataType="String" Length="255" />
+        </XORMTable>
+        <XORMTable ID="00000000-0000-0000-0000-000000000007" Name="Order" Schema="dbo" X="400" Y="100" Width="200" Height="150">
+            <XORMField ID="00000000-0000-0000-0000-000000000008" Name="OrderID" DataType="Integer" IsPrimaryKey="true" />
+            <XORMField ID="00000000-0000-0000-0000-000000000009" Name="CustomerID" DataType="Integer" />
+            <XORMField ID="00000000-0000-0000-0000-00000000000a" Name="OrderDate" DataType="DateTime" />
+            <XORMField ID="00000000-0000-0000-0000-00000000000b" Name="Total" DataType="Decimal" Precision="18" Scale="2" />
+        </XORMTable>
+        <XORMReference ID="00000000-0000-0000-0000-00000000000c" Name="FK_Order_Customer" SourceID="00000000-0000-0000-0000-000000000007" TargetID="00000000-0000-0000-0000-000000000003" />
+    </XORMDesign>
+</XORMDocument>

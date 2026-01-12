@@ -414,7 +414,7 @@ export class XmlReader
     {
         const result = new Map<string, XIXDataValue | XIXLinkDataValue>();
 
-        const propsNode = pNode.ChildNodes.find(n => n.TagName === "Properties");
+        const propsNode = pNode.ChildNodes.find(n => n.TagName === "XValues");
         if (!propsNode)
             return result;
 
@@ -551,7 +551,7 @@ export class XmlReader
     {
         for (const childNode of pNode.ChildNodes)
         {
-            if (childNode.TagName === "Properties")
+            if (childNode.TagName === "XValues")
                 continue;
 
             const childElement = this.ReadElement(childNode);

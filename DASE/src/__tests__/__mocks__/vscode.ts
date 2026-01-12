@@ -209,6 +209,7 @@ export const window = {
     showWarningMessage: jest.fn(() => Promise.resolve(undefined)),
     showErrorMessage: jest.fn(() => Promise.resolve(undefined)),
     showInputBox: jest.fn(() => Promise.resolve(undefined)),
+    showQuickPick: jest.fn(() => Promise.resolve(undefined)),
     registerCustomEditorProvider: jest.fn(),
     registerWebviewViewProvider: jest.fn(),
     activeTextEditor: undefined as { document: TextDocument } | undefined

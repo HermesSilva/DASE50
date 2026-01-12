@@ -12,7 +12,7 @@ export { XError } from "./XError.js";
 
 // XElement - Base element class
 export { XElement, XDocumentBase, IsXElement, IsXDocumentBase } from "./XElement.js";
-export type { XElementCtor, XElementPredicate } from "./XElement.js";
+export type { XElementPredicate } from "./XElement.js";
 
 // XProperty - Property system
 export { XProperty, XPropertyDefault, XPersistableElementBase } from "./XProperty.js";

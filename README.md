@@ -147,7 +147,7 @@ DASE aims to be a comprehensive visual design environment supporting:
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Custom Editor | Opens `.daseorm.json` files in visual designer | ✅ Implemented |
+| Custom Editor | Opens `.dsorm` files in visual designer | ✅ Implemented |
 | Tables | Visual table representation with columns | ✅ Implemented |
 | Relations | Visual relationship lines between tables | ✅ Implemented |
 | Properties Panel | Edit selected element properties | ✅ Implemented |
@@ -207,7 +207,7 @@ The designer uses a typed message protocol for webview communication:
 - `Dase.DeleteSelected` — Delete selected elements
 - `Dase.RenameSelected` — Rename selected element
 
-**Explorer (.daseorm.json files):**
+**Explorer (.dsorm files):**
 - `Dase.OpenORMDesigner` — Open file in visual designer
 - `Dase.ValidateORMModel` — Validate model and populate Issues
 

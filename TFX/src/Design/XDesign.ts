@@ -141,12 +141,13 @@ export abstract class XDesign extends XRectangle
             return false;
 
         const gap = pOptions?.Gap ?? this._DefaultGap;
+        const checkCollision = pOptions?.CheckCollision ?? true;
         const router = this.Router;
         router.Gap = gap;
         router.clear();
         router.clearObstacles();
 
-        if (pObstacles && (pOptions?.CheckCollision ?? true))
+        if (pObstacles && checkCollision)
         {
             for (const obs of pObstacles)
             {
@@ -310,8 +311,15 @@ export abstract class XDesign extends XRectangle
         const dy = pPoint.Y - center.Y;
 
         if (Math.abs(dx) > Math.abs(dy))
-            return dx > 0 ? XRouterDirection.East : XRouterDirection.West;
-        return dy > 0 ? XRouterDirection.South : XRouterDirection.North;
+        {
+            if (dx > 0)
+                return XRouterDirection.East;
+            return XRouterDirection.West;
+        }
+        
+        if (dy > 0)
+            return XRouterDirection.South;
+        return XRouterDirection.North;
     }
 
     /**
