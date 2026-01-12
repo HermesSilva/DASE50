@@ -1163,4 +1163,566 @@ describe('XTFXBridge', () => {
             expect(result).toBeUndefined();
         });
     });
+
+    describe('LoadOrmModelFromText XML handling', () => {
+        it('should load XML format when text starts with <?xml', async () => {
+            const xmlText = '<?xml version="1.0"?><XORMDocument><Name>Test</Name></XORMDocument>';
+            
+            // Mock the Engine.Deserialize to return success with data
+            const mockDoc = {
+                ID: 'mock-id',
+                Name: 'Test Doc',
+                ChildNodes: [],
+                Design: { ChildNodes: [] },
+                Initialize: jest.fn()
+            };
+            
+            bridge.Initialize();
+            (bridge as any)._Engine = {
+                Deserialize: jest.fn().mockReturnValue({ Success: true, Data: mockDoc }),
+                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '' })
+            };
+
+            const doc = await bridge.LoadOrmModelFromText(xmlText);
+
+            expect(mockDoc.Initialize).toHaveBeenCalled();
+            expect(doc).toBe(mockDoc);
+        });
+
+        it('should load XML format when text starts with <', async () => {
+            const xmlText = '<XORMDocument><Name>Test</Name></XORMDocument>';
+            
+            const mockDoc = {
+                ID: 'mock-id',
+                Name: 'Test Doc',
+                ChildNodes: [],
+                Design: { ChildNodes: [] },
+                Initialize: jest.fn()
+            };
+            
+            bridge.Initialize();
+            (bridge as any)._Engine = {
+                Deserialize: jest.fn().mockReturnValue({ Success: true, Data: mockDoc }),
+                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '' })
+            };
+
+            const doc = await bridge.LoadOrmModelFromText(xmlText);
+
+            expect(mockDoc.Initialize).toHaveBeenCalled();
+        });
+
+        it('should fallback to new doc when XML deserialization fails', async () => {
+            const xmlText = '<?xml version="1.0"?><XORMDocument></XORMDocument>';
+            
+            bridge.Initialize();
+            (bridge as any)._Engine = {
+                Deserialize: jest.fn().mockReturnValue({ Success: false, Data: null }),
+                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '' })
+            };
+
+            const doc = await bridge.LoadOrmModelFromText(xmlText);
+
+            expect(doc).toBeDefined();
+            expect(doc.Name).toBe('ORM Model');
+        });
+
+        it('should fallback to new doc when XML deserialization returns null data', async () => {
+            const xmlText = '<?xml version="1.0"?><XORMDocument></XORMDocument>';
+            
+            bridge.Initialize();
+            (bridge as any)._Engine = {
+                Deserialize: jest.fn().mockReturnValue({ Success: true, Data: null }),
+                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '' })
+            };
+
+            const doc = await bridge.LoadOrmModelFromText(xmlText);
+
+            expect(doc).toBeDefined();
+            expect(doc.Name).toBe('ORM Model');
+        });
+    });
+
+    describe('SaveOrmModelToText serialization branches', () => {
+        it('should return XML when serialization succeeds with XmlOutput', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            (bridge as any)._Engine = {
+                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '<TestXml/>' })
+            };
+
+            const result = bridge.SaveOrmModelToText();
+
+            expect(result).toBe('<TestXml/>');
+        });
+
+        it('should return empty XML when serialization succeeds but XmlOutput is empty', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            (bridge as any)._Engine = {
+                Serialize: jest.fn().mockReturnValue({ Success: true, XmlOutput: '' })
+            };
+
+            const result = bridge.SaveOrmModelToText();
+
+            expect(result).toBe('<?xml version="1.0" encoding="utf-8"?>\n<XORMDocument />');
+        });
+
+        it('should return empty XML when serialization returns Success: false', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            (bridge as any)._Engine = {
+                Serialize: jest.fn().mockReturnValue({ Success: false, XmlOutput: '<SomeXml/>' })
+            };
+
+            const result = bridge.SaveOrmModelToText();
+
+            expect(result).toBe('<?xml version="1.0" encoding="utf-8"?>\n<XORMDocument />');
+        });
+    });
+
+    describe('AddReference FK field creation', () => {
+        beforeEach(async () => {
+            await bridge.LoadOrmModelFromText('{}');
+        });
+
+        it('should use "Target" as default name when target table not found', () => {
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(null);
+            bridge.Controller.AddReference = jest.fn().mockReturnValue({ Success: true });
+            bridge.Controller.AddField = jest.fn().mockReturnValue({ Success: true });
+
+            const result = bridge.AddReference('source-id', 'target-id', 'FK_Test');
+
+            expect(bridge.Controller.AddField).toHaveBeenCalledWith(expect.objectContaining({
+                TableID: 'source-id',
+                Name: 'TargetID'
+            }));
+        });
+
+        it('should use target table name for FK field when target table found', () => {
+            const mockTargetTable = { Name: 'Users' };
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockTargetTable);
+            bridge.Controller.AddReference = jest.fn().mockReturnValue({ Success: true });
+            bridge.Controller.AddField = jest.fn().mockReturnValue({ Success: true });
+
+            const result = bridge.AddReference('source-id', 'target-id', 'FK_Test');
+
+            expect(bridge.Controller.AddField).toHaveBeenCalledWith(expect.objectContaining({
+                TableID: 'source-id',
+                Name: 'UsersID'
+            }));
+        });
+
+        it('should generate default reference name when name is empty', () => {
+            const mockTargetTable = { Name: 'Orders' };
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockTargetTable);
+            bridge.Controller.AddReference = jest.fn().mockReturnValue({ Success: true });
+            bridge.Controller.AddField = jest.fn().mockReturnValue({ Success: true });
+
+            bridge.AddReference('source-id', 'target-id', '');
+
+            expect(bridge.Controller.AddReference).toHaveBeenCalledWith(expect.objectContaining({
+                Name: 'FK_Orders'
+            }));
+        });
+
+        it('should not create FK field when AddReference fails', () => {
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue({ Name: 'Users' });
+            bridge.Controller.AddReference = jest.fn().mockReturnValue({ Success: false });
+            bridge.Controller.AddField = jest.fn();
+
+            bridge.AddReference('source-id', 'target-id', 'FK_Test');
+
+            expect(bridge.Controller.AddField).not.toHaveBeenCalled();
+        });
+
+        it('should return fallback when Controller.AddReference returns null', () => {
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue({ Name: 'Users' });
+            bridge.Controller.AddReference = jest.fn().mockReturnValue(null);
+            bridge.Controller.AddField = jest.fn();
+
+            const result = bridge.AddReference('source-id', 'target-id', 'FK_Test');
+
+            expect(result).toEqual({ Success: false });
+            expect(bridge.Controller.AddField).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('GetModelData table Fields fallback', () => {
+        it('should use table.Fields when GetChildrenOfType is null', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            const mockField = { ID: 'field-1', Name: 'FieldFromArray', DataType: 'String', IsPrimaryKey: false, IsNullable: true };
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'TestTable',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                GetChildrenOfType: null,
+                Fields: [mockField]
+            };
+            
+            bridge.Controller.Document = { Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const data = await bridge.GetModelData();
+
+            expect(data.Tables[0].Fields.length).toBe(1);
+            expect(data.Tables[0].Fields[0].Name).toBe('FieldFromArray');
+        });
+
+        it('should use empty array when both GetChildrenOfType is undefined and Fields is undefined', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            // Create plain object without GetChildrenOfType method
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'TestTable',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 }
+                // No GetChildrenOfType property at all
+                // No Fields property at all
+            };
+            
+            bridge.Controller.Document = { Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const data = await bridge.GetModelData();
+
+            expect(data.Tables[0].Fields).toEqual([]);
+        });
+
+        it('should use empty array when GetChildrenOfType returns null', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'TestTable',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                GetChildrenOfType: jest.fn().mockReturnValue(null)
+            };
+            
+            bridge.Controller.Document = { Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const data = await bridge.GetModelData();
+
+            expect(data.Tables[0].Fields).toEqual([]);
+        });
+    });
+
+    describe('LoadFromJson reference error handling', () => {
+        let mockDoc: any;
+        
+        beforeEach(async () => {
+            await bridge.Initialize();
+            
+            mockDoc = {
+                ID: 'test-doc',
+                Name: 'Initial',
+                Design: {
+                    CreateTable: jest.fn().mockReturnValue({
+                        ID: 'table-1',
+                        Fields: [],
+                        CreateField: jest.fn()
+                    }),
+                    CreateReference: jest.fn().mockImplementation(() => {
+                        throw new Error('Reference creation failed');
+                    })
+                }
+            };
+        });
+
+        it('should log warning and continue when reference creation throws', async () => {
+            const jsonData = {
+                References: [
+                    { Name: 'FailingRef', SourceID: 'table-1', TargetID: 'table-2' }
+                ]
+            };
+
+            // Should not throw - error is caught and logged
+            expect(() => {
+                (bridge as any).LoadFromJson(mockDoc, jsonData);
+            }).not.toThrow();
+        });
+
+        it('should process multiple references and continue after error', async () => {
+            let callCount = 0;
+            mockDoc.Design.CreateReference = jest.fn().mockImplementation(() => {
+                callCount++;
+                if (callCount === 1) {
+                    throw new Error('First reference failed');
+                }
+                return { ID: 'ref-2', Name: 'SecondRef', Points: [] };
+            });
+
+            const jsonData = {
+                References: [
+                    { Name: 'FirstRef', SourceID: 'table-1', TargetID: 'table-2' },
+                    { Name: 'SecondRef', SourceID: 'table-2', TargetID: 'table-3' }
+                ]
+            };
+
+            (bridge as any).LoadFromJson(mockDoc, jsonData);
+
+            expect(mockDoc.Design.CreateReference).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    describe('SaveToJson Fields fallback', () => {
+        it('should use table.Fields when GetChildrenOfType is null in SaveToJson', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            const mockField = { ID: 'field-1', Name: 'FieldFromArray', DataType: 'String', Length: 0, IsPrimaryKey: false, IsNullable: true, IsAutoIncrement: false, DefaultValue: '', Description: '' };
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'TestTable',
+                Schema: 'dbo',
+                Description: '',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                GetChildrenOfType: null,
+                Fields: [mockField]
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const result = (bridge as any).SaveToJson(bridge.Controller.Document);
+
+            expect(result.Tables[0].Fields.length).toBe(1);
+            expect(result.Tables[0].Fields[0].Name).toBe('FieldFromArray');
+        });
+
+        it('should use empty array when both GetChildrenOfType is undefined and Fields is undefined in SaveToJson', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            // Create plain object without GetChildrenOfType method or Fields
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'TestTable',
+                Schema: 'dbo',
+                Description: '',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 }
+                // No GetChildrenOfType property at all
+                // No Fields property at all
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const result = (bridge as any).SaveToJson(bridge.Controller.Document);
+
+            expect(result.Tables[0].Fields).toEqual([]);
+        });
+    });
+
+    describe('AlignLines', () => {
+        it('should return false when RouteAllLines is undefined', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            bridge.Controller.RouteAllLines = undefined;
+
+            const result = bridge.AlignLines();
+
+            expect(result).toBe(false);
+        });
+
+        it('should return false when RouteAllLines returns undefined', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            bridge.Controller.RouteAllLines = jest.fn().mockReturnValue(undefined);
+
+            const result = bridge.AlignLines();
+
+            expect(result).toBe(false);
+        });
+
+        it('should return true when RouteAllLines succeeds', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            bridge.Controller.RouteAllLines = jest.fn().mockReturnValue(true);
+
+            const result = bridge.AlignLines();
+
+            expect(result).toBe(true);
+        });
+    });
+
+    describe('DeleteElement fallback', () => {
+        it('should return { Success: false } when Controller is null', () => {
+            const result = bridge.DeleteElement('elem-1');
+
+            expect(result).toEqual({ Success: false });
+        });
+    });
+
+    describe('RenameElement fallback', () => {
+        it('should return { Success: false } when Controller is null', () => {
+            const result = bridge.RenameElement('elem-1', 'NewName');
+
+            expect(result).toEqual({ Success: false });
+        });
+    });
+
+    describe('MoveElement fallback', () => {
+        it('should return { Success: false } when Controller is null', () => {
+            const result = bridge.MoveElement('elem-1', 100, 200);
+
+            expect(result).toEqual({ Success: false });
+        });
+    });
+
+    describe('UpdateProperty fallback', () => {
+        it('should return { Success: false } when Controller is null', () => {
+            const result = bridge.UpdateProperty('elem-1', 'Name', 'NewName');
+
+            expect(result).toEqual({ Success: false });
+        });
+    });
+
+    describe('AddField fallback', () => {
+        it('should return { Success: false } when Controller is null', () => {
+            const result = bridge.AddField('table-1', 'NewField', 'String');
+
+            expect(result).toEqual({ Success: false });
+        });
+    });
+
+    describe('AddTable fallback', () => {
+        it('should return { Success: false } when Controller AddTable returns null', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            bridge.Controller.AddTable = jest.fn().mockReturnValue(null);
+
+            const result = bridge.AddTable(100, 200, 'NewTable');
+
+            expect(result).toEqual({ Success: false, Message: "Failed to add table." });
+        });
+    });
+
+    describe('SaveToJson reference fallbacks', () => {
+        it('should use Source/Target when SourceID/TargetID are undefined', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            const mockReference = {
+                ID: 'ref-1',
+                Name: 'FK_Test',
+                SourceID: undefined,
+                TargetID: undefined,
+                Source: 'src-table',
+                Target: 'tgt-table',
+                Description: '',
+                Points: null
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockReference]);
+
+            const result = (bridge as any).SaveToJson(bridge.Controller.Document);
+
+            expect(result.References[0].SourceID).toBe('src-table');
+            expect(result.References[0].TargetID).toBe('tgt-table');
+            expect(result.References[0].Points).toEqual([]);
+        });
+
+        it('should map reference Points correctly', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            const mockReference = {
+                ID: 'ref-1',
+                Name: 'FK_Test',
+                SourceID: 'table-1',
+                TargetID: 'table-2',
+                Description: 'Test',
+                Points: [{ X: 10, Y: 20 }, { X: 30, Y: 40 }]
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([mockReference]);
+
+            const result = (bridge as any).SaveToJson(bridge.Controller.Document);
+
+            expect(result.References[0].Points).toEqual([{ X: 10, Y: 20 }, { X: 30, Y: 40 }]);
+        });
+    });
+
+    describe('GetModelData with table having no GetChildrenOfType and no Fields (line 382)', () => {
+        it('should use empty array when table has neither GetChildrenOfType nor Fields property', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            // Create a table mock without GetChildrenOfType and without Fields
+            const mockTableWithoutMethods = {
+                ID: 'table-no-methods',
+                Name: 'NoMethodsTable',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                // No GetChildrenOfType method
+                // No Fields property
+            };
+            
+            bridge.Controller.Document = { Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTableWithoutMethods]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const result = bridge.GetModelData();
+
+            expect(result.Tables).toHaveLength(1);
+            expect(result.Tables[0].ID).toBe('table-no-methods');
+            expect(result.Tables[0].Fields).toEqual([]); // Should be empty array from else branch
+        });
+    });
+
+    describe('SaveToJson with table having no GetChildrenOfType and no Fields (lines 510-512)', () => {
+        it('should use empty array when table has neither GetChildrenOfType nor Fields', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            // Create a table mock that has neither GetChildrenOfType nor Fields
+            const tableWithNoFieldAccess = {
+                ID: 'table-bare',
+                Name: 'BareTable',
+                Schema: 'dbo',
+                Description: 'A table with no field access',
+                Bounds: { Left: 100, Top: 200, Width: 250, Height: 180 }
+                // Explicitly no GetChildrenOfType
+                // Explicitly no Fields
+            };
+            
+            bridge.Controller.Document = { Name: 'TestDoc', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([tableWithNoFieldAccess]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const result = (bridge as any).SaveToJson(bridge.Controller.Document);
+
+            expect(result.Name).toBe('TestDoc');
+            expect(result.Tables).toHaveLength(1);
+            expect(result.Tables[0].ID).toBe('table-bare');
+            expect(result.Tables[0].Name).toBe('BareTable');
+            expect(result.Tables[0].Fields).toEqual([]); // Empty array from else branch at line 512
+        });
+
+        it('should use Fields when GetChildrenOfType is undefined but Fields exists', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            // Table with Fields but no GetChildrenOfType
+            const tableWithFields = {
+                ID: 'table-fields',
+                Name: 'FieldsTable',
+                Schema: 'dbo',
+                Description: '',
+                Bounds: { Left: 0, Top: 0, Width: 200, Height: 150 },
+                // No GetChildrenOfType
+                Fields: [
+                    { ID: 'f1', Name: 'ID', DataType: 'Int32', Length: 4, IsPrimaryKey: true, IsNullable: false, IsAutoIncrement: true, DefaultValue: '', Description: '' }
+                ]
+            };
+            
+            bridge.Controller.Document = { Name: 'Test', Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([tableWithFields]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const result = (bridge as any).SaveToJson(bridge.Controller.Document);
+
+            expect(result.Tables[0].Fields).toHaveLength(1);
+            expect(result.Tables[0].Fields[0].Name).toBe('ID');
+        });
+    });
 });

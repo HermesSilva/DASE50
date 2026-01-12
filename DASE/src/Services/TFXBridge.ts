@@ -375,12 +375,7 @@ export class XTFXBridge
 
         const tablesData: ITableData[] = tables.map((t: any) => {
             // Get fields using GetChildrenOfType or directly from Fields array
-            let fields = [];
-            if (t.GetChildrenOfType) {
-                fields = t.GetChildrenOfType(XORMField) || [];
-            } else if (t.Fields) {
-                fields = t.Fields || [];
-            }
+            const fields = t.GetChildrenOfType?.(XORMField) ?? t.Fields ?? [];
             
             return {
                 ID: t.ID,
@@ -505,12 +500,7 @@ export class XTFXBridge
             Name: pDoc.Name,
             Tables: tables.map((t: any) => {
                 // Get fields using GetChildrenOfType or directly from Fields array
-                let fields = [];
-                if (t.GetChildrenOfType) {
-                    fields = t.GetChildrenOfType(null) || [];
-                } else if (t.Fields) {
-                    fields = t.Fields || [];
-                }
+                const fields = t.GetChildrenOfType?.(null) ?? t.Fields ?? [];
                 
                 return {
                     ID: t.ID,

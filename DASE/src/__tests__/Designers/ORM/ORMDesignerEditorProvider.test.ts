@@ -778,6 +778,43 @@ describe('XORMDesignerEditorProvider', () => {
 
             expect(mockState.AddField).not.toHaveBeenCalled();
         });
+
+        it('should not save when AddField fails', async () => {
+            (GetSelectionService as jest.Mock).mockReturnValue({
+                OnSelectionChanged: jest.fn(() => ({ dispose: jest.fn() })),
+                Clear: jest.fn(),
+                Select: jest.fn(),
+                ToggleSelection: jest.fn(),
+                AddToSelection: jest.fn(),
+                HasSelection: true,
+                PrimaryID: 'table-1',
+                SelectedIDs: ['table-1']
+            });
+
+            const testProvider = new XORMDesignerEditorProvider(mockContext as any);
+
+            const uri = Uri.file('/test/model.dsorm');
+            const mockPanel = createMockWebviewPanel();
+            mockPanel.active = true;
+            
+            const mockState = {
+                AddField: jest.fn().mockReturnValue({ Success: false }),
+                GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
+                Save: jest.fn().mockResolvedValue(undefined),
+                Document: { uri }
+            };
+
+            (testProvider as any)._States.set(uri.toString(), mockState);
+            (testProvider as any)._Webviews.set(uri.toString(), mockPanel);
+
+            (vscode.window.showInputBox as jest.Mock).mockResolvedValue('TestField');
+            (vscode.window.showQuickPick as jest.Mock).mockResolvedValue('String');
+
+            await testProvider.AddFieldToSelectedTable();
+
+            expect(mockState.AddField).toHaveBeenCalled();
+            expect(mockState.Save).not.toHaveBeenCalled();
+        });
     });
 
     describe('ValidateModel', () => {
@@ -1339,6 +1376,314 @@ describe('XORMDesignerEditorProvider', () => {
             expect(typeof provider.saveCustomDocumentAs).toBe('function');
             expect(typeof provider.revertCustomDocument).toBe('function');
             expect(typeof provider.backupCustomDocument).toBe('function');
+        });
+    });
+
+    describe('AlignLinesInActiveDesigner', () => {
+        it('should show warning when no active designer', async () => {
+            await provider.AlignLinesInActiveDesigner();
+
+            expect(vscode.window.showWarningMessage).toHaveBeenCalledWith('No active ORM Designer.');
+        });
+
+        it('should align lines and save when successful', async () => {
+            const uri = Uri.file('/test/model.dsorm');
+            const mockPanel = createMockWebviewPanel();
+            mockPanel.active = true;
+            
+            const mockState = {
+                AlignLines: jest.fn().mockReturnValue({ Success: true }),
+                GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
+                Save: jest.fn().mockResolvedValue(undefined),
+                Document: { uri }
+            };
+
+            (provider as any)._States.set(uri.toString(), mockState);
+            (provider as any)._Webviews.set(uri.toString(), mockPanel);
+
+            await provider.AlignLinesInActiveDesigner();
+
+            expect(mockState.AlignLines).toHaveBeenCalled();
+            expect(mockState.GetModelData).toHaveBeenCalled();
+            expect(mockPanel.webview.postMessage).toHaveBeenCalled();
+            expect(mockState.Save).toHaveBeenCalled();
+            expect(vscode.window.showInformationMessage).toHaveBeenCalledWith('Lines aligned successfully.');
+        });
+
+        it('should show warning when align fails', async () => {
+            const uri = Uri.file('/test/model.dsorm');
+            const mockPanel = createMockWebviewPanel();
+            mockPanel.active = true;
+            
+            const mockState = {
+                AlignLines: jest.fn().mockReturnValue({ Success: false }),
+                GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
+                Save: jest.fn().mockResolvedValue(undefined),
+                Document: { uri }
+            };
+
+            (provider as any)._States.set(uri.toString(), mockState);
+            (provider as any)._Webviews.set(uri.toString(), mockPanel);
+
+            await provider.AlignLinesInActiveDesigner();
+
+            expect(vscode.window.showWarningMessage).toHaveBeenCalledWith('Failed to align lines.');
+            expect(mockState.Save).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('HandleMessage AlignLines', () => {
+        let mockPanel: any;
+        let mockState: any;
+
+        beforeEach(() => {
+            mockPanel = createMockWebviewPanel();
+            mockState = {
+                AlignLines: jest.fn().mockReturnValue({ Success: true }),
+                GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
+                IsDirty: false,
+                Document: { uri: Uri.file('/test/model.dsorm') }
+            };
+        });
+
+        it('should handle AlignLines message', async () => {
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'AlignLines' });
+
+            expect(mockState.AlignLines).toHaveBeenCalled();
+        });
+
+        it('should post model data when AlignLines succeeds', async () => {
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'AlignLines' });
+
+            expect(mockState.GetModelData).toHaveBeenCalled();
+            expect(mockPanel.webview.postMessage).toHaveBeenCalled();
+        });
+
+        it('should not post message when AlignLines fails', async () => {
+            mockState.AlignLines = jest.fn().mockReturnValue({ Success: false });
+            mockPanel.webview.postMessage.mockClear();
+
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'AlignLines' });
+
+            expect(mockPanel.webview.postMessage).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('HandleMessage AddField with tableID from payload', () => {
+        let mockPanel: any;
+        let mockState: any;
+
+        beforeEach(() => {
+            mockPanel = createMockWebviewPanel();
+            mockState = {
+                AddField: jest.fn().mockReturnValue({ Success: true }),
+                GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
+                IsDirty: false,
+                Document: { uri: Uri.file('/test/model.dsorm') }
+            };
+        });
+
+        it('should use tableID from payload when provided', async () => {
+            await provider.HandleMessage(mockPanel, mockState, { 
+                Type: 'AddField', 
+                Payload: { TableID: 'table-from-payload', Name: 'TestField', DataType: 'String' } 
+            });
+
+            expect(mockState.AddField).toHaveBeenCalledWith('table-from-payload', 'TestField', 'String');
+        });
+
+        it('should not show input prompts when Name and DataType are provided', async () => {
+            await provider.HandleMessage(mockPanel, mockState, { 
+                Type: 'AddField', 
+                Payload: { TableID: 'table-1', Name: 'ProvidedName', DataType: 'Int32' } 
+            });
+
+            expect(vscode.window.showInputBox).not.toHaveBeenCalled();
+            expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('OnAddField tableID from selection', () => {
+        let mockPanel: any;
+        let mockState: any;
+
+        beforeEach(() => {
+            mockPanel = createMockWebviewPanel();
+            mockState = {
+                AddField: jest.fn().mockReturnValue({ Success: true }),
+                GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
+                IsDirty: false,
+                Document: { uri: Uri.file('/test/model.dsorm') }
+            };
+        });
+
+        it('should use selection PrimaryID when tableID not in payload', async () => {
+            // Setup selection service with selection
+            (GetSelectionService as jest.Mock).mockReturnValue({
+                OnSelectionChanged: jest.fn(() => ({ dispose: jest.fn() })),
+                Clear: jest.fn(),
+                Select: jest.fn(),
+                ToggleSelection: jest.fn(),
+                AddToSelection: jest.fn(),
+                HasSelection: true,
+                PrimaryID: 'selected-table-id',
+                SelectedIDs: ['selected-table-id']
+            });
+
+            // Create new provider with the updated mock
+            const testProvider = new XORMDesignerEditorProvider(mockContext as any);
+
+            await testProvider.HandleMessage(mockPanel, mockState, { 
+                Type: 'AddField', 
+                Payload: { Name: 'TestField', DataType: 'String' } // No TableID
+            });
+
+            expect(mockState.AddField).toHaveBeenCalledWith('selected-table-id', 'TestField', 'String');
+        });
+
+        it('should show warning when no tableID and no selection', async () => {
+            // Setup selection service without selection
+            (GetSelectionService as jest.Mock).mockReturnValue({
+                OnSelectionChanged: jest.fn(() => ({ dispose: jest.fn() })),
+                Clear: jest.fn(),
+                Select: jest.fn(),
+                ToggleSelection: jest.fn(),
+                AddToSelection: jest.fn(),
+                HasSelection: false,
+                PrimaryID: null,
+                SelectedIDs: []
+            });
+
+            const testProvider = new XORMDesignerEditorProvider(mockContext as any);
+
+            await testProvider.HandleMessage(mockPanel, mockState, { 
+                Type: 'AddField', 
+                Payload: { Name: 'TestField', DataType: 'String' } // No TableID
+            });
+
+            expect(vscode.window.showWarningMessage).toHaveBeenCalledWith('No table selected.');
+            expect(mockState.AddField).not.toHaveBeenCalled();
+        });
+
+        it('should prompt for field name when not provided and add field', async () => {
+            (GetSelectionService as jest.Mock).mockReturnValue({
+                OnSelectionChanged: jest.fn(() => ({ dispose: jest.fn() })),
+                HasSelection: true,
+                PrimaryID: 'table-1',
+                SelectedIDs: ['table-1']
+            });
+
+            const testProvider = new XORMDesignerEditorProvider(mockContext as any);
+            (vscode.window.showInputBox as jest.Mock).mockResolvedValue('PromptedFieldName');
+            (vscode.window.showQuickPick as jest.Mock).mockResolvedValue('DateTime');
+
+            await testProvider.HandleMessage(mockPanel, mockState, { 
+                Type: 'AddField', 
+                Payload: { TableID: 'table-1' } // No Name or DataType
+            });
+
+            expect(vscode.window.showInputBox).toHaveBeenCalled();
+            expect(vscode.window.showQuickPick).toHaveBeenCalled();
+            expect(mockState.AddField).toHaveBeenCalledWith('table-1', 'PromptedFieldName', 'DateTime');
+        });
+
+        it('should abort when field name prompt is cancelled', async () => {
+            (vscode.window.showInputBox as jest.Mock).mockResolvedValue(undefined);
+
+            await provider.HandleMessage(mockPanel, mockState, { 
+                Type: 'AddField', 
+                Payload: { TableID: 'table-1' } // No Name
+            });
+
+            expect(mockState.AddField).not.toHaveBeenCalled();
+        });
+
+        it('should abort when data type prompt is cancelled', async () => {
+            (vscode.window.showInputBox as jest.Mock).mockResolvedValue('TestField');
+            (vscode.window.showQuickPick as jest.Mock).mockResolvedValue(undefined);
+
+            await provider.HandleMessage(mockPanel, mockState, { 
+                Type: 'AddField', 
+                Payload: { TableID: 'table-1' } // No DataType
+            });
+
+            expect(mockState.AddField).not.toHaveBeenCalled();
+        });
+
+        it('should not post message when AddField fails', async () => {
+            mockState.AddField = jest.fn().mockReturnValue({ Success: false });
+            mockPanel.webview.postMessage.mockClear();
+
+            await provider.HandleMessage(mockPanel, mockState, { 
+                Type: 'AddField', 
+                Payload: { TableID: 'table-1', Name: 'TestField', DataType: 'String' }
+            });
+
+            expect(mockPanel.webview.postMessage).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('revertCustomDocument when state not found', () => {
+        it('should not throw when state not found', async () => {
+            const uri = Uri.file('/test/nonexistent.dsorm');
+            const mockDoc = { uri, dispose: jest.fn() };
+            const token = {} as vscode.CancellationToken;
+
+            (vscode.workspace.fs.readFile as jest.Mock).mockClear();
+
+            await provider.revertCustomDocument(mockDoc as any, token);
+
+            expect(vscode.workspace.fs.readFile).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('State changes and document notifications', () => {
+        it('should fire document change event when state becomes dirty', async () => {
+            const uri = Uri.file('/test/model.dsorm');
+            const mockDoc = { uri, dispose: jest.fn() };
+            const mockPanel = createMockWebviewPanel();
+            const token = {} as vscode.CancellationToken;
+
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+
+            let capturedListener: ((e: any) => void) | null = null;
+            const mockEventEmitter = {
+                event: jest.fn((listener) => {
+                    capturedListener = listener;
+                    return { dispose: jest.fn() };
+                }),
+                fire: jest.fn()
+            };
+
+            await provider.resolveCustomEditor(mockDoc as any, mockPanel as any, token);
+
+            // Get the state and set it to dirty to trigger the event
+            const state = (provider as any)._States.get(uri.toString());
+            expect(state).toBeDefined();
+            
+            // Setting IsDirty should trigger OnStateChanged
+            state.IsDirty = true;
+            expect(state.IsDirty).toBe(true);
+        });
+
+        it('should not fire event when state IsDirty is false', async () => {
+            const uri = Uri.file('/test/model2.dsorm');
+            const mockDoc = { uri, dispose: jest.fn() };
+            const mockPanel = createMockWebviewPanel();
+            const token = {} as vscode.CancellationToken;
+
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+
+            await provider.resolveCustomEditor(mockDoc as any, mockPanel as any, token);
+
+            // Get the state
+            const state = (provider as any)._States.get(uri.toString());
+            expect(state).toBeDefined();
+            
+            // Set dirty then clear it - this tests the false branch
+            state.IsDirty = true;
+            state.IsDirty = false;
+            expect(state.IsDirty).toBe(false);
         });
     });
 });

@@ -1,7 +1,3 @@
-# DASE50 — Design-Aided Software Engineering
-
-
-
 ## TFX — Core Framework
 
 [![CI](https://github.com/Tootega/DASE50/actions/workflows/ci.yml/badge.svg)](https://github.com/HermesSilva/DASE50/actions/workflows/ci.yml)
@@ -23,6 +19,8 @@
 ![AI Written](https://img.shields.io/badge/written%20by-AI-blueviolet)
 
 ---
+
+# DASE50 — Design-Aided Software Engineering
 
 ## 🧪 An Experiment in AI-Driven Software Development
 

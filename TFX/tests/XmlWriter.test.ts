@@ -79,8 +79,12 @@ describe("XmlWriter", () => {
         el.SetValue(XWriterTestElement.LinkProp, targetID);
         
         writer.WriteElement(el);
-        // Linked properties are tracked in context and not written as XData
-        expect(writer.GetOutput()).not.toContain("LinkProp");
+        const output = writer.GetOutput();
+        
+        // Linked properties should be written as XLinkData
+        expect(output).toContain("XLinkData");
+        expect(output).toContain("LinkProp");
+        expect(output).toContain(targetID);
     });
 
     it("should handle culture sensitive property serialization (Lines 336-337)", () => {

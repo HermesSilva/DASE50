@@ -2,6 +2,7 @@ import { XDesignElement } from "./XDesignElement.js";
 import { XProperty } from "../Core/XProperty.js";
 import { XColor, XPoint } from "../Core/XGeometry.js";
 import { XGuid } from "../Core/XGuid.js";
+import { XLinkData } from "../Core/XData.js";
 
 export abstract class XLine extends XDesignElement
 {
@@ -52,12 +53,37 @@ export abstract class XLine extends XDesignElement
 
     public get Source(): string
     {
-        return this.GetValue(XLine.SourceProp) as string;
+        // For Link properties, we need to read from XLinkData
+        const linkData = this.Values.GetChildById<XLinkData>(XLine.SourceProp.ID);
+        if (linkData === null)
+            return XGuid.EmptyValue;
+        return (linkData.Data as string) || XGuid.EmptyValue;
     }
 
     public set Source(pValue: string)
     {
-        this.SetValue(XLine.SourceProp, pValue);
+        // For Link properties, we need to create XLinkData manually
+        if (!pValue)
+            pValue = XGuid.EmptyValue;
+
+        const old = this.Source; // Use the getter
+        if (old === pValue)
+            return;
+
+        let linkData = this.Values.GetChildById<XLinkData>(XLine.SourceProp.ID);
+        if (linkData === null)
+        {
+            linkData = new XLinkData();
+            linkData.ID = XLine.SourceProp.ID;
+            linkData.Name = XLine.SourceProp.Name;
+            linkData.Data = pValue;
+            this.Values.AppendChild(linkData as any);
+        }
+        else
+            linkData.Data = pValue;
+
+        this.TrackChange(XLine.SourceProp, old, pValue);
+        this.RaisePropertyChanged(XLine.SourceProp, pValue);
     }
 
     public get SourceID(): string
@@ -67,12 +93,37 @@ export abstract class XLine extends XDesignElement
 
     public get Target(): string
     {
-        return this.GetValue(XLine.TargetProp) as string;
+        // For Link properties, we need to read from XLinkData
+        const linkData = this.Values.GetChildById<XLinkData>(XLine.TargetProp.ID);
+        if (linkData === null)
+            return XGuid.EmptyValue;
+        return (linkData.Data as string) || XGuid.EmptyValue;
     }
 
     public set Target(pValue: string)
     {
-        this.SetValue(XLine.TargetProp, pValue);
+        // For Link properties, we need to create XLinkData manually
+        if (!pValue)
+            pValue = XGuid.EmptyValue;
+
+        const old = this.Target; // Use the getter
+        if (old === pValue)
+            return;
+
+        let linkData = this.Values.GetChildById<XLinkData>(XLine.TargetProp.ID);
+        if (linkData === null)
+        {
+            linkData = new XLinkData();
+            linkData.ID = XLine.TargetProp.ID;
+            linkData.Name = XLine.TargetProp.Name;
+            linkData.Data = pValue;
+            this.Values.AppendChild(linkData as any);
+        }
+        else
+            linkData.Data = pValue;
+
+        this.TrackChange(XLine.TargetProp, old, pValue);
+        this.RaisePropertyChanged(XLine.TargetProp, pValue);
     }
 
     public get TargetID(): string

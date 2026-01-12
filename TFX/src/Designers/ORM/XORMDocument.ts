@@ -63,11 +63,8 @@ export class XORMDocument extends XDocument<XORMDesign>
                 if (design !== primaryDesign)
                 {
                     const idx = this.ChildNodes.indexOf(design);
-                    if (idx >= 0)
-                    {
-                        console.log(`[XORMDocument.Initialize] Removing duplicate design at index ${idx}`);
-                        this.ChildNodes.splice(idx, 1);
-                    }
+                    console.log(`[XORMDocument.Initialize] Removing duplicate design at index ${idx}`);
+                    this.ChildNodes.splice(idx, 1);
                 }
             }
             

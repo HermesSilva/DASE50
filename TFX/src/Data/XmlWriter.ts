@@ -322,10 +322,26 @@ export class XmlWriter
 
         if (pData.IsLinked)
         {
+            // Write XLinkData to XML
+            const elementID = pData.Value as string;
+            this.WriteXLinkData(
+                pd.Name,
+                prop.ID,
+                "String",  // GUIDs are stored as strings
+                elementID,
+                "",  // Text
+                "",  // DocumentID
+                "",  // DocumentName
+                "",  // ModuleID
+                "",  // ModuleName
+                elementID,
+                ""   // DataEx
+            );
+
             this._Context.AddPendingReference(
                 this._Context.DocumentID,
                 prop.ID,
-                pData.Value as string
+                elementID
             );
             return;
         }

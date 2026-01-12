@@ -412,4 +412,158 @@ describe('XORMDesignerState', () => {
             expect(() => state.Dispose()).not.toThrow();
         });
     });
+
+    describe('DocumentUri', () => {
+        it('should return document uri as string', () => {
+            const uri = state.DocumentUri;
+
+            expect(typeof uri).toBe('string');
+            expect(uri).toBeTruthy();
+        });
+    });
+
+    describe('AddField', () => {
+        beforeEach(async () => {
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await state.Load();
+        });
+
+        it('should add field and mark dirty on success', () => {
+            state.Bridge.AddField = jest.fn().mockReturnValue({ Success: true });
+
+            const result = state.AddField('table-1', 'NewField', 'String');
+
+            expect(result.Success).toBe(true);
+            expect(state.IsDirty).toBe(true);
+        });
+
+        it('should not mark dirty when add fails', () => {
+            state.Bridge.AddField = jest.fn().mockReturnValue({ Success: false });
+
+            const result = state.AddField('table-1', 'NewField', 'String');
+
+            expect(result.Success).toBe(false);
+            expect(state.IsDirty).toBe(false);
+        });
+
+        it('should handle null result from bridge', () => {
+            state.Bridge.AddField = jest.fn().mockReturnValue(null);
+
+            const result = state.AddField('table-1', 'NewField', 'String');
+
+            expect(result.Success).toBe(false);
+            expect(state.IsDirty).toBe(false);
+        });
+    });
+
+    describe('AlignLines', () => {
+        beforeEach(async () => {
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await state.Load();
+        });
+
+        it('should align lines and mark dirty on success', () => {
+            state.Bridge.AlignLines = jest.fn().mockReturnValue(true);
+
+            const result = state.AlignLines();
+
+            expect(result.Success).toBe(true);
+            expect(state.IsDirty).toBe(true);
+        });
+
+        it('should not mark dirty when align returns false', () => {
+            state.Bridge.AlignLines = jest.fn().mockReturnValue(false);
+
+            const result = state.AlignLines();
+
+            expect(result.Success).toBe(false);
+            expect(state.IsDirty).toBe(false);
+        });
+    });
+
+    describe('AddTable null result', () => {
+        beforeEach(async () => {
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await state.Load();
+        });
+
+        it('should handle null result from Bridge.AddTable', () => {
+            state.Bridge.AddTable = jest.fn().mockReturnValue(null);
+
+            const result = state.AddTable(100, 200, 'NewTable');
+
+            expect(result.Success).toBe(false);
+            expect(state.IsDirty).toBe(false);
+        });
+    });
+
+    describe('RenameSelected null result', () => {
+        beforeEach(async () => {
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await state.Load();
+        });
+
+        it('should handle null result from Bridge.RenameElement', () => {
+            const selectionService = state.SelectionService;
+            Object.defineProperty(selectionService, 'HasSelection', { value: true, writable: true });
+            Object.defineProperty(selectionService, 'PrimaryID', { value: 'elem-1', writable: true });
+            state.Bridge.RenameElement = jest.fn().mockReturnValue(null);
+
+            const result = state.RenameSelected('NewName');
+
+            expect(result.Success).toBe(false);
+            expect(state.IsDirty).toBe(false);
+        });
+    });
+
+    describe('MoveElement null result', () => {
+        beforeEach(async () => {
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await state.Load();
+        });
+
+        it('should handle null result from Bridge.MoveElement', () => {
+            state.Bridge.MoveElement = jest.fn().mockReturnValue(null);
+
+            const result = state.MoveElement('elem-1', 300, 400);
+
+            expect(result.Success).toBe(false);
+            expect(state.IsDirty).toBe(false);
+        });
+    });
+
+    describe('UpdateProperty null result', () => {
+        beforeEach(async () => {
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await state.Load();
+        });
+
+        it('should handle null result from Bridge.UpdateProperty', () => {
+            state.Bridge.UpdateProperty = jest.fn().mockReturnValue(null);
+
+            const result = state.UpdateProperty('elem-1', 'Name', 'NewName');
+
+            expect(result.Success).toBe(false);
+            expect(state.IsDirty).toBe(false);
+        });
+    });
+
+    describe('DeleteSelected null result', () => {
+        beforeEach(async () => {
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await state.Load();
+        });
+
+        it('should handle null result from Bridge.DeleteElement', () => {
+            const selectionService = state.SelectionService;
+            Object.defineProperty(selectionService, 'HasSelection', { value: true, writable: true });
+            Object.defineProperty(selectionService, 'SelectedIDs', { value: ['elem-1'], writable: true });
+            selectionService.Clear = jest.fn();
+            state.Bridge.DeleteElement = jest.fn().mockReturnValue(null);
+
+            const result = state.DeleteSelected();
+
+            expect(result.Success).toBe(false);
+        });
+    });
 });

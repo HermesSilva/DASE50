@@ -272,7 +272,11 @@ export class XTypeConverter
                 const py = ("Y" in pValue ? pValue.Y : (pValue as { Top?: number }).Top) ?? 0;
                 const dx = ("X" in pDefault ? pDefault.X : (pDefault as { Left?: number }).Left) ?? 0;
                 const dy = ("Y" in pDefault ? pDefault.Y : (pDefault as { Top?: number }).Top) ?? 0;
-                return px === dx && py === dy && pValue?.Width === pDefault?.Width && pValue?.Height === pDefault?.Height;
+                const vw = pValue.Width ?? 0;
+                const vh = pValue.Height ?? 0;
+                const dw = pDefault.Width ?? 0;
+                const dh = pDefault.Height ?? 0;
+                return px === dx && py === dy && vw === dw && vh === dh;
             }
         });
 
