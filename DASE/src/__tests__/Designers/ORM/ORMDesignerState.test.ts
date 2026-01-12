@@ -565,4 +565,20 @@ describe('XORMDesignerState', () => {
             expect(result.Success).toBe(false);
         });
     });
+
+    describe('GetElementInfo', () => {
+        beforeEach(async () => {
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await state.Load();
+        });
+
+        it('should delegate to Bridge.GetElementInfo', () => {
+            state.Bridge.GetElementInfo = jest.fn().mockReturnValue({ ID: 'elem-1', Name: 'Test', Type: 'table' });
+
+            const result = state.GetElementInfo('elem-1');
+
+            expect(state.Bridge.GetElementInfo).toHaveBeenCalledWith('elem-1');
+            expect(result).toEqual({ ID: 'elem-1', Name: 'Test', Type: 'table' });
+        });
+    });
 });

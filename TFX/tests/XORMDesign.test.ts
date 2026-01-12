@@ -9,4 +9,11 @@ describe("XORMDesign", () => {
         expect(design).toBeInstanceOf(XORMDesign);
         expect(design).toBeInstanceOf(XDesign);
     });
+
+    it("should get and set Schema property", () => {
+        const design = new XORMDesign();
+        expect(design.Schema).toBe("dbo");
+        design.Schema = "sales";
+        expect(design.Schema).toBe("sales");
+    });
 });

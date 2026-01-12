@@ -9,8 +9,8 @@
       <XValues>
         <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">b2caa08c-8871-49bd-9d18-e11be1ad6e5e</XData>
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">NewTable</XData>
-        <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=645;Y=309;Width=200;Height=150}</XData>
-        <XData Name="Fill" ID="00000001-0001-0001-0003-000000000007" Type="Color">{A=255;R=139;G=69;B=19}</XData>
+        <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=557;Y=347;Width=200;Height=150}</XData>
+        <XData Name="Fill" ID="00000001-0001-0001-0003-000000000007" Type="Color">{A=255;R=0;G=128;B=0}</XData>
       </XValues>
       <XORMField ID="06f1f323-3ec7-4dad-ad9a-6851a5047c20" Name="NewTableID">
         <XValues>
@@ -24,6 +24,7 @@
         <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">b194133d-53e5-4731-a182-81bc1ca3045b</XData>
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">NewTablesdsdds</XData>
         <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=533;Y=3;Width=200;Height=150}</XData>
+        <XData Name="Fill" ID="00000001-0001-0001-0003-000000000007" Type="Color">{A=255;R=47;G=79;B=79}</XData>
       </XValues>
       <XORMField ID="21f65dba-6ec8-4b03-a599-23a9b040256d" Name="NewTableID">
         <XValues>
@@ -36,8 +37,8 @@
       <XValues>
         <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">7570ec88-d3ec-4ee8-acfd-aaeeb1759f08</XData>
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">sdsdsd</XData>
-        <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=1233;Y=243;Width=200;Height=150}</XData>
-        <XData Name="Fill" ID="00000001-0001-0001-0003-000000000007" Type="Color">{A=255;R=127;G=255;B=0}</XData>
+        <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=1224;Y=222;Width=200;Height=150}</XData>
+        <XData Name="Fill" ID="00000001-0001-0001-0003-000000000007" Type="Color">{A=255;R=154;G=205;B=50}</XData>
         <XData Name="Schema" ID="00000001-0002-0001-0001-000000000002" Type="String">dbodd</XData>
       </XValues>
       <XORMField ID="a756a4f3-f1eb-4728-a91c-76418b4b60f5" Name="NewTableID">
@@ -51,8 +52,8 @@
       <XValues>
         <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">7a4073ea-ae8d-49d4-8566-531323fdb943</XData>
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">NewTable</XData>
-        <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=942;Y=23;Width=200;Height=150}</XData>
-        <XData Name="Fill" ID="00000001-0001-0001-0003-000000000007" Type="Color">{A=255;R=154;G=205;B=50}</XData>
+        <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=887;Y=156;Width=200;Height=150}</XData>
+        <XData Name="Fill" ID="00000001-0001-0001-0003-000000000007" Type="Color">{A=255;R=178;G=34;B=34}</XData>
       </XValues>
     </XORMTable>
     <XORMTable ID="5ca89602-0700-44e2-a5a8-e237084d3a5d" Name="NewTable">
@@ -74,7 +75,7 @@
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">FK_NewTable</XData>
         <XLinkData Name="Source" ID="00000001-0001-0001-0004-000000000010" Type="String" ElementID="ee5024ea-828e-4ae4-82bf-cc59047517bc" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">ee5024ea-828e-4ae4-82bf-cc59047517bc</XLinkData>
         <XLinkData Name="Target" ID="00000001-0001-0001-0004-000000000011" Type="String" ElementID="7a4073ea-ae8d-49d4-8566-531323fdb943" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">7a4073ea-ae8d-49d4-8566-531323fdb943</XLinkData>
-        <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="Point[]">{X=451;Y=221}|{X=1453;Y=221}|{X=1453;Y=98}|{X=942;Y=98}</XData>
+        <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="Point[]">{X=451;Y=221}|{X=669;Y=221}|{X=669;Y=231}|{X=887;Y=231}</XData>
       </XValues>
     </XORMReference>
     <XORMReference ID="aebb733a-2dd2-4bf8-87f5-fa6547740d68" Name="FK_NewTable">
@@ -83,7 +84,7 @@
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">FK_NewTable</XData>
         <XLinkData Name="Source" ID="00000001-0001-0001-0004-000000000010" Type="String" ElementID="21f65dba-6ec8-4b03-a599-23a9b040256d" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">21f65dba-6ec8-4b03-a599-23a9b040256d</XLinkData>
         <XLinkData Name="Target" ID="00000001-0001-0001-0004-000000000011" Type="String" ElementID="7a4073ea-ae8d-49d4-8566-531323fdb943" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">7a4073ea-ae8d-49d4-8566-531323fdb943</XLinkData>
-        <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="Point[]">{X=733;Y=43}|{X=837.5;Y=43}|{X=837.5;Y=83}|{X=942;Y=83}</XData>
+        <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="Point[]">{X=733;Y=43}|{X=810;Y=43}|{X=810;Y=216}|{X=887;Y=216}</XData>
       </XValues>
     </XORMReference>
     <XORMReference ID="4e0e9ef8-ecca-49b2-bd0e-7c4a1a08ab5c" Name="FK_NewTable">
@@ -92,7 +93,7 @@
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">FK_NewTable</XData>
         <XLinkData Name="Source" ID="00000001-0001-0001-0004-000000000010" Type="String" ElementID="a756a4f3-f1eb-4728-a91c-76418b4b60f5" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">a756a4f3-f1eb-4728-a91c-76418b4b60f5</XLinkData>
         <XLinkData Name="Target" ID="00000001-0001-0001-0004-000000000011" Type="String" ElementID="7a4073ea-ae8d-49d4-8566-531323fdb943" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">7a4073ea-ae8d-49d4-8566-531323fdb943</XLinkData>
-        <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="Point[]">{X=1233;Y=283}|{X=1187.5;Y=283}|{X=1187.5;Y=98}|{X=1142;Y=98}</XData>
+        <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="Point[]">{X=1224;Y=262}|{X=1155.5;Y=262}|{X=1155.5;Y=231}|{X=1087;Y=231}</XData>
       </XValues>
     </XORMReference>
     <XORMReference ID="4e51fbb0-7077-4373-aa19-91bb6073cf2a" Name="FK_NewTable">
@@ -101,7 +102,7 @@
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">FK_NewTable</XData>
         <XLinkData Name="Source" ID="00000001-0001-0001-0004-000000000010" Type="String" ElementID="06f1f323-3ec7-4dad-ad9a-6851a5047c20" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">06f1f323-3ec7-4dad-ad9a-6851a5047c20</XLinkData>
         <XLinkData Name="Target" ID="00000001-0001-0001-0004-000000000011" Type="String" ElementID="7a4073ea-ae8d-49d4-8566-531323fdb943" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">7a4073ea-ae8d-49d4-8566-531323fdb943</XLinkData>
-        <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="Point[]">{X=845;Y=349}|{X=893.5;Y=349}|{X=893.5;Y=128}|{X=942;Y=128}</XData>
+        <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="Point[]">{X=757;Y=387}|{X=822;Y=387}|{X=822;Y=261}|{X=887;Y=261}</XData>
       </XValues>
     </XORMReference>
   </XORMDesign>

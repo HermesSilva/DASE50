@@ -576,6 +576,23 @@ describe('XTFXBridge', () => {
 
             expect(result.Success).toBe(true); // Basic property update should work
         });
+
+        it('should return success for unknown element type with non-Name property (line 467 false branch)', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel"
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            // Mock GetElementByID to return an unknown element type
+            const mockElement = { ID: 'unknown-1', Name: 'Unknown', SomeProperty: 'value' } as any;
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockElement);
+
+            // Use a property key that's NOT "Name" to go through all instanceof checks
+            const result = bridge.UpdateProperty('unknown-1', 'SomeOtherProp', 'NewValue');
+
+            // Should return success but property not actually set (falls through)
+            expect(result.Success).toBe(true);
+        });
     });
 
     describe('GetProperties', () => {
@@ -637,6 +654,7 @@ describe('XTFXBridge', () => {
             (newBridge as any)._Controller.Document = null;
             
             const data = await newBridge.GetModelData();
+
 
             expect(data).toEqual({ Tables: [], References: [] });
         });
@@ -832,6 +850,29 @@ describe('XTFXBridge', () => {
             const data = await bridge.GetModelData();
 
             expect(data.Tables[0].FillProp).toBe('#FF0000');
+        });
+
+        it('should not set FillProp when Fill is object without ToString and not string (line 586 false branch)', async () => {
+            await bridge.LoadOrmModelFromText('{}');
+            
+            // Fill is an object without ToString method and not a string
+            // This tests when typeof t.Fill === 'string' returns false
+            const mockTable = {
+                ID: 'table-1',
+                Name: 'Users',
+                Bounds: { Left: 100, Top: 200, Width: 200, Height: 150 },
+                Fill: 12345, // Number, not a string, no ToString as function
+                GetChildrenOfType: jest.fn().mockReturnValue([])
+            };
+            
+            bridge.Controller.Document = { Design: {} };
+            bridge.Controller.GetTables = jest.fn().mockReturnValue([mockTable]);
+            bridge.Controller.GetReferences = jest.fn().mockReturnValue([]);
+
+            const data = await bridge.GetModelData();
+
+            // Fill should not be processed since it's neither XColor nor string
+            expect(data.Tables[0].FillProp).toBeUndefined();
         });
 
         it('should handle references with Source/Target properties', async () => {

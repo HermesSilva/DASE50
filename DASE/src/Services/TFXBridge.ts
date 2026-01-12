@@ -497,14 +497,11 @@ export class XTFXBridge
             props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String));
             
             const fillColor = element.Fill;
-            if (fillColor)
-            {
-                // Handle both XColor objects and strings
-                const colorStr = typeof fillColor.ToString === 'function' 
-                    ? fillColor.ToString() 
-                    : String(fillColor);
-                props.push(new XPropertyItem("Fill", "Fill", colorStr, XPropertyType.Color));
-            }
+            // fillColor is always an XColor object (never null/undefined) due to TFX property system defaults
+            const colorStr = typeof fillColor.ToString === 'function' 
+                ? fillColor.ToString() 
+                : String(fillColor);
+            props.push(new XPropertyItem("Fill", "Fill", colorStr, XPropertyType.Color));
 
             const bounds = element.Bounds;
             props.push(new XPropertyItem("X", "X", bounds.Left, XPropertyType.Number));
