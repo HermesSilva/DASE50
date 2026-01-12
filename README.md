@@ -1,11 +1,11 @@
 # DASE50 — Design-Aided Software Engineering
 
-[![CI](https://github.com/Tootega/DASE50/actions/workflows/ci.yml/badge.svg)](https://github.com/Tootega/DASE50/actions/workflows/ci.yml)
+[![CI](https://github.com/Tootega/DASE50/actions/workflows/ci.yml/badge.svg)](https://github.com/HermesSilva/DASE50/actions/workflows/ci.yml)
 
 ## TFX — Core Framework
 
-![TFX Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Tootega/4a8de64c5760e89b94863a7f0d9ecc46/raw/tfx-tests.json)
-![TFX Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Tootega/4a8de64c5760e89b94863a7f0d9ecc46/raw/tfx-coverage.json)
+![TFX Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/HermesSilva/4a8de64c5760e89b94863a7f0d9ecc46/raw/tfx-tests.json)
+![TFX Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/HermesSilva/4a8de64c5760e89b94863a7f0d9ecc46/raw/tfx-coverage.json)
 ![Node.js Version](https://img.shields.io/badge/node-%3E%3D%2020-blue.svg)
 ![Vitest](https://img.shields.io/badge/tested%20with-vitest-663399?logo=vitest)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-3178C6?logo=typescript&logoColor=white)
@@ -13,8 +13,8 @@
 
 ## DASE — VS Code Extension
 
-![DASE Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Tootega/4a8de64c5760e89b94863a7f0d9ecc46/raw/dase-tests.json)
-![DASE Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/Tootega/4a8de64c5760e89b94863a7f0d9ecc46/raw/dase-coverage.json)
+![DASE Tests](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/HermesSilva/4a8de64c5760e89b94863a7f0d9ecc46/raw/dase-tests.json)
+![DASE Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/HermesSilva/4a8de64c5760e89b94863a7f0d9ecc46/raw/dase-coverage.json)
 ![Node.js Version](https://img.shields.io/badge/node-%3E%3D%2020-blue.svg)
 ![Jest](https://img.shields.io/badge/tested%20with-jest-C21325?logo=jest)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-3178C6?logo=typescript&logoColor=white)
