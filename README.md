@@ -3,8 +3,8 @@
 ## TFX — Core Framework
 
 [![TFX CI](https://github.com/Tootega/DASE50/actions/workflows/tfx-ci.yml/badge.svg)](https://github.com/Tootega/DASE50/actions/workflows/tfx-ci.yml)
-![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
-![Tests](https://img.shields.io/badge/tests-1240%20passed-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-96%25-brightgreen)
+![Tests](https://img.shields.io/badge/tests-1301%20passed-brightgreen)
 ![Node.js Version](https://img.shields.io/badge/node-%3E%3D%2020-blue.svg)
 ![Vitest](https://img.shields.io/badge/tested%20with-vitest-663399?logo=vitest)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-3178C6?logo=typescript&logoColor=white)
@@ -14,7 +14,7 @@
 
 [![DASE CI](https://github.com/Tootega/DASE50/actions/workflows/dase-ci.yml/badge.svg)](https://github.com/Tootega/DASE50/actions/workflows/dase-ci.yml)
 ![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
-![Tests](https://img.shields.io/badge/tests-341%20passed-brightgreen)
+![Tests](https://img.shields.io/badge/tests-348%20passed-brightgreen)
 ![Node.js Version](https://img.shields.io/badge/node-%3E%3D%2020-blue.svg)
 ![Jest](https://img.shields.io/badge/tested%20with-jest-C21325?logo=jest)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-3178C6?logo=typescript&logoColor=white)
