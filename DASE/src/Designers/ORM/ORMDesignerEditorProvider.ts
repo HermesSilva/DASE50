@@ -311,7 +311,16 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
     async OnDesignerReady(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void>
     {
+        // Route all lines before sending model to ensure proper orthogonal routing
+        GetLogService().Info('[OnDesignerReady] About to call AlignLines');
+        const alignResult = pState.AlignLines();
+        GetLogService().Info(`[OnDesignerReady] AlignLines result: ${JSON.stringify(alignResult)}`);
+
         const modelData = await pState.GetModelData();
+        GetLogService().Info(`[OnDesignerReady] ModelData references: ${modelData.References?.length || 0}`);
+        modelData.References?.forEach((ref: any, i: number) => {
+            GetLogService().Info(`  Ref ${i}: ${ref.Name}, Points: ${ref.Points?.length || 0}`);
+        });
         pPanel.webview.postMessage({
             Type: XDesignerMessageType.LoadModel,
             Payload: modelData

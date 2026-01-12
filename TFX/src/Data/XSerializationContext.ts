@@ -242,6 +242,8 @@ export class XSerializationContext
         this._Phase = XSerializationPhase.ResolvingReferences;
         let resolved = 0;
 
+        console.log(`[ResolveReferences] Starting. Pending references: ${this._PendingReferences.length}`);
+
         for (let i = this._PendingReferences.length - 1; i >= 0; i--)
         {
             const ref = this._PendingReferences[i];
@@ -256,12 +258,14 @@ export class XSerializationContext
 
             if (source && target)
             {
+                // Marca como resolvido - GetLinkedElement resolverá automaticamente quando chamado
                 ref.IsResolved = true;
                 resolved++;
                 this._PendingReferences.splice(i, 1);
             }
         }
 
+        console.log(`[ResolveReferences] Completed. Resolved: ${resolved}`);
         return resolved;
     }
 

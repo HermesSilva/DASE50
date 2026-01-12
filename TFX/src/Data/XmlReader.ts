@@ -1,5 +1,6 @@
 import { XGuid } from "../Core/XGuid.js";
 import { XProperty } from "../Core/XProperty.js";
+import { XElement } from "../Core/XElement.js";
 import type { XPersistableElement } from "../Core/XPersistableElement.js";
 import { XSerializationContext, XSerializationPhase } from "./XSerializationContext.js";
 import { XElementRegistry } from "./XElementRegistry.js";
@@ -556,7 +557,7 @@ export class XmlReader
 
             const childElement = this.ReadElement(childNode);
             if (childElement)
-                pElement.ChildNodes.push(childElement as unknown as typeof pElement.ChildNodes[0]);
+                pElement.AppendChild(childElement as unknown as XElement);
         }
     }
 

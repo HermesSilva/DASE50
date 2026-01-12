@@ -1,4 +1,5 @@
 import { XGuid } from "../Core/XGuid.js";
+import { XRect, XPoint } from "../Core/XGeometry.js";
 
 export type XDataTypeName =
     | "String"
@@ -247,7 +248,7 @@ export class XTypeConverter
                 const h = pValue.Height ?? 0;
                 return `{X=${x};Y=${y};Width=${w};Height=${h}}`;
             },
-            FromString: (pValue: string): XIRect & { Left: number; Top: number } =>
+            FromString: (pValue: string): XRect =>
             {
                 const match = pValue?.match(/X=([^;]+);Y=([^;]+);Width=([^;]+);Height=([^}]+)/);
                 const x = match ? (parseFloat(match[1]) || 0) : 0;
@@ -255,15 +256,7 @@ export class XTypeConverter
                 const w = match ? (parseFloat(match[3]) || 0) : 0;
                 const h = match ? (parseFloat(match[4]) || 0) : 0;
                 
-                return {
-                    X: x,
-                    Y: y,
-                    Left: x,
-                    Top: y,
-                    Width: w,
-                    Height: h
-                };
-                
+                return new XRect(x, y, w, h);
             },
             
             IsDefault: (pValue: XIRect | { Left?: number; Top?: number; Width?: number; Height?: number }, pDefault: XIRect | { Left?: number; Top?: number; Width?: number; Height?: number }): boolean =>
@@ -290,17 +283,17 @@ export class XTypeConverter
                 return `{X=${pValue.X};Y=${pValue.Y}}`;
                 
             },
-            FromString: (pValue: string): XIPoint =>
+            FromString: (pValue: string): XPoint =>
             {
                 const match = pValue?.match(/X=([^;]+);Y=([^}]+)/);
                 
                 if (!match)
-                    return { X: 0, Y: 0 };
-                return {
-                    X: parseFloat(match[1]) || 0,
-                    Y: parseFloat(match[2]) || 0
-                };
+                    return new XPoint(0, 0);
                 
+                return new XPoint(
+                    parseFloat(match[1]) || 0,
+                    parseFloat(match[2]) || 0
+                );
             },
             IsDefault: (pValue: XIPoint, pDefault: XIPoint): boolean =>
                 pValue?.X === pDefault?.X && pValue?.Y === pDefault?.Y
@@ -314,9 +307,8 @@ export class XTypeConverter
                     return "";
                 return pValue.map(p => `{X=${p.X};Y=${p.Y}}`).join("|");
             },
-            FromString: (pValue: string): XIPoint[] =>
+            FromString: (pValue: string): XPoint[] =>
             {
-                
                 if (!pValue)
                     return [];
                 
@@ -327,13 +319,13 @@ export class XTypeConverter
                     const match = part.match(/X=([^;]+);Y=([^}]+)/);
                     
                     if (!match)
-                        return { X: 0, Y: 0 };
-                    return {
-                        X: parseFloat(match[1]) || 0,
-                        Y: parseFloat(match[2]) || 0
-                    };
+                        return new XPoint(0, 0);
+                    
+                    return new XPoint(
+                        parseFloat(match[1]) || 0,
+                        parseFloat(match[2]) || 0
+                    );
                 });
-                
             },
             
             IsDefault: (pValue: XIPoint[], pDefault: XIPoint[]): boolean =>

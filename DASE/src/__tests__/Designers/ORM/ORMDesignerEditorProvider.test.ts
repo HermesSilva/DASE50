@@ -1005,6 +1005,22 @@ describe('XORMDesignerEditorProvider', () => {
         it('should handle DesignerReady message', async () => {
             await provider.HandleMessage(mockPanel, mockState, { Type: 'DesignerReady' });
 
+            expect(mockState.AlignLines).toHaveBeenCalled();
+            expect(mockState.GetModelData).toHaveBeenCalled();
+            expect(mockPanel.webview.postMessage).toHaveBeenCalled();
+        });
+
+        it('should handle DesignerReady message with references in model', async () => {
+            mockState.GetModelData = jest.fn().mockResolvedValue({
+                Tables: [],
+                References: [
+                    { Name: 'FK_Test', Points: [{ X: 0, Y: 0 }, { X: 100, Y: 100 }] }
+                ]
+            });
+
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'DesignerReady' });
+
+            expect(mockState.AlignLines).toHaveBeenCalled();
             expect(mockState.GetModelData).toHaveBeenCalled();
             expect(mockPanel.webview.postMessage).toHaveBeenCalled();
         });
@@ -1295,6 +1311,7 @@ describe('XORMDesignerEditorProvider', () => {
                 GetModelData: jest.fn().mockResolvedValue({ Tables: [], References: [] }),
                 GetProperties: jest.fn().mockResolvedValue([{ Key: 'Name', Value: 'Test' }]),
                 Validate: jest.fn().mockResolvedValue([]),
+                AlignLines: jest.fn().mockReturnValue({ Success: true }),
                 IssueService: {
                     OnIssuesChanged: jest.fn((cb) => {
                         onIssuesChangedCallback = cb;
@@ -1337,6 +1354,7 @@ describe('XORMDesignerEditorProvider', () => {
                 await onMessageCallback({ Type: 'DesignerReady' });
             }
 
+            expect(mockState.AlignLines).toHaveBeenCalled();
             expect(mockState.GetModelData).toHaveBeenCalled();
         });
 

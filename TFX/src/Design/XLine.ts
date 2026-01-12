@@ -91,6 +91,11 @@ export abstract class XLine extends XDesignElement
         return this.Source;
     }
 
+    public GetSourceElement<T extends XDesignElement>(): T | null
+    {
+        return this.GetLinkedElement<T>(XLine.SourceProp);
+    }
+
     public get Target(): string
     {
         // For Link properties, we need to read from XLinkData
@@ -129,6 +134,11 @@ export abstract class XLine extends XDesignElement
     public get TargetID(): string
     {
         return this.Target;
+    }
+
+    public GetTargetElement<T extends XDesignElement>(): T | null
+    {
+        return this.GetLinkedElement<T>(XLine.TargetProp);
     }
 
     public get Points(): XPoint[]

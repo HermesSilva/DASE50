@@ -148,11 +148,28 @@ export class XTFXBridge
                     if (result.Success && result.Data)
                     {
                         // Initialize the document to consolidate multiple XORMDesign instances
-                        console.log('[TFXBridge] Before Initialize: ChildNodes count =', result.Data.ChildNodes?.length);
+                        GetLogService().Info('[TFXBridge] Before Initialize: ChildNodes count = ' + result.Data.ChildNodes?.length);
                         result.Data.Initialize();
-                        console.log('[TFXBridge] After Initialize: ChildNodes count =', result.Data.ChildNodes?.length);
-                        console.log('[TFXBridge] Design children count =', result.Data.Design?.ChildNodes?.length);
+                        GetLogService().Info('[TFXBridge] After Initialize: ChildNodes count = ' + result.Data.ChildNodes?.length);
+                        GetLogService().Info('[TFXBridge] Design children count = ' + result.Data.Design?.ChildNodes?.length);
                         this._Controller.Document = result.Data;
+                        
+                        // Route all lines after document is fully loaded and relationships established
+                        GetLogService().Info('[TFXBridge] Routing lines after load...');
+                        const references = result.Data.Design?.GetReferences();
+                        GetLogService().Info(`[TFXBridge] Found ${references?.length || 0} references before routing`);
+                        references?.forEach((ref: any, i: number) => {
+                            GetLogService().Info(`  Ref ${i}: Points before = ${ref.Points?.length || 0}, Points = ${JSON.stringify(ref.Points)}`);
+                        });
+                        
+                        result.Data.Design?.RouteAllLines();
+                        
+                        GetLogService().Info(`[TFXBridge] Found ${references?.length || 0} references after routing`);
+                        references?.forEach((ref: any, i: number) => {
+                            GetLogService().Info(`  Ref ${i}: Points after = ${ref.Points?.length || 0}, Points = ${JSON.stringify(ref.Points)}`);
+                        });
+                        GetLogService().Info('[TFXBridge] Lines routed');
+                        
                         return result.Data;
                     }
                 }
@@ -409,12 +426,16 @@ export class XTFXBridge
 
         const refsData: IReferenceData[] = references.map((r: any) => {
             GetLogService().Debug(`Reference: ID=${r.ID}, Name=${r.Name}, Source=${r.Source}, Target=${r.Target}`);
+            GetLogService().Debug(`Reference Points raw: ${JSON.stringify(r.Points)}`);
+            GetLogService().Debug(`Reference Points length: ${r.Points?.length || 0}`);
+            const mappedPoints = r.Points?.map((p: any) => ({ X: p.X, Y: p.Y })) || [];
+            GetLogService().Debug(`Reference Points mapped: ${JSON.stringify(mappedPoints)}`);
             return {
                 ID: r.ID,
                 Name: r.Name,
                 SourceFieldID: r.Source,
                 TargetTableID: r.Target,
-                Points: r.Points?.map((p: any) => ({ X: p.X, Y: p.Y })) || []
+                Points: mappedPoints
             };
         });
 
