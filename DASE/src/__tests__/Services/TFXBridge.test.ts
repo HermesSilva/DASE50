@@ -1631,33 +1631,29 @@ describe('XTFXBridge', () => {
             const pkTypeProp = props.find(p => p.Key === 'PKType');
 
             expect(pkTypeProp).toBeDefined();
-            // Fallback types should be used
-            expect(pkTypeProp?.Options).toEqual(["Int32", "Int64", "Guid"]);
+            // Fallback types should be used (alphabetically sorted)
+            expect(pkTypeProp?.Options).toEqual(["Guid", "Int32", "Int64"]);
         });
 
         it('should use fallback AllTypes when _AllDataTypes is empty', async () => {
-            // Load model with a table containing a field - don't mock GetElementByID
-            const json = JSON.stringify({
-                Name: "TestModel",
-                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "TestField", DataType: "String" }] }]
-            });
-            await bridge.LoadOrmModelFromText(json);
+            // Create a mock field element
+            const mockField = new tfx.XORMField();
+            mockField.ID = 'field-1';
+            mockField.Name = 'TestField';
+            mockField.DataType = 'String' as any;
 
-            // Find the field ID by traversing the model data
-            const modelData = bridge.GetModelData();
-            const table = modelData.Tables.find(t => t.Name === "TestTable");
-            const field = table?.Fields?.find((f: any) => f.Name === "TestField");
-            const fieldId = field?.ID || 'field-1';
+            // Mock GetElementByID to return the field
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockField);
 
             // Force _AllDataTypes to be empty
             (bridge as any)._AllDataTypes = [];
 
-            const props = bridge.GetProperties(fieldId);
+            const props = bridge.GetProperties('field-1');
             const dataTypeProp = props.find(p => p.Key === 'DataType');
 
             expect(dataTypeProp).toBeDefined();
-            // Fallback types should be used
-            expect(dataTypeProp?.Options).toEqual(["String", "Int32", "Boolean", "DateTime", "Guid"]);
+            // Fallback types should be used (alphabetically sorted)
+            expect(dataTypeProp?.Options).toEqual(["Boolean", "DateTime", "Guid", "Int32", "String"]);
         });
     });
 

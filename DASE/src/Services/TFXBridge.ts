@@ -585,6 +585,30 @@ export class XTFXBridge
         return { Success: true, ElementID: pElementID };
     }
 
+    private static readonly _GroupOrder: Record<string, number> =
+    {
+        "Tenanttity": 1,
+        "Data": 2,
+        "Behaviour": 3,
+        "Appearance": 4,
+        "Design": 5,
+        "Control": 6,
+        "Test": 7,
+        "General": 99
+    };
+
+    private SortProperties(pProps: XPropertyItem[]): XPropertyItem[]
+    {
+        return pProps.sort((a, b) =>
+        {
+            const grpA = XTFXBridge._GroupOrder[a.Group ?? "General"] ?? 99;
+            const grpB = XTFXBridge._GroupOrder[b.Group ?? "General"] ?? 99;
+            if (grpA !== grpB)
+                return grpA - grpB;
+            return a.Name.localeCompare(b.Name);
+        });
+    }
+
     GetProperties(pElementID: string): XPropertyItem[]
     {
         this.Initialize();
@@ -595,53 +619,52 @@ export class XTFXBridge
 
         const props: XPropertyItem[] = [];
 
-        props.push(new XPropertyItem("ID", "ID", element.ID, XPropertyType.String));
-        props.push(new XPropertyItem("Name", "Name", element.Name, XPropertyType.String));
+        props.push(new XPropertyItem("ID", "ID", element.ID, XPropertyType.String, undefined, "Tenanttity"));
+        props.push(new XPropertyItem("Name", "Name", element.Name, XPropertyType.String, undefined, "Tenanttity"));
 
         if (element instanceof XORMTable)
         {
             const pkTypes = this._PKDataTypes.length > 0 ? this._PKDataTypes : ["Guid", "Int32", "Int64"];
-            props.push(new XPropertyItem("PKType", "PK Type", element.PKType, XPropertyType.Enum, pkTypes));
-            props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String));
+            props.push(new XPropertyItem("PKType", "PK Type", element.PKType, XPropertyType.Enum, pkTypes, "Data"));
+            props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data"));
             
             const fillColor = element.Fill;
-            // fillColor is always an XColor object (never null/undefined) due to TFX property system defaults
             const colorStr = typeof fillColor.ToString === 'function' 
                 ? fillColor.ToString() 
                 : String(fillColor);
-            props.push(new XPropertyItem("Fill", "Fill", colorStr, XPropertyType.Color));
+            props.push(new XPropertyItem("Fill", "Fill", colorStr, XPropertyType.Color, undefined, "Appearance"));
 
             const bounds = element.Bounds;
-            props.push(new XPropertyItem("X", "X", bounds.Left, XPropertyType.Number));
-            props.push(new XPropertyItem("Y", "Y", bounds.Top, XPropertyType.Number));
-            props.push(new XPropertyItem("Width", "Width", bounds.Width, XPropertyType.Number));
-            props.push(new XPropertyItem("Height", "Height", bounds.Height, XPropertyType.Number));
+            props.push(new XPropertyItem("X", "X", bounds.Left, XPropertyType.Number, undefined, "Design"));
+            props.push(new XPropertyItem("Y", "Y", bounds.Top, XPropertyType.Number, undefined, "Design"));
+            props.push(new XPropertyItem("Width", "Width", bounds.Width, XPropertyType.Number, undefined, "Design"));
+            props.push(new XPropertyItem("Height", "Height", bounds.Height, XPropertyType.Number, undefined, "Design"));
         }
         else if (element instanceof XORMReference)
         {
-            props.push(new XPropertyItem("Source", "Source", element.Source, XPropertyType.String));
-            props.push(new XPropertyItem("Target", "Target", element.Target, XPropertyType.String));
-            props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String));
+            props.push(new XPropertyItem("Source", "Source", element.Source, XPropertyType.String, undefined, "Data"));
+            props.push(new XPropertyItem("Target", "Target", element.Target, XPropertyType.String, undefined, "Data"));
+            props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data"));
         }
         else if (element instanceof XORMField)
         {
             const allTypes = this._AllDataTypes.length > 0 ? this._AllDataTypes : ["Boolean", "DateTime", "Guid", "Int32", "String"];
-            props.push(new XPropertyItem("DataType", "Data Type", element.DataType, XPropertyType.Enum, allTypes));
-            props.push(new XPropertyItem("Length", "Length", element.Length, XPropertyType.Number));
-            props.push(new XPropertyItem("Scale", "Scale", element.Scale, XPropertyType.Number));
-            props.push(new XPropertyItem("IsRequired", "Required", element.IsRequired, XPropertyType.Boolean));
-            props.push(new XPropertyItem("IsPrimaryKey", "Primary Key", element.IsPrimaryKey, XPropertyType.Boolean));
-            props.push(new XPropertyItem("IsNullable", "Nullable", element.IsNullable, XPropertyType.Boolean));
-            props.push(new XPropertyItem("IsAutoIncrement", "Auto Increment", element.IsAutoIncrement, XPropertyType.Boolean));
-            props.push(new XPropertyItem("DefaultValue", "Default Value", element.DefaultValue, XPropertyType.String));
-            props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String));
+            props.push(new XPropertyItem("DataType", "Data Type", element.DataType, XPropertyType.Enum, allTypes, "Data"));
+            props.push(new XPropertyItem("Length", "Length", element.Length, XPropertyType.Number, undefined, "Data"));
+            props.push(new XPropertyItem("Scale", "Scale", element.Scale, XPropertyType.Number, undefined, "Data"));
+            props.push(new XPropertyItem("IsRequired", "Required", element.IsRequired, XPropertyType.Boolean, undefined, "Behaviour"));
+            props.push(new XPropertyItem("IsPrimaryKey", "Primary Key", element.IsPrimaryKey, XPropertyType.Boolean, undefined, "Data"));
+            props.push(new XPropertyItem("IsNullable", "Nullable", element.IsNullable, XPropertyType.Boolean, undefined, "Behaviour"));
+            props.push(new XPropertyItem("IsAutoIncrement", "Auto Increment", element.IsAutoIncrement, XPropertyType.Boolean, undefined, "Behaviour"));
+            props.push(new XPropertyItem("DefaultValue", "Default Value", element.DefaultValue, XPropertyType.String, undefined, "Data"));
+            props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data"));
         }
         else if (element instanceof XORMDesign)
         {
-            props.push(new XPropertyItem("Schema", "Schema", element.Schema, XPropertyType.String));
+            props.push(new XPropertyItem("Schema", "Schema", element.Schema, XPropertyType.String, undefined, "Data"));
         }
 
-        return props;
+        return this.SortProperties(props);
     }
 
     GetElementInfo(pElementID: string): { ID: string; Name: string; Type: string } | null

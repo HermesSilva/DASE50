@@ -235,25 +235,80 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         .property-readonly {
             opacity: 0.6;
         }
-        .color-picker-container {
+        .color-dropdown {
+            position: relative;
+            width: 100%;
+        }
+        .color-dropdown-selected {
             display: flex;
             align-items: center;
             gap: 6px;
+            padding: 2px 4px;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            cursor: pointer;
+            min-height: 20px;
         }
-        .color-swatch {
-            width: 20px;
-            height: 20px;
-            border-radius: 3px;
+        .color-dropdown-selected:hover {
+            border-color: var(--vscode-focusBorder);
+        }
+        .color-dropdown-swatch {
+            width: 16px;
+            height: 12px;
             border: 1px solid var(--vscode-input-border);
             flex-shrink: 0;
         }
-        .color-select {
+        .color-dropdown-name {
             flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
-        .color-option {
+        .color-dropdown-arrow {
+            margin-left: auto;
+            font-size: 10px;
+        }
+        .color-dropdown-list {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            z-index: 1000;
+        }
+        .color-dropdown.open .color-dropdown-list {
+            display: block;
+        }
+        .color-dropdown-item {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
+            padding: 3px 6px;
+            cursor: pointer;
+        }
+        .color-dropdown-item:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+        .color-dropdown-item.selected {
+            background-color: var(--vscode-list-activeSelectionBackground);
+        }
+        .property-group {
+            margin-bottom: 8px;
+        }
+        .property-group-header {
+            font-weight: 600;
+            padding: 6px 0 4px 0;
+            color: var(--vscode-foreground);
+            border-bottom: 1px solid var(--vscode-panel-border);
+            margin-bottom: 4px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.8;
         }
     </style>
 </head>
@@ -265,156 +320,148 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         let currentElementID = ${elementId};
         const initialProperties = ${propertiesJson};
         
-        // Web Colors - sorted by hue for better organization
+        // Web Colors - sorted alphabetically by name
         const WebColors = [
-            // Reds
-            { name: "IndianRed", hex: "#CD5C5C" },
-            { name: "LightCoral", hex: "#F08080" },
-            { name: "Salmon", hex: "#FA8072" },
-            { name: "DarkSalmon", hex: "#E9967A" },
-            { name: "Crimson", hex: "#DC143C" },
-            { name: "Red", hex: "#FF0000" },
-            { name: "FireBrick", hex: "#B22222" },
-            { name: "DarkRed", hex: "#8B0000" },
-            // Pinks
-            { name: "Pink", hex: "#FFC0CB" },
-            { name: "LightPink", hex: "#FFB6C1" },
-            { name: "HotPink", hex: "#FF69B4" },
-            { name: "DeepPink", hex: "#FF1493" },
-            { name: "MediumVioletRed", hex: "#C71585" },
-            { name: "PaleVioletRed", hex: "#DB7093" },
-            // Oranges
-            { name: "LightSalmon", hex: "#FFA07A" },
-            { name: "Coral", hex: "#FF7F50" },
-            { name: "Tomato", hex: "#FF6347" },
-            { name: "OrangeRed", hex: "#FF4500" },
-            { name: "DarkOrange", hex: "#FF8C00" },
-            { name: "Orange", hex: "#FFA500" },
-            // Yellows
-            { name: "Gold", hex: "#FFD700" },
-            { name: "Yellow", hex: "#FFFF00" },
-            { name: "LightYellow", hex: "#FFFFE0" },
-            { name: "LemonChiffon", hex: "#FFFACD" },
-            { name: "PapayaWhip", hex: "#FFEFD5" },
-            { name: "Moccasin", hex: "#FFE4B5" },
-            { name: "PeachPuff", hex: "#FFDAB9" },
-            { name: "PaleGoldenrod", hex: "#EEE8AA" },
-            { name: "Khaki", hex: "#F0E68C" },
-            { name: "DarkKhaki", hex: "#BDB76B" },
-            // Purples
-            { name: "Lavender", hex: "#E6E6FA" },
-            { name: "Thistle", hex: "#D8BFD8" },
-            { name: "Plum", hex: "#DDA0DD" },
-            { name: "Violet", hex: "#EE82EE" },
-            { name: "Orchid", hex: "#DA70D6" },
-            { name: "Fuchsia", hex: "#FF00FF" },
-            { name: "Magenta", hex: "#FF00FF" },
-            { name: "MediumOrchid", hex: "#BA55D3" },
-            { name: "MediumPurple", hex: "#9370DB" },
+            { name: "AliceBlue", hex: "#F0F8FF" },
+            { name: "AntiqueWhite", hex: "#FAEBD7" },
+            { name: "Aqua", hex: "#00FFFF" },
+            { name: "Aquamarine", hex: "#7FFFD4" },
+            { name: "Azure", hex: "#F0FFFF" },
+            { name: "Beige", hex: "#F5F5DC" },
+            { name: "Bisque", hex: "#FFE4C4" },
+            { name: "Black", hex: "#000000" },
+            { name: "BlanchedAlmond", hex: "#FFEBCD" },
+            { name: "Blue", hex: "#0000FF" },
             { name: "BlueViolet", hex: "#8A2BE2" },
-            { name: "DarkViolet", hex: "#9400D3" },
-            { name: "DarkOrchid", hex: "#9932CC" },
-            { name: "DarkMagenta", hex: "#8B008B" },
-            { name: "Purple", hex: "#800080" },
-            { name: "Indigo", hex: "#4B0082" },
-            { name: "SlateBlue", hex: "#6A5ACD" },
-            { name: "DarkSlateBlue", hex: "#483D8B" },
-            // Greens
-            { name: "GreenYellow", hex: "#ADFF2F" },
+            { name: "Brown", hex: "#A52A2A" },
+            { name: "BurlyWood", hex: "#DEB887" },
+            { name: "CadetBlue", hex: "#5F9EA0" },
             { name: "Chartreuse", hex: "#7FFF00" },
+            { name: "Chocolate", hex: "#D2691E" },
+            { name: "Coral", hex: "#FF7F50" },
+            { name: "CornflowerBlue", hex: "#6495ED" },
+            { name: "Cornsilk", hex: "#FFF8DC" },
+            { name: "Crimson", hex: "#DC143C" },
+            { name: "Cyan", hex: "#00FFFF" },
+            { name: "DarkBlue", hex: "#00008B" },
+            { name: "DarkCyan", hex: "#008B8B" },
+            { name: "DarkGoldenrod", hex: "#B8860B" },
+            { name: "DarkGray", hex: "#A9A9A9" },
+            { name: "DarkGreen", hex: "#006400" },
+            { name: "DarkKhaki", hex: "#BDB76B" },
+            { name: "DarkMagenta", hex: "#8B008B" },
+            { name: "DarkOliveGreen", hex: "#556B2F" },
+            { name: "DarkOrange", hex: "#FF8C00" },
+            { name: "DarkOrchid", hex: "#9932CC" },
+            { name: "DarkRed", hex: "#8B0000" },
+            { name: "DarkSalmon", hex: "#E9967A" },
+            { name: "DarkSeaGreen", hex: "#8FBC8F" },
+            { name: "DarkSlateBlue", hex: "#483D8B" },
+            { name: "DarkSlateGray", hex: "#2F4F4F" },
+            { name: "DarkTurquoise", hex: "#00CED1" },
+            { name: "DarkViolet", hex: "#9400D3" },
+            { name: "DeepPink", hex: "#FF1493" },
+            { name: "DeepSkyBlue", hex: "#00BFFF" },
+            { name: "DimGray", hex: "#696969" },
+            { name: "DodgerBlue", hex: "#1E90FF" },
+            { name: "FireBrick", hex: "#B22222" },
+            { name: "FloralWhite", hex: "#FFFAF0" },
+            { name: "ForestGreen", hex: "#228B22" },
+            { name: "Fuchsia", hex: "#FF00FF" },
+            { name: "Gainsboro", hex: "#DCDCDC" },
+            { name: "GhostWhite", hex: "#F8F8FF" },
+            { name: "Gold", hex: "#FFD700" },
+            { name: "Goldenrod", hex: "#DAA520" },
+            { name: "Gray", hex: "#808080" },
+            { name: "Green", hex: "#008000" },
+            { name: "GreenYellow", hex: "#ADFF2F" },
+            { name: "Honeydew", hex: "#F0FFF0" },
+            { name: "HotPink", hex: "#FF69B4" },
+            { name: "IndianRed", hex: "#CD5C5C" },
+            { name: "Indigo", hex: "#4B0082" },
+            { name: "Ivory", hex: "#FFFFF0" },
+            { name: "Khaki", hex: "#F0E68C" },
+            { name: "Lavender", hex: "#E6E6FA" },
+            { name: "LavenderBlush", hex: "#FFF0F5" },
             { name: "LawnGreen", hex: "#7CFC00" },
+            { name: "LemonChiffon", hex: "#FFFACD" },
+            { name: "LightBlue", hex: "#ADD8E6" },
+            { name: "LightCoral", hex: "#F08080" },
+            { name: "LightCyan", hex: "#E0FFFF" },
+            { name: "LightGoldenrodYellow", hex: "#FAFAD2" },
+            { name: "LightGray", hex: "#D3D3D3" },
+            { name: "LightGreen", hex: "#90EE90" },
+            { name: "LightPink", hex: "#FFB6C1" },
+            { name: "LightSalmon", hex: "#FFA07A" },
+            { name: "LightSeaGreen", hex: "#20B2AA" },
+            { name: "LightSkyBlue", hex: "#87CEFA" },
+            { name: "LightSlateGray", hex: "#778899" },
+            { name: "LightSteelBlue", hex: "#B0C4DE" },
+            { name: "LightYellow", hex: "#FFFFE0" },
             { name: "Lime", hex: "#00FF00" },
             { name: "LimeGreen", hex: "#32CD32" },
-            { name: "PaleGreen", hex: "#98FB98" },
-            { name: "LightGreen", hex: "#90EE90" },
-            { name: "MediumSpringGreen", hex: "#00FA9A" },
-            { name: "SpringGreen", hex: "#00FF7F" },
-            { name: "MediumSeaGreen", hex: "#3CB371" },
-            { name: "SeaGreen", hex: "#2E8B57" },
-            { name: "ForestGreen", hex: "#228B22" },
-            { name: "Green", hex: "#008000" },
-            { name: "DarkGreen", hex: "#006400" },
-            { name: "YellowGreen", hex: "#9ACD32" },
-            { name: "OliveDrab", hex: "#6B8E23" },
-            { name: "Olive", hex: "#808000" },
-            { name: "DarkOliveGreen", hex: "#556B2F" },
-            { name: "MediumAquamarine", hex: "#66CDAA" },
-            { name: "DarkSeaGreen", hex: "#8FBC8F" },
-            { name: "LightSeaGreen", hex: "#20B2AA" },
-            { name: "DarkCyan", hex: "#008B8B" },
-            { name: "Teal", hex: "#008080" },
-            // Blues
-            { name: "Aqua", hex: "#00FFFF" },
-            { name: "Cyan", hex: "#00FFFF" },
-            { name: "LightCyan", hex: "#E0FFFF" },
-            { name: "PaleTurquoise", hex: "#AFEEEE" },
-            { name: "Aquamarine", hex: "#7FFFD4" },
-            { name: "Turquoise", hex: "#40E0D0" },
-            { name: "MediumTurquoise", hex: "#48D1CC" },
-            { name: "DarkTurquoise", hex: "#00CED1" },
-            { name: "CadetBlue", hex: "#5F9EA0" },
-            { name: "SteelBlue", hex: "#4682B4" },
-            { name: "LightSteelBlue", hex: "#B0C4DE" },
-            { name: "PowderBlue", hex: "#B0E0E6" },
-            { name: "LightBlue", hex: "#ADD8E6" },
-            { name: "SkyBlue", hex: "#87CEEB" },
-            { name: "LightSkyBlue", hex: "#87CEFA" },
-            { name: "DeepSkyBlue", hex: "#00BFFF" },
-            { name: "DodgerBlue", hex: "#1E90FF" },
-            { name: "CornflowerBlue", hex: "#6495ED" },
-            { name: "RoyalBlue", hex: "#4169E1" },
-            { name: "Blue", hex: "#0000FF" },
-            { name: "MediumBlue", hex: "#0000CD" },
-            { name: "DarkBlue", hex: "#00008B" },
-            { name: "Navy", hex: "#000080" },
-            { name: "MidnightBlue", hex: "#191970" },
-            // Browns
-            { name: "Cornsilk", hex: "#FFF8DC" },
-            { name: "BlanchedAlmond", hex: "#FFEBCD" },
-            { name: "Bisque", hex: "#FFE4C4" },
-            { name: "NavajoWhite", hex: "#FFDEAD" },
-            { name: "Wheat", hex: "#F5DEB3" },
-            { name: "BurlyWood", hex: "#DEB887" },
-            { name: "Tan", hex: "#D2B48C" },
-            { name: "RosyBrown", hex: "#BC8F8F" },
-            { name: "SandyBrown", hex: "#F4A460" },
-            { name: "Goldenrod", hex: "#DAA520" },
-            { name: "DarkGoldenrod", hex: "#B8860B" },
-            { name: "Peru", hex: "#CD853F" },
-            { name: "Chocolate", hex: "#D2691E" },
-            { name: "SaddleBrown", hex: "#8B4513" },
-            { name: "Sienna", hex: "#A0522D" },
-            { name: "Brown", hex: "#A52A2A" },
-            { name: "Maroon", hex: "#800000" },
-            // Whites
-            { name: "White", hex: "#FFFFFF" },
-            { name: "Snow", hex: "#FFFAFA" },
-            { name: "Honeydew", hex: "#F0FFF0" },
-            { name: "MintCream", hex: "#F5FFFA" },
-            { name: "Azure", hex: "#F0FFFF" },
-            { name: "AliceBlue", hex: "#F0F8FF" },
-            { name: "GhostWhite", hex: "#F8F8FF" },
-            { name: "WhiteSmoke", hex: "#F5F5F5" },
-            { name: "Seashell", hex: "#FFF5EE" },
-            { name: "Beige", hex: "#F5F5DC" },
-            { name: "OldLace", hex: "#FDF5E6" },
-            { name: "FloralWhite", hex: "#FFFAF0" },
-            { name: "Ivory", hex: "#FFFFF0" },
-            { name: "AntiqueWhite", hex: "#FAEBD7" },
             { name: "Linen", hex: "#FAF0E6" },
-            { name: "LavenderBlush", hex: "#FFF0F5" },
+            { name: "Magenta", hex: "#FF00FF" },
+            { name: "Maroon", hex: "#800000" },
+            { name: "MediumAquamarine", hex: "#66CDAA" },
+            { name: "MediumBlue", hex: "#0000CD" },
+            { name: "MediumOrchid", hex: "#BA55D3" },
+            { name: "MediumPurple", hex: "#9370DB" },
+            { name: "MediumSeaGreen", hex: "#3CB371" },
+            { name: "MediumSlateBlue", hex: "#7B68EE" },
+            { name: "MediumSpringGreen", hex: "#00FA9A" },
+            { name: "MediumTurquoise", hex: "#48D1CC" },
+            { name: "MediumVioletRed", hex: "#C71585" },
+            { name: "MidnightBlue", hex: "#191970" },
+            { name: "MintCream", hex: "#F5FFFA" },
             { name: "MistyRose", hex: "#FFE4E1" },
-            // Grays
-            { name: "Gainsboro", hex: "#DCDCDC" },
-            { name: "LightGray", hex: "#D3D3D3" },
+            { name: "Moccasin", hex: "#FFE4B5" },
+            { name: "NavajoWhite", hex: "#FFDEAD" },
+            { name: "Navy", hex: "#000080" },
+            { name: "OldLace", hex: "#FDF5E6" },
+            { name: "Olive", hex: "#808000" },
+            { name: "OliveDrab", hex: "#6B8E23" },
+            { name: "Orange", hex: "#FFA500" },
+            { name: "OrangeRed", hex: "#FF4500" },
+            { name: "Orchid", hex: "#DA70D6" },
+            { name: "PaleGoldenrod", hex: "#EEE8AA" },
+            { name: "PaleGreen", hex: "#98FB98" },
+            { name: "PaleTurquoise", hex: "#AFEEEE" },
+            { name: "PaleVioletRed", hex: "#DB7093" },
+            { name: "PapayaWhip", hex: "#FFEFD5" },
+            { name: "PeachPuff", hex: "#FFDAB9" },
+            { name: "Peru", hex: "#CD853F" },
+            { name: "Pink", hex: "#FFC0CB" },
+            { name: "Plum", hex: "#DDA0DD" },
+            { name: "PowderBlue", hex: "#B0E0E6" },
+            { name: "Purple", hex: "#800080" },
+            { name: "Red", hex: "#FF0000" },
+            { name: "RosyBrown", hex: "#BC8F8F" },
+            { name: "RoyalBlue", hex: "#4169E1" },
+            { name: "SaddleBrown", hex: "#8B4513" },
+            { name: "Salmon", hex: "#FA8072" },
+            { name: "SandyBrown", hex: "#F4A460" },
+            { name: "SeaGreen", hex: "#2E8B57" },
+            { name: "Seashell", hex: "#FFF5EE" },
+            { name: "Sienna", hex: "#A0522D" },
             { name: "Silver", hex: "#C0C0C0" },
-            { name: "DarkGray", hex: "#A9A9A9" },
-            { name: "Gray", hex: "#808080" },
-            { name: "DimGray", hex: "#696969" },
-            { name: "LightSlateGray", hex: "#778899" },
+            { name: "SkyBlue", hex: "#87CEEB" },
+            { name: "SlateBlue", hex: "#6A5ACD" },
             { name: "SlateGray", hex: "#708090" },
-            { name: "DarkSlateGray", hex: "#2F4F4F" },
-            { name: "Black", hex: "#000000" }
+            { name: "Snow", hex: "#FFFAFA" },
+            { name: "SpringGreen", hex: "#00FF7F" },
+            { name: "SteelBlue", hex: "#4682B4" },
+            { name: "Tan", hex: "#D2B48C" },
+            { name: "Teal", hex: "#008080" },
+            { name: "Thistle", hex: "#D8BFD8" },
+            { name: "Tomato", hex: "#FF6347" },
+            { name: "Turquoise", hex: "#40E0D0" },
+            { name: "Violet", hex: "#EE82EE" },
+            { name: "Wheat", hex: "#F5DEB3" },
+            { name: "White", hex: "#FFFFFF" },
+            { name: "WhiteSmoke", hex: "#F5F5F5" },
+            { name: "Yellow", hex: "#FFFF00" },
+            { name: "YellowGreen", hex: "#9ACD32" }
         ];
         
         console.log("[PropertiesWebview] Script initialized with", initialProperties.length, "properties");
@@ -444,14 +491,29 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 return;
             }
 
-            let html = "";
+            const groups = new Map();
             for (const prop of pProperties)
             {
-                html += '<div class="property-row">';
-                html += '<div class="property-name" title="' + EscapeHtml(prop.Key) + '">' + EscapeHtml(prop.Name) + '</div>';
-                html += '<div class="property-value">';
-                html += GetPropertyEditor(prop);
-                html += '</div></div>';
+                const grp = prop.Group || "General";
+                if (!groups.has(grp))
+                    groups.set(grp, []);
+                groups.get(grp).push(prop);
+            }
+
+            let html = "";
+            for (const [grpName, grpProps] of groups)
+            {
+                html += '<div class="property-group">';
+                html += '<div class="property-group-header">' + EscapeHtml(grpName) + '</div>';
+                for (const prop of grpProps)
+                {
+                    html += '<div class="property-row">';
+                    html += '<div class="property-name" title="' + EscapeHtml(prop.Key) + '">' + EscapeHtml(prop.Name) + '</div>';
+                    html += '<div class="property-value">';
+                    html += GetPropertyEditor(prop);
+                    html += '</div></div>';
+                }
+                html += '</div>';
             }
             
             container.innerHTML = html;
@@ -498,20 +560,21 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
 
                 case "Color":
                     const hexColor = ConvertToHtmlColor(value);
-                    let colorOptions = "";
+                    const selectedColor = WebColors.find(function(c) { return c.hex.toUpperCase() === hexColor.toUpperCase(); }) || { name: "Unknown", hex: hexColor };
+                    let colorItems = "";
                     for (const c of WebColors)
                     {
-                        const selected = c.hex.toUpperCase() === hexColor.toUpperCase() ? "selected" : "";
-                        const brightness = parseInt(c.hex.slice(1,3),16) + parseInt(c.hex.slice(3,5),16) + parseInt(c.hex.slice(5,7),16);
-                        const textColor = brightness > 382 ? '#000' : '#fff';
-                        colorOptions += '<option value="' + c.hex + '" style="background-color:' + c.hex + ';color:' + textColor + '" ' + selected + '>' + c.name + '</option>';
+                        const isSelected = c.hex.toUpperCase() === hexColor.toUpperCase();
+                        colorItems += '<div class="color-dropdown-item' + (isSelected ? ' selected' : '') + '" data-value="' + c.hex + '">' +
+                                     '<div class="color-dropdown-swatch" style="background-color:' + c.hex + '"></div>' +
+                                     '<span class="color-dropdown-name">' + c.name + '</span></div>';
                     }
-                    const currentBrightness = parseInt(hexColor.slice(1,3),16) + parseInt(hexColor.slice(3,5),16) + parseInt(hexColor.slice(5,7),16);
-                    const currentTextColor = currentBrightness > 382 ? '#000' : '#fff';
-                    return '<div class="color-picker-container">' +
-                           '<div class="color-swatch" id="swatch-' + key + '" style="background-color:' + hexColor + '"></div>' +
-                           '<select data-key="' + key + '" class="color-select" style="background-color:' + hexColor + ';color:' + currentTextColor + '">' + colorOptions + '</select>' +
-                           '</div>';
+                    return '<div class="color-dropdown" data-key="' + key + '">' +
+                           '<div class="color-dropdown-selected">' +
+                           '<div class="color-dropdown-swatch" style="background-color:' + hexColor + '"></div>' +
+                           '<span class="color-dropdown-name">' + selectedColor.name + '</span>' +
+                           '<span class="color-dropdown-arrow">▼</span></div>' +
+                           '<div class="color-dropdown-list">' + colorItems + '</div></div>';
 
                 default:
                     return '<input type="text" data-key="' + key + '" value="' + EscapeHtml(String(value)) + '" ' + readonly + '>';
@@ -534,6 +597,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
 
         function AttachEventHandlers()
         {
+            // Handle regular inputs and selects
             const inputs = document.querySelectorAll("input, select");
             inputs.forEach(function(input) {
                 input.addEventListener("change", function() {
@@ -544,16 +608,6 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                         value = this.checked;
                     else if (this.type === "number")
                         value = parseFloat(this.value) || 0;
-                    else if (this.classList.contains("color-select"))
-                    {
-                        value = ConvertFromHtmlColor(this.value);
-                        const rgb = parseInt(this.value.slice(1,3),16) + parseInt(this.value.slice(3,5),16) + parseInt(this.value.slice(5,7),16);
-                        this.style.backgroundColor = this.value;
-                        this.style.color = rgb > 382 ? '#000' : '#fff';
-                        // Update swatch
-                        const swatch = document.getElementById('swatch-' + key);
-                        if (swatch) swatch.style.backgroundColor = this.value;
-                    }
                     else
                         value = this.value;
 
@@ -562,6 +616,57 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                         PropertyKey: key,
                         Value: value
                     });
+                });
+            });
+
+            // Handle custom color dropdowns
+            const colorDropdowns = document.querySelectorAll(".color-dropdown");
+            colorDropdowns.forEach(function(dropdown) {
+                const selected = dropdown.querySelector(".color-dropdown-selected");
+                const list = dropdown.querySelector(".color-dropdown-list");
+                const items = dropdown.querySelectorAll(".color-dropdown-item");
+
+                selected.addEventListener("click", function(e) {
+                    e.stopPropagation();
+                    // Close other dropdowns
+                    document.querySelectorAll(".color-dropdown.open").forEach(function(d) {
+                        if (d !== dropdown) d.classList.remove("open");
+                    });
+                    dropdown.classList.toggle("open");
+                });
+
+                items.forEach(function(item) {
+                    item.addEventListener("click", function(e) {
+                        e.stopPropagation();
+                        const hexValue = this.getAttribute("data-value");
+                        const colorName = this.querySelector(".color-dropdown-name").textContent;
+                        const key = dropdown.getAttribute("data-key");
+
+                        // Update selected display
+                        selected.querySelector(".color-dropdown-swatch").style.backgroundColor = hexValue;
+                        selected.querySelector(".color-dropdown-name").textContent = colorName;
+
+                        // Update selected state in list
+                        items.forEach(function(i) { i.classList.remove("selected"); });
+                        this.classList.add("selected");
+
+                        // Close dropdown
+                        dropdown.classList.remove("open");
+
+                        // Send update
+                        vscode.postMessage({
+                            Type: "UpdateProperty",
+                            PropertyKey: key,
+                            Value: ConvertFromHtmlColor(hexValue)
+                        });
+                    });
+                });
+            });
+
+            // Close dropdowns when clicking outside
+            document.addEventListener("click", function() {
+                document.querySelectorAll(".color-dropdown.open").forEach(function(d) {
+                    d.classList.remove("open");
                 });
             });
         }
@@ -641,6 +746,81 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
         .property-readonly {
             opacity: 0.6;
         }
+        .property-group {
+            margin-bottom: 8px;
+        }
+        .property-group-header {
+            font-weight: 600;
+            padding: 6px 0 4px 0;
+            color: var(--vscode-foreground);
+            border-bottom: 1px solid var(--vscode-panel-border);
+            margin-bottom: 4px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.8;
+        }
+        .color-dropdown {
+            position: relative;
+            width: 100%;
+        }
+        .color-dropdown-selected {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 4px;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            cursor: pointer;
+            min-height: 20px;
+        }
+        .color-dropdown-selected:hover {
+            border-color: var(--vscode-focusBorder);
+        }
+        .color-dropdown-swatch {
+            width: 16px;
+            height: 12px;
+            border: 1px solid var(--vscode-input-border);
+            flex-shrink: 0;
+        }
+        .color-dropdown-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .color-dropdown-arrow {
+            margin-left: auto;
+            font-size: 10px;
+        }
+        .color-dropdown-list {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background-color: var(--vscode-input-background);
+            border: 1px solid var(--vscode-input-border);
+            z-index: 1000;
+        }
+        .color-dropdown.open .color-dropdown-list {
+            display: block;
+        }
+        .color-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 6px;
+            cursor: pointer;
+        }
+        .color-dropdown-item:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+        .color-dropdown-item.selected {
+            background-color: var(--vscode-list-activeSelectionBackground);
+        }
     </style>
 </head>
 <body>
@@ -650,6 +830,150 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
     <script>
         const vscode = acquireVsCodeApi();
         let currentElementID = null;
+        
+        // Web Colors - sorted alphabetically by name
+        const WebColors = [
+            { name: "AliceBlue", hex: "#F0F8FF" },
+            { name: "AntiqueWhite", hex: "#FAEBD7" },
+            { name: "Aqua", hex: "#00FFFF" },
+            { name: "Aquamarine", hex: "#7FFFD4" },
+            { name: "Azure", hex: "#F0FFFF" },
+            { name: "Beige", hex: "#F5F5DC" },
+            { name: "Bisque", hex: "#FFE4C4" },
+            { name: "Black", hex: "#000000" },
+            { name: "BlanchedAlmond", hex: "#FFEBCD" },
+            { name: "Blue", hex: "#0000FF" },
+            { name: "BlueViolet", hex: "#8A2BE2" },
+            { name: "Brown", hex: "#A52A2A" },
+            { name: "BurlyWood", hex: "#DEB887" },
+            { name: "CadetBlue", hex: "#5F9EA0" },
+            { name: "Chartreuse", hex: "#7FFF00" },
+            { name: "Chocolate", hex: "#D2691E" },
+            { name: "Coral", hex: "#FF7F50" },
+            { name: "CornflowerBlue", hex: "#6495ED" },
+            { name: "Cornsilk", hex: "#FFF8DC" },
+            { name: "Crimson", hex: "#DC143C" },
+            { name: "Cyan", hex: "#00FFFF" },
+            { name: "DarkBlue", hex: "#00008B" },
+            { name: "DarkCyan", hex: "#008B8B" },
+            { name: "DarkGoldenrod", hex: "#B8860B" },
+            { name: "DarkGray", hex: "#A9A9A9" },
+            { name: "DarkGreen", hex: "#006400" },
+            { name: "DarkKhaki", hex: "#BDB76B" },
+            { name: "DarkMagenta", hex: "#8B008B" },
+            { name: "DarkOliveGreen", hex: "#556B2F" },
+            { name: "DarkOrange", hex: "#FF8C00" },
+            { name: "DarkOrchid", hex: "#9932CC" },
+            { name: "DarkRed", hex: "#8B0000" },
+            { name: "DarkSalmon", hex: "#E9967A" },
+            { name: "DarkSeaGreen", hex: "#8FBC8F" },
+            { name: "DarkSlateBlue", hex: "#483D8B" },
+            { name: "DarkSlateGray", hex: "#2F4F4F" },
+            { name: "DarkTurquoise", hex: "#00CED1" },
+            { name: "DarkViolet", hex: "#9400D3" },
+            { name: "DeepPink", hex: "#FF1493" },
+            { name: "DeepSkyBlue", hex: "#00BFFF" },
+            { name: "DimGray", hex: "#696969" },
+            { name: "DodgerBlue", hex: "#1E90FF" },
+            { name: "FireBrick", hex: "#B22222" },
+            { name: "FloralWhite", hex: "#FFFAF0" },
+            { name: "ForestGreen", hex: "#228B22" },
+            { name: "Fuchsia", hex: "#FF00FF" },
+            { name: "Gainsboro", hex: "#DCDCDC" },
+            { name: "GhostWhite", hex: "#F8F8FF" },
+            { name: "Gold", hex: "#FFD700" },
+            { name: "Goldenrod", hex: "#DAA520" },
+            { name: "Gray", hex: "#808080" },
+            { name: "Green", hex: "#008000" },
+            { name: "GreenYellow", hex: "#ADFF2F" },
+            { name: "Honeydew", hex: "#F0FFF0" },
+            { name: "HotPink", hex: "#FF69B4" },
+            { name: "IndianRed", hex: "#CD5C5C" },
+            { name: "Indigo", hex: "#4B0082" },
+            { name: "Ivory", hex: "#FFFFF0" },
+            { name: "Khaki", hex: "#F0E68C" },
+            { name: "Lavender", hex: "#E6E6FA" },
+            { name: "LavenderBlush", hex: "#FFF0F5" },
+            { name: "LawnGreen", hex: "#7CFC00" },
+            { name: "LemonChiffon", hex: "#FFFACD" },
+            { name: "LightBlue", hex: "#ADD8E6" },
+            { name: "LightCoral", hex: "#F08080" },
+            { name: "LightCyan", hex: "#E0FFFF" },
+            { name: "LightGoldenrodYellow", hex: "#FAFAD2" },
+            { name: "LightGray", hex: "#D3D3D3" },
+            { name: "LightGreen", hex: "#90EE90" },
+            { name: "LightPink", hex: "#FFB6C1" },
+            { name: "LightSalmon", hex: "#FFA07A" },
+            { name: "LightSeaGreen", hex: "#20B2AA" },
+            { name: "LightSkyBlue", hex: "#87CEFA" },
+            { name: "LightSlateGray", hex: "#778899" },
+            { name: "LightSteelBlue", hex: "#B0C4DE" },
+            { name: "LightYellow", hex: "#FFFFE0" },
+            { name: "Lime", hex: "#00FF00" },
+            { name: "LimeGreen", hex: "#32CD32" },
+            { name: "Linen", hex: "#FAF0E6" },
+            { name: "Magenta", hex: "#FF00FF" },
+            { name: "Maroon", hex: "#800000" },
+            { name: "MediumAquamarine", hex: "#66CDAA" },
+            { name: "MediumBlue", hex: "#0000CD" },
+            { name: "MediumOrchid", hex: "#BA55D3" },
+            { name: "MediumPurple", hex: "#9370DB" },
+            { name: "MediumSeaGreen", hex: "#3CB371" },
+            { name: "MediumSlateBlue", hex: "#7B68EE" },
+            { name: "MediumSpringGreen", hex: "#00FA9A" },
+            { name: "MediumTurquoise", hex: "#48D1CC" },
+            { name: "MediumVioletRed", hex: "#C71585" },
+            { name: "MidnightBlue", hex: "#191970" },
+            { name: "MintCream", hex: "#F5FFFA" },
+            { name: "MistyRose", hex: "#FFE4E1" },
+            { name: "Moccasin", hex: "#FFE4B5" },
+            { name: "NavajoWhite", hex: "#FFDEAD" },
+            { name: "Navy", hex: "#000080" },
+            { name: "OldLace", hex: "#FDF5E6" },
+            { name: "Olive", hex: "#808000" },
+            { name: "OliveDrab", hex: "#6B8E23" },
+            { name: "Orange", hex: "#FFA500" },
+            { name: "OrangeRed", hex: "#FF4500" },
+            { name: "Orchid", hex: "#DA70D6" },
+            { name: "PaleGoldenrod", hex: "#EEE8AA" },
+            { name: "PaleGreen", hex: "#98FB98" },
+            { name: "PaleTurquoise", hex: "#AFEEEE" },
+            { name: "PaleVioletRed", hex: "#DB7093" },
+            { name: "PapayaWhip", hex: "#FFEFD5" },
+            { name: "PeachPuff", hex: "#FFDAB9" },
+            { name: "Peru", hex: "#CD853F" },
+            { name: "Pink", hex: "#FFC0CB" },
+            { name: "Plum", hex: "#DDA0DD" },
+            { name: "PowderBlue", hex: "#B0E0E6" },
+            { name: "Purple", hex: "#800080" },
+            { name: "Red", hex: "#FF0000" },
+            { name: "RosyBrown", hex: "#BC8F8F" },
+            { name: "RoyalBlue", hex: "#4169E1" },
+            { name: "SaddleBrown", hex: "#8B4513" },
+            { name: "Salmon", hex: "#FA8072" },
+            { name: "SandyBrown", hex: "#F4A460" },
+            { name: "SeaGreen", hex: "#2E8B57" },
+            { name: "Seashell", hex: "#FFF5EE" },
+            { name: "Sienna", hex: "#A0522D" },
+            { name: "Silver", hex: "#C0C0C0" },
+            { name: "SkyBlue", hex: "#87CEEB" },
+            { name: "SlateBlue", hex: "#6A5ACD" },
+            { name: "SlateGray", hex: "#708090" },
+            { name: "Snow", hex: "#FFFAFA" },
+            { name: "SpringGreen", hex: "#00FF7F" },
+            { name: "SteelBlue", hex: "#4682B4" },
+            { name: "Tan", hex: "#D2B48C" },
+            { name: "Teal", hex: "#008080" },
+            { name: "Thistle", hex: "#D8BFD8" },
+            { name: "Tomato", hex: "#FF6347" },
+            { name: "Turquoise", hex: "#40E0D0" },
+            { name: "Violet", hex: "#EE82EE" },
+            { name: "Wheat", hex: "#F5DEB3" },
+            { name: "White", hex: "#FFFFFF" },
+            { name: "WhiteSmoke", hex: "#F5F5F5" },
+            { name: "Yellow", hex: "#FFFF00" },
+            { name: "YellowGreen", hex: "#9ACD32" }
+        ];
         
         console.log("[PropertiesWebview] Script initialized");
         
@@ -675,51 +999,33 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                 return;
             }
 
-            let html = "";
+            const groups = new Map();
             for (const prop of pProperties)
             {
-                html += '<div class="property-row">';
-                html += '<div class="property-name" title="' + EscapeHtml(prop.Key) + '">' + EscapeHtml(prop.Name) + '</div>';
-                html += '<div class="property-value">';
-                html += GetPropertyEditor(prop);
-                html += '</div></div>';
+                const grp = prop.Group || "General";
+                if (!groups.has(grp))
+                    groups.set(grp, []);
+                groups.get(grp).push(prop);
+            }
+
+            let html = "";
+            for (const [grpName, grpProps] of groups)
+            {
+                html += '<div class="property-group">';
+                html += '<div class="property-group-header">' + EscapeHtml(grpName) + '</div>';
+                for (const prop of grpProps)
+                {
+                    html += '<div class="property-row">';
+                    html += '<div class="property-name" title="' + EscapeHtml(prop.Key) + '">' + EscapeHtml(prop.Name) + '</div>';
+                    html += '<div class="property-value">';
+                    html += GetPropertyEditor(prop);
+                    html += '</div></div>';
+                }
+                html += '</div>';
             }
             
             container.innerHTML = html;
             AttachEventHandlers();
-        }
-
-        function GetColorPalette256()
-        {
-            const colors = [];
-            // Web-safe 216 colors (6x6x6 cube)
-            for (let r = 0; r < 6; r++)
-                for (let g = 0; g < 6; g++)
-                    for (let b = 0; b < 6; b++)
-                        colors.push({ r: r * 51, g: g * 51, b: b * 51 });
-            
-            // Add 40 grayscale colors to reach 256
-            for (let i = 0; i < 40; i++)
-            {
-                const gray = Math.round(i * 255 / 39);
-                // Avoid duplicates from web-safe palette
-                if (gray % 51 !== 0)
-                    colors.push({ r: gray, g: gray, b: gray });
-            }
-            
-            // Pad to exactly 256 with more grays if needed
-            while (colors.length < 256)
-            {
-                const gray = Math.round((colors.length - 216) * 6.375);
-                colors.push({ r: gray, g: gray, b: gray });
-            }
-            
-            return colors.slice(0, 256);
-        }
-
-        function RgbToHex(r, g, b)
-        {
-            return "#" + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
         }
 
         function GetPropertyEditor(pProp)
@@ -751,15 +1057,21 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
 
                 case "Color":
                     const hexColor = ConvertToHtmlColor(value);
-                    const palette = GetColorPalette256();
-                    let colorOptions = "";
-                    for (const c of palette)
+                    const selectedColor = WebColors.find(function(c) { return c.hex.toUpperCase() === hexColor.toUpperCase(); }) || { name: "Unknown", hex: hexColor };
+                    let colorItems = "";
+                    for (const c of WebColors)
                     {
-                        const hex = RgbToHex(c.r, c.g, c.b);
-                        const selected = hex.toUpperCase() === hexColor.toUpperCase() ? "selected" : "";
-                        colorOptions += '<option value="' + hex + '" style="background-color:' + hex + ';color:' + (c.r + c.g + c.b > 382 ? '#000' : '#fff') + '" ' + selected + '>' + hex + '</option>';
+                        const isSelected = c.hex.toUpperCase() === hexColor.toUpperCase();
+                        colorItems += '<div class="color-dropdown-item' + (isSelected ? ' selected' : '') + '" data-value="' + c.hex + '">' +
+                                     '<div class="color-dropdown-swatch" style="background-color:' + c.hex + '"></div>' +
+                                     '<span class="color-dropdown-name">' + c.name + '</span></div>';
                     }
-                    return '<select data-key="' + key + '" class="color-select" style="background-color:' + hexColor + ';color:' + (parseInt(hexColor.slice(1,3),16) + parseInt(hexColor.slice(3,5),16) + parseInt(hexColor.slice(5,7),16) > 382 ? '#000' : '#fff') + '">' + colorOptions + '</select>';
+                    return '<div class="color-dropdown" data-key="' + key + '">' +
+                           '<div class="color-dropdown-selected">' +
+                           '<div class="color-dropdown-swatch" style="background-color:' + hexColor + '"></div>' +
+                           '<span class="color-dropdown-name">' + selectedColor.name + '</span>' +
+                           '<span class="color-dropdown-arrow">▼</span></div>' +
+                           '<div class="color-dropdown-list">' + colorItems + '</div></div>';
 
                 default:
                     return '<input type="text" data-key="' + key + '" value="' + EscapeHtml(String(value)) + '" ' + readonly + '>';
@@ -784,10 +1096,10 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
 
         function AttachEventHandlers()
         {
+            // Handle regular inputs and selects
             const inputs = document.querySelectorAll("input, select");
             inputs.forEach(function(input) {
-                const eventType = input.type === "checkbox" ? "change" : "change";
-                input.addEventListener(eventType, function() {
+                input.addEventListener("change", function() {
                     const key = this.getAttribute("data-key");
                     let value;
                     
@@ -795,16 +1107,6 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                         value = this.checked;
                     else if (this.type === "number")
                         value = parseFloat(this.value) || 0;
-                    else if (this.type === "color")
-                        value = ConvertFromHtmlColor(this.value);
-                    else if (this.classList.contains("color-select"))
-                    {
-                        value = ConvertFromHtmlColor(this.value);
-                        // Update dropdown background color
-                        const rgb = parseInt(this.value.slice(1,3),16) + parseInt(this.value.slice(3,5),16) + parseInt(this.value.slice(5,7),16);
-                        this.style.backgroundColor = this.value;
-                        this.style.color = rgb > 382 ? '#000' : '#fff';
-                    }
                     else
                         value = this.value;
 
@@ -814,6 +1116,56 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider
                         Value: value
                     });
                 });
+            });
+
+            // Handle custom color dropdowns
+            const colorDropdowns = document.querySelectorAll(".color-dropdown");
+            colorDropdowns.forEach(function(dropdown) {
+                const selected = dropdown.querySelector(".color-dropdown-selected");
+                const list = dropdown.querySelector(".color-dropdown-list");
+                const items = dropdown.querySelectorAll(".color-dropdown-item");
+
+                selected.addEventListener("click", function(e) {
+                    e.stopPropagation();
+                    // Close other dropdowns
+                    document.querySelectorAll(".color-dropdown.open").forEach(function(d) {
+                        if (d !== dropdown) d.classList.remove("open");
+                    });
+                    dropdown.classList.toggle("open");
+                });
+
+                items.forEach(function(item) {
+                    item.addEventListener("click", function(e) {
+                        e.stopPropagation();
+                        const hexValue = this.getAttribute("data-value");
+                        const colorName = this.querySelector(".color-dropdown-name").textContent;
+                        const key = dropdown.getAttribute("data-key");
+
+                        // Update selected display
+                        selected.querySelector(".color-dropdown-swatch").style.backgroundColor = hexValue;
+                        selected.querySelector(".color-dropdown-name").textContent = colorName;
+
+                        // Update selected state in list
+                        items.forEach(function(i) { i.classList.remove("selected"); });
+                        this.classList.add("selected");
+
+                        // Close dropdown
+                        dropdown.classList.remove("open");
+
+                        // Send update
+                        vscode.postMessage({
+                            Type: "UpdateProperty",
+                            PropertyKey: key,
+                            Value: ConvertFromHtmlColor(hexValue)
+                        });
+                    });
+                });
+            });
+
+            // Close dropdowns when clicking outside
+            document.addEventListener("click", function() {
+                document.querySelectorAll(".color-dropdown.open").forEach(function(d) {
+                    d.classList.remove("open");
                 });
             });
         }
