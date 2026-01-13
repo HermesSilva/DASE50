@@ -1,4 +1,11 @@
-**Languages:** English | [Português (Brasil)](README.pt-BR.md)
+<p align="center">
+  <a href="README.md"><img src="https://img.shields.io/badge/lang-English-blue?style=for-the-badge" alt="English">
+    <img src="https://flagcdn.com/48x36/gb.png" alt="English" title="English">
+</a>
+  &nbsp;&nbsp;
+  <a href="README.pt-BR.md"><img src="https://img.shields.io/badge/lang-Portugu%C3%AAs%20(Brasil)-green?style=for-the-badge" alt="Português (Brasil)"><img src="https://flagcdn.com/48x36/br.png" alt="Brasil" title="Português (Brasil)">
+  </a>
+</p>
 
 ---
 
