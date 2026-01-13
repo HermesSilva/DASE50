@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { XORMField, XORMFieldDataType } from "../src/Designers/ORM/XORMField.js";
+import { XORMField } from "../src/Designers/ORM/XORMField.js";
 import { XField } from "../src/Design/XField.js";
 
 describe("XORMField", () => {
@@ -12,7 +12,7 @@ describe("XORMField", () => {
 
     it("should have default property values", () => {
         const field = new XORMField();
-        expect(field.DataType).toBe(XORMFieldDataType.String);
+        expect(field.DataType).toBe("String");
         expect(field.Length).toBe(0);
         expect(field.IsPrimaryKey).toBe(false);
         expect(field.IsNullable).toBe(true);
@@ -22,11 +22,11 @@ describe("XORMField", () => {
 
     it("should allow getting and setting DataType", () => {
         const field = new XORMField();
-        field.DataType = XORMFieldDataType.Integer;
-        expect(field.DataType).toBe(XORMFieldDataType.Integer);
+        field.DataType = "Int32";
+        expect(field.DataType).toBe("Int32");
         
-        field.DataType = XORMFieldDataType.DateTime;
-        expect(field.DataType).toBe(XORMFieldDataType.DateTime);
+        field.DataType = "DateTime";
+        expect(field.DataType).toBe("DateTime");
     });
 
     it("should allow getting and setting Length", () => {
@@ -74,17 +74,36 @@ describe("XORMField", () => {
         expect(field.DefaultValue).toBe("another value");
     });
 
-    describe("XORMFieldDataType enum", () => {
-        it("should have all expected data types", () => {
-            expect(XORMFieldDataType.String).toBe("String");
-            expect(XORMFieldDataType.Integer).toBe("Integer");
-            expect(XORMFieldDataType.Long).toBe("Long");
-            expect(XORMFieldDataType.Decimal).toBe("Decimal");
-            expect(XORMFieldDataType.Boolean).toBe("Boolean");
-            expect(XORMFieldDataType.DateTime).toBe("DateTime");
-            expect(XORMFieldDataType.Guid).toBe("Guid");
-            expect(XORMFieldDataType.Binary).toBe("Binary");
-            expect(XORMFieldDataType.Text).toBe("Text");
+    describe("DataType property", () => {
+        it("should accept all common data type names", () => {
+            const field = new XORMField();
+            
+            field.DataType = "String";
+            expect(field.DataType).toBe("String");
+            
+            field.DataType = "Int32";
+            expect(field.DataType).toBe("Int32");
+            
+            field.DataType = "Int64";
+            expect(field.DataType).toBe("Int64");
+            
+            field.DataType = "Numeric";
+            expect(field.DataType).toBe("Numeric");
+            
+            field.DataType = "Boolean";
+            expect(field.DataType).toBe("Boolean");
+            
+            field.DataType = "DateTime";
+            expect(field.DataType).toBe("DateTime");
+            
+            field.DataType = "Guid";
+            expect(field.DataType).toBe("Guid");
+            
+            field.DataType = "Binary";
+            expect(field.DataType).toBe("Binary");
+            
+            field.DataType = "Text";
+            expect(field.DataType).toBe("Text");
         });
     });
 });

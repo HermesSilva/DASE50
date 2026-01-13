@@ -124,6 +124,22 @@ body {
     font-weight: 600;
 }
 
+.orm-field-group {
+    cursor: pointer;
+}
+
+.orm-field-group:hover .orm-field-bg {
+    fill: var(--vscode-list-hoverBackground);
+}
+
+.orm-field-group.selected .orm-field-bg {
+    fill: var(--vscode-list-activeSelectionBackground);
+}
+
+.orm-field-group.selected .orm-table-field {
+    fill: var(--vscode-list-activeSelectionForeground);
+}
+
 .orm-table-anchor {
     fill: var(--vscode-focusBorder);
     stroke: var(--vscode-panel-border);

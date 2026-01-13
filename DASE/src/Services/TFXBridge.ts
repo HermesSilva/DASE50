@@ -2,6 +2,7 @@
 import { XPropertyItem, XPropertyType } from "../Models/PropertyItem";
 import { XIssueItem, XIssueSeverity, TIssueSeverity } from "../Models/IssueItem";
 import { GetLogService } from "./LogService";
+import { XVsCodeFileSystemAdapter } from "./VsCodeFileSystemAdapter";
 
 // TFX imports - direct CommonJS import
 import * as tfx from "@tootega/tfx";
@@ -17,7 +18,6 @@ import {
     XORMDesign,
     XORMTable,
     XORMField,
-    XORMFieldDataType,
     XORMReference,
     XORMController,
     XORMValidator,
@@ -26,7 +26,10 @@ import {
     XGuid,
     XSerializationEngine,
     RegisterORMElements,
-    XColor
+    XColor,
+    XConfigurationManager,
+    XConfigTarget,
+    XConfigGroup
 } from "@tootega/tfx";
 
 // Data interfaces for webview communication (JSON-serializable)
@@ -103,6 +106,10 @@ export class XTFXBridge
     private _Validator: XORMValidator;
     private _Engine: XSerializationEngine;
     private _Initialized: boolean;
+    private _ContextPath: string;
+    private _AllDataTypes: string[];
+    private _PKDataTypes: string[];
+    private _TypesLoaded: boolean;
 
     constructor()
     {
@@ -110,6 +117,10 @@ export class XTFXBridge
         this._Validator = null!;
         this._Engine = null!;
         this._Initialized = false;
+        this._ContextPath = "";
+        this._AllDataTypes = [];
+        this._PKDataTypes = [];
+        this._TypesLoaded = false;
     }
 
     Initialize(): void
@@ -122,6 +133,92 @@ export class XTFXBridge
         this._Validator = new XORMValidator();
         this._Engine = XSerializationEngine.Instance;
         this._Initialized = true;
+    }
+
+    /**
+     * Set the context path for configuration file lookup
+     * This should be the path to the current design file
+     */
+    SetContextPath(pPath: string): void
+    {
+        if (this._ContextPath !== pPath)
+        {
+            this._ContextPath = pPath;
+            this._TypesLoaded = false;
+        }
+    }
+
+    /**
+     * Get the current context path
+     */
+    get ContextPath(): string
+    {
+        return this._ContextPath;
+    }
+
+    /**
+     * Load data types from configuration file
+     * Must be called before GetProperties if types are needed
+     */
+    async LoadDataTypes(): Promise<void>
+    {
+        if (this._TypesLoaded && this._AllDataTypes.length > 0)
+            return;
+
+        const manager = XConfigurationManager.GetInstance();
+        manager.SetFileSystem(new XVsCodeFileSystemAdapter());
+
+        try
+        {
+            const contextPath = this._ContextPath || process.cwd();
+            
+            const allTypes = await manager.GetORMDataTypes(contextPath);
+            this._AllDataTypes = allTypes.map(t => t.TypeName).sort((a, b) => a.localeCompare(b));
+            
+            const pkTypes = await manager.GetORMPrimaryKeyTypes(contextPath);
+            this._PKDataTypes = pkTypes.map(t => t.TypeName).sort((a, b) => a.localeCompare(b));
+
+            this._TypesLoaded = true;
+
+            GetLogService().Info(`Loaded ${this._AllDataTypes.length} data types, ${this._PKDataTypes.length} PK types from configuration`);
+        }
+        catch (error)
+        {
+            GetLogService().Error(`Failed to load data types: ${error}`);
+            this._AllDataTypes = ["Boolean", "DateTime", "Guid", "Int32", "String"];
+            this._PKDataTypes = ["Guid", "Int32", "Int64"];
+            this._TypesLoaded = true;
+        }
+    }
+
+    /**
+     * Force reload of data types from configuration
+     * Use when configuration file has changed
+     */
+    async ReloadDataTypes(): Promise<void>
+    {
+        this._TypesLoaded = false;
+        
+        const manager = XConfigurationManager.GetInstance();
+        manager.ClearCache();
+        
+        await this.LoadDataTypes();
+    }
+
+    /**
+     * Get all available data types
+     */
+    GetAllDataTypes(): string[]
+    {
+        return [...this._AllDataTypes];
+    }
+
+    /**
+     * Get data types that can be used in primary keys
+     */
+    GetPKDataTypes(): string[]
+    {
+        return [...this._PKDataTypes];
     }
 
     get Controller(): any
@@ -398,6 +495,9 @@ export class XTFXBridge
         {
             switch (pPropertyKey)
             {
+                case "PKType":
+                    element.PKType = pValue as string;
+                    break;
                 case "Description":
                     element.Description = pValue as string;
                     break;
@@ -440,10 +540,16 @@ export class XTFXBridge
             switch (pPropertyKey)
             {
                 case "DataType":
-                    element.DataType = pValue as XORMFieldDataType;
+                    element.DataType = pValue as string;
                     break;
                 case "Length":
                     element.Length = pValue as number;
+                    break;
+                case "Scale":
+                    element.Scale = pValue as number;
+                    break;
+                case "IsRequired":
+                    element.IsRequired = pValue as boolean;
                     break;
                 case "IsPrimaryKey":
                     element.IsPrimaryKey = pValue as boolean;
@@ -494,6 +600,8 @@ export class XTFXBridge
 
         if (element instanceof XORMTable)
         {
+            const pkTypes = this._PKDataTypes.length > 0 ? this._PKDataTypes : ["Guid", "Int32", "Int64"];
+            props.push(new XPropertyItem("PKType", "PK Type", element.PKType, XPropertyType.Enum, pkTypes));
             props.push(new XPropertyItem("Description", "Description", element.Description, XPropertyType.String));
             
             const fillColor = element.Fill;
@@ -517,8 +625,11 @@ export class XTFXBridge
         }
         else if (element instanceof XORMField)
         {
-            props.push(new XPropertyItem("DataType", "Data Type", element.DataType, XPropertyType.Enum, ["String", "Integer", "Long", "Decimal", "Boolean", "DateTime", "Guid", "Binary", "Text"]));
+            const allTypes = this._AllDataTypes.length > 0 ? this._AllDataTypes : ["Boolean", "DateTime", "Guid", "Int32", "String"];
+            props.push(new XPropertyItem("DataType", "Data Type", element.DataType, XPropertyType.Enum, allTypes));
             props.push(new XPropertyItem("Length", "Length", element.Length, XPropertyType.Number));
+            props.push(new XPropertyItem("Scale", "Scale", element.Scale, XPropertyType.Number));
+            props.push(new XPropertyItem("IsRequired", "Required", element.IsRequired, XPropertyType.Boolean));
             props.push(new XPropertyItem("IsPrimaryKey", "Primary Key", element.IsPrimaryKey, XPropertyType.Boolean));
             props.push(new XPropertyItem("IsNullable", "Nullable", element.IsNullable, XPropertyType.Boolean));
             props.push(new XPropertyItem("IsAutoIncrement", "Auto Increment", element.IsAutoIncrement, XPropertyType.Boolean));
@@ -705,7 +816,7 @@ export class XTFXBridge
                     {
                         const field = table.CreateField({
                             Name: fData.Name || "",
-                            DataType: (fData.DataType as XORMFieldDataType) || XORMFieldDataType.String,
+                            DataType: (fData.DataType as string) || "String",
                             Length: fData.Length || 0,
                             IsPrimaryKey: fData.IsPrimaryKey || false,
                             IsNullable: fData.IsNullable !== false,

@@ -8,6 +8,7 @@ import { XAlignLinesCommand } from "./Designers/ORM/Commands/AlignLinesCommand";
 import { XValidateORMModelCommand } from "./Designers/ORM/Commands/ValidateORMModelCommand";
 import { XDeleteSelectedCommand } from "./Commands/DeleteSelectedCommand";
 import { XRenameSelectedCommand } from "./Commands/RenameSelectedCommand";
+import { XReloadDataTypesCommand } from "./Commands/ReloadDataTypesCommand";
 import { XIssuesViewProvider } from "./Views/IssuesViewProvider";
 import { XPropertiesViewProvider } from "./Views/PropertiesViewProvider";
 import { InitializeLogService, GetLogService } from "./Services/LogService";
@@ -29,6 +30,7 @@ export function activate(pContext: vscode.ExtensionContext): void
         XValidateORMModelCommand.Register(pContext, designerProvider);
         XDeleteSelectedCommand.Register(pContext, designerProvider);
         XRenameSelectedCommand.Register(pContext, designerProvider);
+        XReloadDataTypesCommand.Register(pContext, designerProvider);
 
         XIssuesViewProvider.Register(pContext);
         XPropertiesViewProvider.Register(pContext, designerProvider);

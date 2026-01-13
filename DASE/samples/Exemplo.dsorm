@@ -45,6 +45,7 @@
         <XValues>
           <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">a756a4f3-f1eb-4728-a91c-76418b4b60f5</XData>
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">NewTableID</XData>
+          <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">DateTime</XData>
         </XValues>
       </XORMField>
     </XORMTable>
@@ -53,7 +54,7 @@
         <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">7a4073ea-ae8d-49d4-8566-531323fdb943</XData>
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">NewTable</XData>
         <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=887;Y=156;Width=200;Height=150}</XData>
-        <XData Name="Fill" ID="00000001-0001-0001-0003-000000000007" Type="Color">{A=255;R=178;G=34;B=34}</XData>
+        <XData Name="Fill" ID="00000001-0001-0001-0003-000000000007" Type="Color">{A=255;R=255;G=20;B=147}</XData>
       </XValues>
     </XORMTable>
     <XORMTable ID="5ca89602-0700-44e2-a5a8-e237084d3a5d" Name="NewTable">

@@ -301,6 +301,10 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 await this.OnAlignLines(pPanel, pState);
                 break;
 
+            case XDesignerMessageType.ReloadDataTypes:
+                await this.OnReloadDataTypes(pPanel, pState);
+                break;
+
             default:
                 console.warn("Unknown message type:", type);
         }
@@ -556,6 +560,31 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         }
     }
 
+    async OnReloadDataTypes(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void>
+    {
+        await pState.ReloadDataTypes();
+        
+        // Notify webview that types have been reloaded
+        pPanel.webview.postMessage({
+            Type: XDesignerMessageType.DataTypesReloaded,
+            Payload: {
+                AllTypes: pState.Bridge.GetAllDataTypes(),
+                PKTypes: pState.Bridge.GetPKDataTypes()
+            }
+        });
+
+        // Re-send properties for currently selected element if any
+        const selection = GetSelectionService();
+        if (selection.HasSelection && selection.PrimaryID)
+        {
+            const props = pState.GetProperties(selection.PrimaryID);
+            pPanel.webview.postMessage({
+                Type: XDesignerMessageType.PropertiesChanged,
+                Payload: { Properties: props }
+            });
+        }
+    }
+
     private NotifyDocumentChanged(pState: XORMDesignerState): void
     {
         // Simply mark as dirty - the OnStateChanged listener will notify VS Code
@@ -615,6 +644,18 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             return;
 
         await this.OnValidateModel(panel, state);
+    }
+
+    async ReloadDataTypes(pUri: vscode.Uri): Promise<void>
+    {
+        const key = pUri.toString();
+        const state = this._States.get(key);
+        const panel = this._Webviews.get(key);
+
+        if (!state || !panel)
+            return;
+
+        await this.OnReloadDataTypes(panel, state);
     }
 
     GetActiveState(): XORMDesignerState | null

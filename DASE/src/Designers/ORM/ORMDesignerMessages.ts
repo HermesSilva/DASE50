@@ -17,7 +17,9 @@ export const XDesignerMessageType = {
     IssuesChanged: "IssuesChanged",
     RequestRename: "RequestRename",
     RenameCompleted: "RenameCompleted",
-    AlignLines: "AlignLines"
+    AlignLines: "AlignLines",
+    ReloadDataTypes: "ReloadDataTypes",
+    DataTypesReloaded: "DataTypesReloaded"
 } as const;
 
 export type TDesignerMessageType = typeof XDesignerMessageType[keyof typeof XDesignerMessageType];

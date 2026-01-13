@@ -120,20 +120,21 @@
                 return;
 
             const action = item.getAttribute("data-action");
+            const tableID = _ContextMenuTarget;
             HideContextMenu();
 
             switch (action)
             {
                 case "add-field":
-                    if (_ContextMenuTarget)
-                        SendMessage(XMessageType.AddField, { TableID: _ContextMenuTarget });
+                    if (tableID)
+                        SendMessage(XMessageType.AddField, { TableID: tableID, Name: "NewField", DataType: "String" });
                     break;
                 case "delete-table":
                     SendMessage(XMessageType.DeleteSelected, {});
                     break;
                 case "rename-table":
-                    if (_ContextMenuTarget)
-                        ShowRenameInput(_ContextMenuTarget);
+                    if (tableID)
+                        ShowRenameInput(tableID);
                     break;
             }
         });
@@ -288,6 +289,20 @@
             let y = headerHeight + 16;
             for (const field of pTable.Fields)
             {
+                const fieldGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                fieldGroup.setAttribute("class", "orm-field-group");
+                fieldGroup.setAttribute("data-field-id", field.ID);
+                fieldGroup.style.cursor = "pointer";
+
+                const fieldBg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                fieldBg.setAttribute("class", "orm-field-bg");
+                fieldBg.setAttribute("x", 2);
+                fieldBg.setAttribute("y", y - 12);
+                fieldBg.setAttribute("width", width - 4);
+                fieldBg.setAttribute("height", 16);
+                fieldBg.setAttribute("fill", "transparent");
+                fieldGroup.appendChild(fieldBg);
+
                 const fieldText = document.createElementNS("http://www.w3.org/2000/svg", "text");
                 fieldText.setAttribute("class", "orm-table-field" + (field.IsPrimaryKey ? " orm-table-field-pk" : ""));
                 fieldText.setAttribute("x", 10);
@@ -296,7 +311,10 @@
                 const prefix = field.IsPrimaryKey ? "🔑 " : "";
                 const nullable = field.IsNullable ? "" : "*";
                 fieldText.textContent = prefix + (field.Name || field.FieldName || "field") + nullable;
-                g.appendChild(fieldText);
+                fieldGroup.appendChild(fieldText);
+
+                SetupFieldEvents(fieldGroup, field);
+                g.appendChild(fieldGroup);
                 
                 y += 16;
             }
@@ -399,6 +417,25 @@
             e.stopPropagation();
             SendMessage(XMessageType.SelectElement, { ElementID: pTable.ID });
             ShowTableContextMenu(e.clientX, e.clientY, pTable.ID);
+        });
+    }
+
+    function SetupFieldEvents(pElement, pField)
+    {
+        pElement.addEventListener("mousedown", function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (!e.ctrlKey)
+                SendMessage(XMessageType.SelectElement, { ElementID: pField.ID });
+            else
+                SendMessage(XMessageType.SelectElement, { ElementID: pField.ID, Toggle: true });
+        });
+
+        pElement.addEventListener("dblclick", function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            ShowRenameInput(pField.ID);
         });
     }
 
@@ -772,17 +809,68 @@
             else
                 r.classList.remove("selected");
         });
+
+        const fields = _TablesLayer.querySelectorAll(".orm-field-group");
+        fields.forEach(function(f) {
+            const id = f.getAttribute("data-field-id");
+            if (_SelectedIDs.indexOf(id) >= 0)
+                f.classList.add("selected");
+            else
+                f.classList.remove("selected");
+        });
     }
 
     function ShowRenameInput(pElementID)
     {
-        const table = _Model.Tables.find(t => t.ID === pElementID);
+        // Try to find table first
+        let table = _Model.Tables.find(t => t.ID === pElementID);
+        let field = null;
+        let parentTable = null;
+
+        // If not a table, look for a field
         if (!table)
+        {
+            for (const t of _Model.Tables)
+            {
+                if (t.Fields)
+                {
+                    field = t.Fields.find(f => f.ID === pElementID);
+                    if (field)
+                    {
+                        parentTable = t;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!table && !field)
             return;
 
-        const g = _TablesLayer.querySelector('[data-id="' + pElementID + '"]');
-        if (!g)
-            return;
+        let g, elementX, elementY, elementWidth, currentName;
+
+        if (table)
+        {
+            g = _TablesLayer.querySelector('[data-id="' + pElementID + '"]');
+            if (!g)
+                return;
+            elementX = table.X;
+            elementY = table.Y;
+            elementWidth = table.Width || 200;
+            currentName = table.Name || "";
+        }
+        else
+        {
+            g = _TablesLayer.querySelector('[data-field-id="' + pElementID + '"]');
+            if (!g)
+                return;
+            const fieldRect = g.getBoundingClientRect();
+            const canvasRect = _CanvasContainer.getBoundingClientRect();
+            elementX = parentTable.X;
+            elementY = fieldRect.top - canvasRect.top + _CanvasContainer.scrollTop;
+            elementWidth = parentTable.Width || 200;
+            currentName = field.Name || "";
+        }
 
         const rect = _CanvasContainer.getBoundingClientRect();
         const scrollLeft = _CanvasContainer.scrollLeft;
@@ -791,10 +879,10 @@
         const input = document.createElement("input");
         input.setAttribute("type", "text");
         input.setAttribute("class", "rename-input");
-        input.value = table.Name || "";
-        input.style.left = (table.X - scrollLeft + rect.left + 10) + "px";
-        input.style.top = (table.Y - scrollTop + rect.top + 4) + "px";
-        input.style.width = ((table.Width || 200) - 20) + "px";
+        input.value = currentName;
+        input.style.left = (elementX - scrollLeft + rect.left + 10) + "px";
+        input.style.top = (elementY - scrollTop + rect.top + 4) + "px";
+        input.style.width = (elementWidth - 20) + "px";
 
         document.body.appendChild(input);
         input.focus();
@@ -802,7 +890,7 @@
 
         const commit = function() {
             const newName = input.value.trim();
-            if (newName && newName !== table.Name)
+            if (newName && newName !== currentName)
             {
                 SendMessage(XMessageType.RenameCompleted, { NewName: newName });
             }

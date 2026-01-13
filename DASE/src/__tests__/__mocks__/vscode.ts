@@ -286,7 +286,9 @@ export const workspace = {
     fs: {
         readFile: jest.fn(() => Promise.resolve(Buffer.from('{}'))),
         writeFile: jest.fn(() => Promise.resolve()),
-        delete: jest.fn(() => Promise.resolve())
+        delete: jest.fn(() => Promise.resolve()),
+        stat: jest.fn(() => Promise.resolve({ type: FileType.File })),
+        createDirectory: jest.fn(() => Promise.resolve())
     },
     openTextDocument: jest.fn(),
     workspaceFolders: []
@@ -304,6 +306,13 @@ export enum ViewColumn {
     Seven = 7,
     Eight = 8,
     Nine = 9
+}
+
+export enum FileType {
+    Unknown = 0,
+    File = 1,
+    Directory = 2,
+    SymbolicLink = 64
 }
 
 export { EventEmitter as Event };

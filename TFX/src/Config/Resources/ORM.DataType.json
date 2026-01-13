@@ -1,0 +1,115 @@
+{
+  "Name": "DSORMTypes",
+  "Target": "ORM",
+  "Group": "DataType",
+  "Types": [
+    {
+      "TypeName": "Text",
+      "CanUseInPK": false,
+      "HasLength": true,
+      "HasScale": false,
+      "CanUseInIndex": false,
+      "IsUTF8": true,
+      "CanAutoIncrement": false
+    },
+    {
+      "TypeName": "Date",
+      "CanUseInPK": false,
+      "HasLength": false,
+      "HasScale": false,
+      "CanUseInIndex": true,
+      "IsUTF8": false,
+      "CanAutoIncrement": false
+    },
+    {
+      "TypeName": "DateTime",
+      "CanUseInPK": false,
+      "HasLength": false,
+      "HasScale": false,
+      "CanUseInIndex": true,
+      "IsUTF8": false,
+      "CanAutoIncrement": false
+    },
+    {
+      "TypeName": "Binary",
+      "CanUseInPK": false,
+      "HasLength": true,
+      "HasScale": false,
+      "CanUseInIndex": false,
+      "IsUTF8": false,
+      "CanAutoIncrement": false
+    },
+    {
+      "TypeName": "Boolean",
+      "CanUseInPK": false,
+      "HasLength": false,
+      "HasScale": false,
+      "CanUseInIndex": true,
+      "IsUTF8": false,
+      "CanAutoIncrement": false
+    },
+    {
+      "TypeName": "Guid",
+      "CanUseInPK": true,
+      "HasLength": false,
+      "HasScale": false,
+      "CanUseInIndex": true,
+      "IsUTF8": false,
+      "CanAutoIncrement": false
+    },
+    {
+      "TypeName": "Int16",
+      "CanUseInPK": true,
+      "HasLength": false,
+      "HasScale": false,
+      "CanUseInIndex": true,
+      "IsUTF8": false,
+      "CanAutoIncrement": true
+    },
+    {
+      "TypeName": "Int32",
+      "CanUseInPK": true,
+      "HasLength": false,
+      "HasScale": false,
+      "CanUseInIndex": true,
+      "IsUTF8": false,
+      "CanAutoIncrement": true
+    },
+    {
+      "TypeName": "Int64",
+      "CanUseInPK": true,
+      "HasLength": false,
+      "HasScale": false,
+      "CanUseInIndex": true,
+      "IsUTF8": false,
+      "CanAutoIncrement": true
+    },
+    {
+      "TypeName": "Numeric",
+      "CanUseInPK": false,
+      "HasLength": true,
+      "HasScale": true,
+      "CanUseInIndex": true,
+      "IsUTF8": false,
+      "CanAutoIncrement": false
+    },
+    {
+      "TypeName": "String",
+      "CanUseInPK": false,
+      "HasLength": true,
+      "HasScale": false,
+      "CanUseInIndex": true,
+      "IsUTF8": true,
+      "CanAutoIncrement": false
+    },
+    {
+      "TypeName": "Int8",
+      "CanUseInPK": true,
+      "HasLength": false,
+      "HasScale": false,
+      "CanUseInIndex": true,
+      "IsUTF8": false,
+      "CanAutoIncrement": true
+    }
+  ]
+}

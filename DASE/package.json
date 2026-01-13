@@ -64,6 +64,12 @@
                 "title": "Align Lines",
                 "category": "DASE",
                 "icon": "$(layout)"
+            },
+            {
+                "command": "Dase.ReloadDataTypes",
+                "title": "Reload Data Types",
+                "category": "DASE",
+                "icon": "$(refresh)"
             }
         ],
         "customEditors": [

@@ -90,6 +90,13 @@ export class XORMDesignerState
         {
             const uri = this._Document.uri;
             
+            // Set context path for configuration lookup
+            if (uri.scheme !== "untitled")
+                this._Bridge.SetContextPath(uri.fsPath);
+            
+            // Load data types from configuration
+            await this._Bridge.LoadDataTypes();
+            
             // Handle untitled files
             if (uri.scheme === "untitled")
             {
@@ -238,6 +245,16 @@ export class XORMDesignerState
     GetElementInfo(pElementID: string): { ID: string; Name: string; Type: string } | null
     {
         return this._Bridge.GetElementInfo(pElementID);
+    }
+
+    /**
+     * Reload data types from configuration file
+     * Use when configuration file has been changed
+     */
+    async ReloadDataTypes(): Promise<void>
+    {
+        await this._Bridge.ReloadDataTypes();
+        GetLogService().Info("Data types reloaded from configuration");
     }
 
     Dispose(): void

@@ -124,6 +124,9 @@ describe('XORMDesignerState', () => {
             const untitledDoc = createMockTextDocument(untitledUri) as unknown as vscode.TextDocument;
             const untitledState = new XORMDesignerState(untitledDoc);
 
+            // Clear any writeFile calls from previous setup (like LoadDataTypes)
+            (vscode.workspace.fs.writeFile as jest.Mock).mockClear();
+
             await untitledState.Save();
 
             expect(vscode.workspace.fs.writeFile).not.toHaveBeenCalled();
@@ -579,6 +582,21 @@ describe('XORMDesignerState', () => {
 
             expect(state.Bridge.GetElementInfo).toHaveBeenCalledWith('elem-1');
             expect(result).toEqual({ ID: 'elem-1', Name: 'Test', Type: 'table' });
+        });
+    });
+
+    describe('ReloadDataTypes', () => {
+        beforeEach(async () => {
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await state.Load();
+        });
+
+        it('should delegate to Bridge.ReloadDataTypes', async () => {
+            state.Bridge.ReloadDataTypes = jest.fn().mockResolvedValue(undefined);
+
+            await state.ReloadDataTypes();
+
+            expect(state.Bridge.ReloadDataTypes).toHaveBeenCalled();
         });
     });
 });

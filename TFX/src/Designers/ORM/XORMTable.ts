@@ -1,11 +1,12 @@
 import { XRectangle } from "../../Design/XRectangle.js";
+import { XProperty } from "../../Core/XProperty.js";
 import { XGuid } from "../../Core/XGuid.js";
-import { XORMField, XORMFieldDataType } from "./XORMField.js";
+import { XORMField } from "./XORMField.js";
 
 export interface XICreateFieldOptions
 {
     Name?: string;
-    DataType?: XORMFieldDataType;
+    DataType?: string;
     Length?: number;
     IsPrimaryKey?: boolean;
     IsNullable?: boolean;
@@ -15,9 +16,27 @@ export interface XICreateFieldOptions
 
 export class XORMTable extends XRectangle
 {
+    public static readonly PKTypeProp = XProperty.Register<XORMTable, string>(
+        (p: XORMTable) => p.PKType,
+        "00000001-0002-0003-0002-000000000001",
+        "PKType",
+        "Primary Key Type",
+        "Int32"
+    );
+
     public constructor()
     {
         super();
+    }
+
+    public get PKType(): string
+    {
+        return this.GetValue(XORMTable.PKTypeProp) as string;
+    }
+
+    public set PKType(pValue: string)
+    {
+        this.SetValue(XORMTable.PKTypeProp, pValue);
     }
 
     public CreateField(pOptions?: XICreateFieldOptions): XORMField
@@ -25,7 +44,7 @@ export class XORMTable extends XRectangle
         const field = new XORMField();
         field.ID = XGuid.NewValue();
         field.Name = pOptions?.Name ?? this.GenerateFieldName();
-        field.DataType = pOptions?.DataType ?? XORMFieldDataType.String;
+        field.DataType = pOptions?.DataType ?? "String";
         field.Length = pOptions?.Length ?? 0;
         field.IsPrimaryKey = pOptions?.IsPrimaryKey ?? false;
         field.IsNullable = pOptions?.IsNullable ?? true;

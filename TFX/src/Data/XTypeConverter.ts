@@ -1,5 +1,5 @@
 import { XGuid } from "../Core/XGuid.js";
-import { XRect, XPoint } from "../Core/XGeometry.js";
+import { XRect, XPoint, XColor } from "../Core/XGeometry.js";
 
 export type XDataTypeName =
     | "String"
@@ -351,14 +351,14 @@ export class XTypeConverter
             {
                 const match = pValue?.match(/A=(\d+);R=(\d+);G=(\d+);B=(\d+)/);
                 if (!match)
-                    return { A: 255, R: 0, G: 0, B: 0 };
+                    return new XColor(255, 0, 0, 0);
                 
-                return {
-                    A: parseInt(match[1], 10),
-                    R: parseInt(match[2], 10),
-                    G: parseInt(match[3], 10),
-                    B: parseInt(match[4], 10)
-                };
+                return new XColor(
+                    parseInt(match[1], 10),
+                    parseInt(match[2], 10),
+                    parseInt(match[3], 10),
+                    parseInt(match[4], 10)
+                );
                 
             },
             

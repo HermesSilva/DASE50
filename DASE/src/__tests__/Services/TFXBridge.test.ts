@@ -332,6 +332,18 @@ describe('XTFXBridge', () => {
             expect(result.Success).toBe(true);
         });
 
+        it('should update PKType property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Width: 150, Height: 200 }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('table-1', 'PKType', 'Guid');
+
+            expect(result.Success).toBe(true);
+        });
+
         it('should update Fill with XColor instance', async () => {
             const json = JSON.stringify({
                 Name: "TestModel",
@@ -446,6 +458,30 @@ describe('XTFXBridge', () => {
             await bridge.LoadOrmModelFromText(json);
 
             const result = bridge.UpdateProperty('field-1', 'Length', 100);
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should update XORMField Scale property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "Amount", DataType: "Decimal" }] }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('field-1', 'Scale', 2);
+
+            expect(result.Success).toBe(true);
+        });
+
+        it('should update XORMField IsRequired property', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "Name", DataType: "String" }] }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('field-1', 'IsRequired', true);
 
             expect(result.Success).toBe(true);
         });
@@ -1578,6 +1614,50 @@ describe('XTFXBridge', () => {
             expect(props.length).toBe(2); // Only ID and Name
             expect(props[0].Key).toBe('ID');
             expect(props[1].Key).toBe('Name');
+        });
+
+        it('should use fallback PKTypes when _PKDataTypes is empty', async () => {
+            // Load model with a table - don't mock GetElementByID
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Width: 150, Height: 200 }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            // Force _PKDataTypes to be empty
+            (bridge as any)._PKDataTypes = [];
+
+            const props = bridge.GetProperties('table-1');
+            const pkTypeProp = props.find(p => p.Key === 'PKType');
+
+            expect(pkTypeProp).toBeDefined();
+            // Fallback types should be used
+            expect(pkTypeProp?.Options).toEqual(["Int32", "Int64", "Guid"]);
+        });
+
+        it('should use fallback AllTypes when _AllDataTypes is empty', async () => {
+            // Load model with a table containing a field - don't mock GetElementByID
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [{ ID: "table-1", Name: "TestTable", X: 100, Y: 100, Fields: [{ ID: "field-1", Name: "TestField", DataType: "String" }] }]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            // Find the field ID by traversing the model data
+            const modelData = bridge.GetModelData();
+            const table = modelData.Tables.find(t => t.Name === "TestTable");
+            const field = table?.Fields?.find((f: any) => f.Name === "TestField");
+            const fieldId = field?.ID || 'field-1';
+
+            // Force _AllDataTypes to be empty
+            (bridge as any)._AllDataTypes = [];
+
+            const props = bridge.GetProperties(fieldId);
+            const dataTypeProp = props.find(p => p.Key === 'DataType');
+
+            expect(dataTypeProp).toBeDefined();
+            // Fallback types should be used
+            expect(dataTypeProp?.Options).toEqual(["String", "Int32", "Boolean", "DateTime", "Guid"]);
         });
     });
 
@@ -3037,6 +3117,77 @@ describe('XTFXBridge', () => {
 
             // Should still produce valid points (sourceTable will be undefined)
             expect(result.References[0].Points.length).toBeGreaterThanOrEqual(2);
+        });
+    });
+
+    describe('SetContextPath', () => {
+        it('should set context path', () => {
+            bridge.SetContextPath('/path/to/file.dsorm');
+            expect(bridge.ContextPath).toBe('/path/to/file.dsorm');
+        });
+
+        it('should reset types loaded when path changes', () => {
+            bridge.SetContextPath('/path/to/file1.dsorm');
+            bridge.SetContextPath('/path/to/file2.dsorm');
+            expect(bridge.ContextPath).toBe('/path/to/file2.dsorm');
+        });
+
+        it('should not reset types loaded when path is same', () => {
+            bridge.SetContextPath('/path/to/file.dsorm');
+            bridge.SetContextPath('/path/to/file.dsorm');
+            expect(bridge.ContextPath).toBe('/path/to/file.dsorm');
+        });
+    });
+
+    describe('GetAllDataTypes', () => {
+        it('should return empty array before loading', () => {
+            const types = bridge.GetAllDataTypes();
+            expect(types).toEqual([]);
+        });
+    });
+
+    describe('GetPKDataTypes', () => {
+        it('should return empty array before loading', () => {
+            const types = bridge.GetPKDataTypes();
+            expect(types).toEqual([]);
+        });
+    });
+
+    describe('LoadDataTypes', () => {
+        it('should use fallback types on error', async () => {
+            bridge.SetContextPath('/nonexistent/path/file.dsorm');
+            await bridge.LoadDataTypes();
+            
+            const allTypes = bridge.GetAllDataTypes();
+            const pkTypes = bridge.GetPKDataTypes();
+            
+            // Should have fallback types
+            expect(allTypes.length).toBeGreaterThan(0);
+            expect(pkTypes.length).toBeGreaterThan(0);
+        });
+
+        it('should not reload if already loaded', async () => {
+            bridge.SetContextPath('/test/path/file.dsorm');
+            await bridge.LoadDataTypes();
+            const types1 = bridge.GetAllDataTypes();
+            
+            await bridge.LoadDataTypes();
+            const types2 = bridge.GetAllDataTypes();
+            
+            expect(types1).toEqual(types2);
+        });
+    });
+
+    describe('ReloadDataTypes', () => {
+        it('should clear cache and reload types', async () => {
+            bridge.SetContextPath('/test/path/file.dsorm');
+            await bridge.LoadDataTypes();
+            
+            await bridge.ReloadDataTypes();
+            
+            // Should have types after reload
+            const allTypes = bridge.GetAllDataTypes();
+            expect(allTypes.length).toBeGreaterThan(0);
         });
     });
 });

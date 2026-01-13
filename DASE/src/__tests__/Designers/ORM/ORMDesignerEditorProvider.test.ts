@@ -1969,4 +1969,94 @@ describe('XORMDesignerEditorProvider', () => {
             expect(state.IsDirty).toBe(false);
         });
     });
+
+    describe('ReloadDataTypes', () => {
+        it('should call state ReloadDataTypes and send updated properties', async () => {
+            const uri = Uri.file('/test/model.dsorm');
+            const mockDoc = { uri, dispose: jest.fn() };
+            const mockPanel = createMockWebviewPanel();
+            const token = {} as vscode.CancellationToken;
+
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await provider.resolveCustomEditor(mockDoc as any, mockPanel as any, token);
+
+            const state = (provider as any)._States.get(uri.toString());
+            state.ReloadDataTypes = jest.fn().mockResolvedValue(undefined);
+            state.Bridge.GetAllDataTypes = jest.fn().mockReturnValue(['String', 'Int32']);
+            state.Bridge.GetPKDataTypes = jest.fn().mockReturnValue(['Int32', 'Int64']);
+            state.GetProperties = jest.fn().mockReturnValue([]);
+
+            await provider.ReloadDataTypes(uri as any);
+
+            expect(state.ReloadDataTypes).toHaveBeenCalled();
+            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    Type: 'DataTypesReloaded'
+                })
+            );
+        });
+
+        it('should re-send properties when selection exists', async () => {
+            const uri = Uri.file('/test/model.dsorm');
+            const mockDoc = { uri, dispose: jest.fn() };
+            const mockPanel = createMockWebviewPanel();
+            const token = {} as vscode.CancellationToken;
+
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await provider.resolveCustomEditor(mockDoc as any, mockPanel as any, token);
+
+            const state = (provider as any)._States.get(uri.toString());
+            state.ReloadDataTypes = jest.fn().mockResolvedValue(undefined);
+            state.Bridge.GetAllDataTypes = jest.fn().mockReturnValue(['String', 'Int32']);
+            state.Bridge.GetPKDataTypes = jest.fn().mockReturnValue(['Int32', 'Int64']);
+            state.GetProperties = jest.fn().mockReturnValue([{ Key: 'Name', Value: 'Test' }]);
+
+            // Mock selection service to have a selection
+            const selectionService = GetSelectionService();
+            (selectionService as any).HasSelection = true;
+            (selectionService as any).PrimaryID = 'element-1';
+
+            await provider.ReloadDataTypes(uri as any);
+
+            expect(state.GetProperties).toHaveBeenCalledWith('element-1');
+            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    Type: 'PropertiesChanged',
+                    Payload: { Properties: [{ Key: 'Name', Value: 'Test' }] }
+                })
+            );
+
+            // Clean up selection mock state
+            (selectionService as any).HasSelection = false;
+            (selectionService as any).PrimaryID = null;
+        });
+
+        it('should not throw when state not found', async () => {
+            const uri = Uri.file('/test/nonexistent.dsorm');
+
+            await expect(provider.ReloadDataTypes(uri as any)).resolves.not.toThrow();
+        });
+    });
+
+    describe('HandleMessage ReloadDataTypes', () => {
+        it('should handle ReloadDataTypes message', async () => {
+            const uri = Uri.file('/test/model.dsorm');
+            const mockDoc = { uri, dispose: jest.fn() };
+            const mockPanel = createMockWebviewPanel();
+            const token = {} as vscode.CancellationToken;
+
+            (vscode.workspace.fs.readFile as jest.Mock).mockResolvedValue(Buffer.from('{}'));
+            await provider.resolveCustomEditor(mockDoc as any, mockPanel as any, token);
+
+            const state = (provider as any)._States.get(uri.toString());
+            state.ReloadDataTypes = jest.fn().mockResolvedValue(undefined);
+            state.Bridge.GetAllDataTypes = jest.fn().mockReturnValue(['String', 'Int32']);
+            state.Bridge.GetPKDataTypes = jest.fn().mockReturnValue(['Int32', 'Int64']);
+            state.GetProperties = jest.fn().mockReturnValue([]);
+
+            await provider.HandleMessage(mockPanel as any, state, { Type: 'ReloadDataTypes' });
+
+            expect(state.ReloadDataTypes).toHaveBeenCalled();
+        });
+    });
 });
