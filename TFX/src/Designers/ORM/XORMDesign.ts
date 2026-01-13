@@ -246,6 +246,16 @@ export class XORMDesign extends XDesign
         return null;
     }
 
+    public FindReferenceBySourceFieldID(pFieldID: string): XORMReference | null
+    {
+        for (const child of this.ChildNodes)
+        {
+            if (child instanceof XORMReference && child.Source === pFieldID)
+                return child;
+        }
+        return null;
+    }
+
     public FindFieldByID(pID: string): XORMField | null
     {
         console.log(`[FindFieldByID] Looking for field ID: "${pID}"`);

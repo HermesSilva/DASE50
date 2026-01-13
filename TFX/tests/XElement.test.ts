@@ -270,7 +270,63 @@ describe("XElement", () =>
             expect(result).toBe(false);
         });
     });
+    describe("InsertChildAt", () =>
+    {
+        it("should insert child at specific index", () =>
+        {
+            const parent = new TestElement();
+            const child1 = new TestElement();
+            const child2 = new TestElement();
+            parent.AppendChild(child1);
+            parent.InsertChildAt(child2, 0);
+            expect(parent.ChildNodes[0]).toBe(child2);
+            expect(parent.ChildNodes[1]).toBe(child1);
+        });
 
+        it("should move existing child to new position", () =>
+        {
+            const parent = new TestElement();
+            const child1 = new TestElement();
+            const child2 = new TestElement();
+            parent.AppendChild(child1);
+            parent.AppendChild(child2);
+            expect(parent.ChildNodes[0]).toBe(child1);
+            expect(parent.ChildNodes[1]).toBe(child2);
+
+            parent.InsertChildAt(child1, 1);
+            expect(parent.ChildNodes[0]).toBe(child2);
+            expect(parent.ChildNodes[1]).toBe(child1);
+        });
+
+        it("should handle indices out of range", () =>
+        {
+            const parent = new TestElement();
+            const child1 = new TestElement();
+            parent.InsertChildAt(child1, 100);
+            expect(parent.ChildNodes[0]).toBe(child1);
+
+            const child2 = new TestElement();
+            parent.InsertChildAt(child2, -100);
+            expect(parent.ChildNodes[0]).toBe(child2);
+        });
+
+        it("should handle child with same parent but not in ChildNodes (line 249 branch)", () =>
+        {
+            const parent = new TestElement();
+            const child = new TestElement();
+            
+            // Artificially set _ParentNode without adding to ChildNodes array
+            // This simulates an inconsistent state
+            (child as any)._ParentNode = parent;
+            
+            // InsertChildAt should handle this gracefully - indexOf returns -1
+            // So the splice at line 250 is skipped, and child is added at the index
+            parent.InsertChildAt(child, 0);
+            
+            expect(parent.ChildNodes[0]).toBe(child);
+            expect(child.ParentNode).toBe(parent);
+        });
+    });
     describe("RemoveFromParent", () =>
     {
         it("should remove element from parent", () =>

@@ -70,3 +70,31 @@ export {
     XBorderColor,
     XFont
 } from "./XGeometry.js";
+
+// XPropertyMetadata - Property metadata system for dynamic property behavior
+export {
+    XPropertyMetadataProvider,
+    CreateEnumValidator,
+    CreateMinValidator,
+    CreateMaxValidator,
+    CreateRangeValidator,
+    CreatePatternValidator,
+    CreateCustomValidator,
+    WhenPropertyEquals,
+    WhenPropertyIn,
+    WhenPropertyNotIn,
+    AllOf,
+    AnyOf,
+    Not
+} from "./XPropertyMetadata.js";
+export type {
+    XIPropertyMetadata,
+    XIPropertyContext,
+    XIPropertyRule,
+    XIPropertyRuleOptions,
+    XIPropertyValidationResult,
+    XIUserFix,
+    TPropertyCondition,
+    TPropertyValidator,
+    TPropertyStringProvider
+} from "./XPropertyMetadata.js";

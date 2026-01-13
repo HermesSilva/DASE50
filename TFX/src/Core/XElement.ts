@@ -235,6 +235,30 @@ export abstract class XElement
         this.ChildNodes.push(pChild);
     }
 
+    /**
+     * Insere um filho em uma posição específica
+     * @param pChild Elemento filho a ser inserido
+     * @param pIndex Índice onde inserir (0 = primeiro)
+     */
+    public InsertChildAt(pChild: XElement, pIndex: number): void
+    {
+        if (pChild._ParentNode === this)
+        {
+            // Já é filho, move para a posição correta
+            const currentIdx = this.ChildNodes.indexOf(pChild);
+            if (currentIdx >= 0)
+                this.ChildNodes.splice(currentIdx, 1);
+        }
+        else
+        {
+            pChild.RemoveFromParent();
+            pChild._ParentNode = this;
+        }
+
+        const idx = Math.max(0, Math.min(pIndex, this.ChildNodes.length));
+        this.ChildNodes.splice(idx, 0, pChild);
+    }
+
     public RemoveChild(pChild: XElement): boolean
     {
         const idx = this.ChildNodes.indexOf(pChild);

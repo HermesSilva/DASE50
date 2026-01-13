@@ -184,18 +184,18 @@ describe("XORMDocument Integration Tests", () => {
         });
 
         // Add fields to customers
-        customers.CreateField({ Name: "CustomerID", DataType: "Int32", IsPrimaryKey: true });
+        customers.CreatePKField({ Name: "CustomerID", DataType: "Int32" });
         customers.CreateField({ Name: "CustomerName", DataType: "String", IsNullable: false });
         customers.CreateField({ Name: "Email", DataType: "String", IsNullable: true });
 
         // Add fields to orders
-        orders.CreateField({ Name: "OrderID", DataType: "Int32", IsPrimaryKey: true });
+        orders.CreatePKField({ Name: "OrderID", DataType: "Int32" });
         const orderCustomerID = orders.CreateField({ Name: "CustomerID", DataType: "Int32", IsNullable: false });
         orders.CreateField({ Name: "OrderDate", DataType: "DateTime", IsNullable: false });
         const orderProductID = orders.CreateField({ Name: "ProductID", DataType: "Int32", IsNullable: false });
 
         // Add fields to products
-        products.CreateField({ Name: "ProductID", DataType: "Int32", IsPrimaryKey: true });
+        products.CreatePKField({ Name: "ProductID", DataType: "Int32" });
         products.CreateField({ Name: "ProductName", DataType: "String", IsNullable: false });
         products.CreateField({ Name: "Price", DataType: "Decimal", IsNullable: false });
 

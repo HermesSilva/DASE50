@@ -6,11 +6,18 @@ import { XORMDesign } from "./XORMDesign.js";
 import { XORMTable } from "./XORMTable.js";
 import { XORMReference } from "./XORMReference.js";
 import { XORMField } from "./XORMField.js";
+import { XORMPKField } from "./XORMPKField.js";
 
 export type XIORMValidationIssue = XIValidationIssue;
 
 export class XORMValidator extends XValidator<XORMDocument, XORMDesign>
 {
+    /** 
+     * Tipos de dados válidos para campos de chave primária.
+     * Deve ser preenchido a partir do ORM.Types.json.
+     */
+    public ValidPKTypes: string[] = [];
+
     protected override GetDesign(pDocument: XORMDocument): XORMDesign | null
     {
         return pDocument.Design;
@@ -59,14 +66,18 @@ export class XORMValidator extends XValidator<XORMDocument, XORMDesign>
             else
                 names.add(lowerName);
 
-            this.ValidateTableFields(table);
+            // Validate that table has a primary key field
+            if (!table.HasPKField())
+                this.AddError(table.ID, table.Name, `Table "${table.Name}" must have a primary key field.`);
+
+            this.ValidateTableFields(table, pDesign);
         }
 
         if (tables.length === 0)
             this.AddWarning(pDesign.ID, pDesign.Name, "Design has no tables.");
     }
 
-    private ValidateTableFields(pTable: XORMTable): void
+    private ValidateTableFields(pTable: XORMTable, pDesign: XORMDesign): void
     {
         const fields = pTable.GetChildrenOfType(XORMField);
         const names = new Set<string>();
@@ -84,6 +95,36 @@ export class XORMValidator extends XValidator<XORMDocument, XORMDesign>
                 this.AddError(field.ID, field.Name, `Duplicate field name in table ${pTable.Name}: ${field.Name}`);
             else
                 names.add(lowerName);
+
+            // Validate PKField DataType against configured valid types
+            if (field instanceof XORMPKField)
+            {
+                if (this.ValidPKTypes.length > 0 && !this.ValidPKTypes.includes(field.DataType))
+                    this.AddError(field.ID, field.Name, `Invalid DataType "${field.DataType}" for Primary Key. Valid types are: ${this.ValidPKTypes.join(", ")}`);
+                
+                continue;
+            }
+
+            // Validate FK field DataType matches target table PKType
+            const ref = pDesign.FindReferenceBySourceFieldID(field.ID);
+            if (ref !== null)
+            {
+                const targetTable = pDesign.FindTableByID(ref.Target);
+                if (targetTable !== null && field.DataType !== targetTable.PKType)
+                    this.AddError(field.ID, field.Name, `FK field DataType must match target table PKType (${targetTable.PKType}).`);
+            }
+
+            // Validate field name format (no spaces at start/end, no special chars)
+            if (field.Name !== field.Name.trim())
+                this.AddWarning(field.ID, field.Name, "Field name has leading or trailing spaces.");
+
+            // Validate Length for string types
+            if (field.DataType === "String" && field.Length === 0)
+                this.AddWarning(field.ID, field.Name, "String field has no length defined.");
+
+            // Validate Scale only for Decimal types
+            if (field.DataType !== "Decimal" && field.Scale > 0)
+                this.AddWarning(field.ID, field.Name, "Scale is only applicable for Decimal fields.");
         }
     }
 

@@ -74,6 +74,7 @@ describe("XORMValidator", () =>
             const table = new XORMTable();
             table.Name = "Users";
             doc.Design.AppendChild(table);
+            table.CreatePKField();
 
             const validator = new XORMValidator();
             const issues = validator.Validate(doc);
@@ -88,10 +89,12 @@ describe("XORMValidator", () =>
             const table1 = new XORMTable();
             table1.Name = "Users";
             doc.Design.AppendChild(table1);
+            table1.CreatePKField();
 
             const table2 = new XORMTable();
             table2.Name = "users";
             doc.Design.AppendChild(table2);
+            table2.CreatePKField();
 
             const validator = new XORMValidator();
             const issues = validator.Validate(doc);
@@ -108,10 +111,12 @@ describe("XORMValidator", () =>
             const table1 = new XORMTable();
             table1.Name = "Users";
             doc.Design.AppendChild(table1);
+            table1.CreatePKField();
 
             const table2 = new XORMTable();
             table2.Name = "Products";
             doc.Design.AppendChild(table2);
+            table2.CreatePKField();
 
             const validator = new XORMValidator();
             const issues = validator.Validate(doc);
@@ -126,21 +131,57 @@ describe("XORMValidator", () =>
         it("should error when field has empty name", () =>
         {
             const doc = new XORMDocument();
-            const table = new XORMTable();
-            table.Name = "Users";
-            doc.Design.AppendChild(table);
+            const table = doc.Design.CreateTable({ Name: "Users" });
+            table.CreatePKField();
 
-            const field = new XORMField();
-            field.Name = "";
-            table.AppendChild(field);
+            const field = table.CreateField({ Name: "" });
 
             const validator = new XORMValidator();
             const issues = validator.Validate(doc);
+            const error = issues.find(i => i.ElementID === field.ID && i.Message === "Field name is required.");
 
-            const error = issues.find(i => i.Message.includes("Field name is required"));
             expect(error).toBeDefined();
             expect(error?.Severity).toBe(XDesignerErrorSeverity.Error);
-            expect(error?.ElementID).toBe(field.ID);
+        });
+
+        it("should validate PK DataType against ValidPKTypes list", () =>
+        {
+            const doc = new XORMDocument();
+            const table = doc.Design.CreateTable({ Name: "TestTable" });
+            const pkField = table.CreatePKField();
+            
+            // Force a DataType that would be invalid according to our list
+            const pkFieldInternal = pkField as any;
+            pkFieldInternal._DataTypeLocked = false; 
+            pkField.DataType = "String";
+
+            const validator = new XORMValidator();
+            validator.ValidPKTypes = ["Int32", "Int64", "Guid"];
+            
+            const issues = validator.Validate(doc);
+            const error = issues.find(i => i.Message.includes("Invalid DataType \"String\" for Primary Key"));
+            
+            expect(error).toBeDefined();
+            expect(error?.Severity).toBe(XDesignerErrorSeverity.Error);
+        });
+
+        it("should not error if ValidPKTypes is empty (skips validation)", () =>
+        {
+            const doc = new XORMDocument();
+            const table = doc.Design.CreateTable({ Name: "TestTableNoTypes" });
+            const pkField = table.CreatePKField();
+            
+            const pkFieldInternal = pkField as any;
+            pkFieldInternal._DataTypeLocked = false;
+            pkField.DataType = "String";
+
+            const validator = new XORMValidator();
+            validator.ValidPKTypes = []; 
+            
+            const issues = validator.Validate(doc);
+            const error = issues.find(i => i.Message.includes("Invalid DataType \"String\" for Primary Key"));
+            
+            expect(error).toBeUndefined();
         });
 
         it("should pass when field has proper name", () =>
@@ -149,6 +190,7 @@ describe("XORMValidator", () =>
             const table = new XORMTable();
             table.Name = "Users";
             doc.Design.AppendChild(table);
+            table.CreatePKField();
 
             const field = new XORMField();
             field.Name = "Email";
@@ -167,6 +209,7 @@ describe("XORMValidator", () =>
             const table = new XORMTable();
             table.Name = "Users";
             doc.Design.AppendChild(table);
+            table.CreatePKField();
 
             const field1 = new XORMField();
             field1.Name = "Email";
@@ -193,17 +236,19 @@ describe("XORMValidator", () =>
             const table1 = new XORMTable();
             table1.Name = "Users";
             doc.Design.AppendChild(table1);
+            table1.CreatePKField();
 
             const field1 = new XORMField();
-            field1.Name = "ID";
+            field1.Name = "Email";
             table1.AppendChild(field1);
 
             const table2 = new XORMTable();
             table2.Name = "Products";
             doc.Design.AppendChild(table2);
+            table2.CreatePKField();
 
             const field2 = new XORMField();
-            field2.Name = "ID";
+            field2.Name = "Email";
             table2.AppendChild(field2);
 
             const validator = new XORMValidator();
@@ -211,6 +256,199 @@ describe("XORMValidator", () =>
 
             const errors = issues.filter(i => i.Message.includes("Duplicate field name"));
             expect(errors.length).toBe(0);
+        });
+
+        it("should warn when field name has leading or trailing spaces", () =>
+        {
+            const doc = new XORMDocument();
+            const table = new XORMTable();
+            table.Name = "Users";
+            doc.Design.AppendChild(table);
+            table.CreatePKField();
+
+            const field = new XORMField();
+            field.Name = "Email ";
+            table.AppendChild(field);
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+
+            const warning = issues.find(i => i.Message.includes("leading or trailing spaces"));
+            expect(warning).toBeDefined();
+        });
+
+        it("should warn when String field has no length defined", () =>
+        {
+            const doc = new XORMDocument();
+            const table = new XORMTable();
+            table.Name = "Users";
+            doc.Design.AppendChild(table);
+            table.CreatePKField();
+
+            const field = new XORMField();
+            field.Name = "Email";
+            field.DataType = "String";
+            field.Length = 0;
+            table.AppendChild(field);
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+
+            const warning = issues.find(i => i.Message.includes("String field has no length"));
+            expect(warning).toBeDefined();
+        });
+
+        it("should not warn when String field has length defined", () =>
+        {
+            const doc = new XORMDocument();
+            const table = new XORMTable();
+            table.Name = "Users";
+            doc.Design.AppendChild(table);
+            table.CreatePKField();
+
+            const field = new XORMField();
+            field.Name = "Email";
+            field.DataType = "String";
+            field.Length = 255;
+            table.AppendChild(field);
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+
+            const warning = issues.find(i => i.Message.includes("String field has no length"));
+            expect(warning).toBeUndefined();
+        });
+
+        it("should warn when Scale is set on non-Decimal field", () =>
+        {
+            const doc = new XORMDocument();
+            const table = new XORMTable();
+            table.Name = "Users";
+            doc.Design.AppendChild(table);
+            table.CreatePKField();
+
+            const field = new XORMField();
+            field.Name = "Age";
+            field.DataType = "Int32";
+            field.Scale = 2;
+            table.AppendChild(field);
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+
+            const warning = issues.find(i => i.Message.includes("Scale is only applicable"));
+            expect(warning).toBeDefined();
+        });
+
+        it("should not warn when Scale is set on Decimal field", () =>
+        {
+            const doc = new XORMDocument();
+            const table = new XORMTable();
+            table.Name = "Products";
+            doc.Design.AppendChild(table);
+            table.CreatePKField();
+
+            const field = new XORMField();
+            field.Name = "Price";
+            field.DataType = "Decimal";
+            field.Scale = 2;
+            table.AppendChild(field);
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+
+            const warning = issues.find(i => i.Message.includes("Scale is only applicable"));
+            expect(warning).toBeUndefined();
+        });
+
+        it("should error when table has no primary key field", () =>
+        {
+            const doc = new XORMDocument();
+            const table = new XORMTable();
+            table.Name = "Users";
+            doc.Design.AppendChild(table);
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+
+            const error = issues.find(i => i.Message.includes("must have a primary key field"));
+            expect(error).toBeDefined();
+            expect(error?.Severity).toBe(XDesignerErrorSeverity.Error);
+            expect(error?.ElementID).toBe(table.ID);
+        });
+
+        it("should error when FK field DataType does not match target table PKType", () =>
+        {
+            const doc = new XORMDocument();
+            doc.Design.Name = "TestDB";
+            
+            const usersTable = new XORMTable();
+            usersTable.InitializeNew();
+            usersTable.Name = "Users";
+            doc.Design.AppendChild(usersTable);
+            usersTable.CreatePKField({ DataType: "Guid" });
+
+            const ordersTable = new XORMTable();
+            ordersTable.InitializeNew();
+            ordersTable.Name = "Orders";
+            doc.Design.AppendChild(ordersTable);
+            ordersTable.CreatePKField();
+
+            const fkField = new XORMField();
+            fkField.InitializeNew();
+            fkField.Name = "UserID";
+            fkField.DataType = "Int32"; // Wrong! Should be Guid
+            ordersTable.AppendChild(fkField);
+
+            const ref = new XORMReference();
+            ref.InitializeNew();
+            ref.Name = "FK_Orders_Users";
+            ref.Source = fkField.ID;
+            ref.Target = usersTable.ID;
+            doc.Design.AppendChild(ref);
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+
+            const error = issues.find(i => i.Message.includes("FK field DataType must match target table PKType"));
+            expect(error).toBeDefined();
+        });
+
+        it("should not error when FK field DataType matches target table PKType", () =>
+        {
+            const doc = new XORMDocument();
+            doc.Design.Name = "TestDB";
+            
+            const usersTable = new XORMTable();
+            usersTable.InitializeNew();
+            usersTable.Name = "Users";
+            doc.Design.AppendChild(usersTable);
+            usersTable.CreatePKField({ DataType: "Guid" });
+
+            const ordersTable = new XORMTable();
+            ordersTable.InitializeNew();
+            ordersTable.Name = "Orders";
+            doc.Design.AppendChild(ordersTable);
+            ordersTable.CreatePKField();
+
+            const fkField = new XORMField();
+            fkField.InitializeNew();
+            fkField.Name = "UserID";
+            fkField.DataType = "Guid"; // Correct!
+            ordersTable.AppendChild(fkField);
+
+            const ref = new XORMReference();
+            ref.InitializeNew();
+            ref.Name = "FK_Orders_Users";
+            ref.Source = fkField.ID;
+            ref.Target = usersTable.ID;
+            doc.Design.AppendChild(ref);
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+
+            const error = issues.find(i => i.Message.includes("FK field DataType must match"));
+            expect(error).toBeUndefined();
         });
     });
 
@@ -445,11 +683,7 @@ describe("XORMValidator", () =>
             usersTable.Name = "Users";
             doc.Design.AppendChild(usersTable);
 
-            const idField = new XORMField();
-            idField.InitializeNew();
-            idField.Name = "ID";
-            idField.IsPrimaryKey = true;
-            usersTable.AppendChild(idField);
+            usersTable.CreatePKField({ Name: "ID", DataType: "Int32" });
 
             const emailField = new XORMField();
             emailField.InitializeNew();
@@ -461,15 +695,12 @@ describe("XORMValidator", () =>
             ordersTable.Name = "Orders";
             doc.Design.AppendChild(ordersTable);
 
-            const orderIDField = new XORMField();
-            orderIDField.InitializeNew();
-            orderIDField.Name = "ID";
-            orderIDField.IsPrimaryKey = true;
-            ordersTable.AppendChild(orderIDField);
+            ordersTable.CreatePKField({ Name: "ID", DataType: "Int32" });
 
             const userIDField = new XORMField();
             userIDField.InitializeNew();
             userIDField.Name = "UserID";
+            userIDField.DataType = "Int32"; // Must match target table PKType
             ordersTable.AppendChild(userIDField);
 
             const ref = new XORMReference();

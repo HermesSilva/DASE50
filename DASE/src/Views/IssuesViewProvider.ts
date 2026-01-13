@@ -167,8 +167,6 @@ export class XIssuesViewProvider implements vscode.WebviewViewProvider
                 html += '<span class="issue-icon ' + iconClass + '">' + icon + '</span>';
                 html += '<div class="issue-content">';
                 html += '<div class="issue-message">' + EscapeHtml(issue.Message) + '</div>';
-                if (issue.ElementName)
-                    html += '<div class="issue-element">' + EscapeHtml(issue.ElementName) + '</div>';
                 html += '</div></div>';
             }
             

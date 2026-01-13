@@ -739,16 +739,7 @@
             path.setAttribute("stroke", GetTableColor(pRef.TargetTableID));
             g.appendChild(path);
 
-            // Label no ponto médio
-            const midIdx = Math.floor(points.length / 2);
-            const midPoint = points[midIdx];
-            const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            label.setAttribute("class", "orm-reference-label");
-            label.setAttribute("x", midPoint.X);
-            label.setAttribute("y", midPoint.Y - 10);
-            label.setAttribute("text-anchor", "middle");
-            label.textContent = pRef.Name || "";
-            g.appendChild(label);
+
         }
         else
         {
@@ -766,17 +757,6 @@
             line.setAttribute("y2", y2);
             line.setAttribute("stroke", GetTableColor(pRef.TargetTableID));
             g.appendChild(line);
-
-            const midX = (x1 + x2) / 2;
-            const midY = (y1 + y2) / 2 - 10;
-
-            const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-            label.setAttribute("class", "orm-reference-label");
-            label.setAttribute("x", midX);
-            label.setAttribute("y", midY);
-            label.setAttribute("text-anchor", "middle");
-            label.textContent = pRef.Name || "";
-            g.appendChild(label);
         }
 
         g.addEventListener("click", function(e) {

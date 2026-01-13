@@ -450,6 +450,25 @@ describe('XTFXBridge', () => {
             expect(result.Success).toBe(true);
         });
 
+        it('should block DataType changes on FK fields', async () => {
+            const json = JSON.stringify({
+                Name: "TestModel",
+                Tables: [
+                    { ID: "table-1", Name: "Users", X: 100, Y: 100, Fields: [] },
+                    { ID: "table-2", Name: "Orders", X: 300, Y: 100, Fields: [{ ID: "field-1", Name: "UserID", DataType: "Int32" }] }
+                ],
+                References: [
+                    { SourceFieldID: "field-1", TargetTableID: "table-1", Name: "FK_Orders_Users" }
+                ]
+            });
+            await bridge.LoadOrmModelFromText(json);
+
+            const result = bridge.UpdateProperty('field-1', 'DataType', 'String');
+
+            expect(result.Success).toBe(false);
+            expect(result.Message).toContain('Cannot change DataType of a foreign key field');
+        });
+
         it('should update XORMField Length property', async () => {
             const json = JSON.stringify({
                 Name: "TestModel",
@@ -495,7 +514,8 @@ describe('XTFXBridge', () => {
 
             const result = bridge.UpdateProperty('field-1', 'IsPrimaryKey', true);
 
-            expect(result.Success).toBe(true);
+            expect(result.Success).toBe(false);
+            expect(result.Message).toContain('structural');
         });
 
         it('should update XORMField IsNullable property', async () => {
@@ -978,6 +998,33 @@ describe('XTFXBridge', () => {
                             Height: options.Height || 150,
                             Bounds: new tfx.XRect(options.X || 0, options.Y || 0, options.Width || 200, options.Height || 150),
                             Fields: [],
+                            GetPKField: jest.fn(() => {
+                                for (const f of table.Fields)
+                                {
+                                    if (f && f.IsPrimaryKey)
+                                        return f;
+                                }
+                                return null;
+                            }),
+                            CreatePKField: jest.fn(() => {
+                                const existing = table.GetPKField();
+                                if (existing)
+                                    return existing;
+
+                                const pk: any = {
+                                    ID: tfx.XGuid.NewValue(),
+                                    Name: 'ID',
+                                    DataType: 'Int32',
+                                    Length: 0,
+                                    IsPrimaryKey: true,
+                                    IsNullable: false,
+                                    IsAutoIncrement: true,
+                                    DefaultValue: '',
+                                    Description: ''
+                                };
+                                table.Fields.splice(0, 0, pk);
+                                return pk;
+                            }),
                             CreateField: jest.fn((fieldOpts: any) => {
                                 const field: any = {
                                     ID: fieldOpts.ID || tfx.XGuid.NewValue(),
@@ -1075,6 +1122,171 @@ describe('XTFXBridge', () => {
             expect(mockDoc.Tables.length).toBe(1);
             expect(mockDoc.Tables[0].Name).toBe('Users');
             expect(mockDoc.Tables[0].Schema).toBe('dbo');
+        });
+
+        it('should normalize legacy PK DataType Long to Int64 and skip PK during field creation', async () => {
+            const jsonData = {
+                Tables: [{
+                    Name: 'TestTable',
+                    Fields: [
+                        { Name: 'ID', DataType: 'Long', IsPrimaryKey: true },
+                        { Name: 'Name', DataType: 'String', IsPrimaryKey: false }
+                    ]
+                }]
+            };
+
+            await (bridge as any).LoadFromJson(mockDoc, jsonData);
+
+            const table = mockDoc.Tables[0];
+            expect(table.Fields[0].IsPrimaryKey).toBe(true);
+            expect(table.Fields[0].DataType).toBe('Int64');
+            expect(table.CreateField).toHaveBeenCalledTimes(1);
+        });
+
+        it('should ignore unsupported PK DataType values', async () => {
+            const jsonData = {
+                Tables: [{
+                    Name: 'TestTable',
+                    Fields: [
+                        { Name: 'ID', DataType: 'String', IsPrimaryKey: true }
+                    ]
+                }]
+            };
+
+            await (bridge as any).LoadFromJson(mockDoc, jsonData);
+
+            const table = mockDoc.Tables[0];
+            expect(table.Fields[0].IsPrimaryKey).toBe(true);
+            expect(table.Fields[0].DataType).toBe('Int32');
+        });
+
+        it('should accept Guid as PK DataType', async () => {
+            const jsonData = {
+                Tables: [{
+                    Name: 'TestTable',
+                    Fields: [
+                        { Name: 'ID', DataType: 'Guid', IsPrimaryKey: true }
+                    ]
+                }]
+            };
+
+            await (bridge as any).LoadFromJson(mockDoc, jsonData);
+
+            const table = mockDoc.Tables[0];
+            expect(table.Fields[0].IsPrimaryKey).toBe(true);
+            expect(table.Fields[0].DataType).toBe('Guid');
+        });
+
+        it('should assign ID and Description to non-PK fields when provided', async () => {
+            const jsonData = {
+                Tables: [{
+                    Name: 'TestTable',
+                    Fields: [
+                        { Name: 'ID', DataType: 'Integer', IsPrimaryKey: true },
+                        { ID: 'field-99', Name: 'Name', DataType: 'String', IsPrimaryKey: false, Description: 'User name' }
+                    ]
+                }]
+            };
+
+            await (bridge as any).LoadFromJson(mockDoc, jsonData);
+
+            const table = mockDoc.Tables[0];
+
+            let nonPKField: any = null;
+            for (const f of table.Fields)
+            {
+                if (f && !f.IsPrimaryKey)
+                    nonPKField = f;
+            }
+
+            expect(nonPKField).not.toBeNull();
+            expect(nonPKField.ID).toBe('field-99');
+            expect(nonPKField.Description).toBe('User name');
+        });
+
+        it('should reuse existing PK field when table already has one', async () => {
+            const existingPK: any = {
+                ID: 'existing-pk',
+                Name: 'ID',
+                DataType: 'Int32',
+                IsPrimaryKey: true,
+                IsNullable: false,
+                IsAutoIncrement: true,
+                DefaultValue: '',
+                Description: ''
+            };
+
+            mockDoc.Tables = [];
+            mockDoc.Design.CreateTable = jest.fn((options: any) => {
+                const table: any = {
+                    ID: options.ID || tfx.XGuid.NewValue(),
+                    Name: options.Name || '',
+                    Schema: options.Schema || 'dbo',
+                    Description: options.Description || '',
+                    X: options.X || 0,
+                    Y: options.Y || 0,
+                    Width: options.Width || 200,
+                    Height: options.Height || 150,
+                    Bounds: new tfx.XRect(options.X || 0, options.Y || 0, options.Width || 200, options.Height || 150),
+                    Fields: [existingPK],
+                    GetPKField: jest.fn(() => existingPK),
+                    CreatePKField: jest.fn(() => {
+                        throw new Error('CreatePKField should not be called');
+                    }),
+                    CreateField: jest.fn((fieldOpts: any) => {
+                        const field: any = {
+                            ID: fieldOpts.ID || tfx.XGuid.NewValue(),
+                            Name: fieldOpts.Name || '',
+                            DataType: fieldOpts.DataType || 'String',
+                            Length: fieldOpts.Length || 0,
+                            IsPrimaryKey: false,
+                            IsNullable: fieldOpts.IsNullable !== false,
+                            IsAutoIncrement: fieldOpts.IsAutoIncrement || false,
+                            DefaultValue: fieldOpts.DefaultValue || '',
+                            Description: ''
+                        };
+                        table.Fields.push(field);
+                        return field;
+                    })
+                };
+
+                mockDoc.Tables.push(table);
+                return table;
+            });
+
+            const jsonData = {
+                Tables: [{
+                    Name: 'TestTable',
+                    Fields: [
+                        { Name: 'NewID', DataType: 'Integer', IsPrimaryKey: true }
+                    ]
+                }]
+            };
+
+            await (bridge as any).LoadFromJson(mockDoc, jsonData);
+
+            const table = mockDoc.Tables[0];
+            expect(table.CreatePKField).not.toHaveBeenCalled();
+            expect(existingPK.Name).toBe('NewID');
+            expect(existingPK.DataType).toBe('Int32');
+        });
+
+        it('should not change PK Name/DataType when legacy pkData omits them', async () => {
+            const jsonData = {
+                Tables: [{
+                    Name: 'TestTable',
+                    Fields: [
+                        { IsPrimaryKey: true }
+                    ]
+                }]
+            };
+
+            await (bridge as any).LoadFromJson(mockDoc, jsonData);
+
+            const table = mockDoc.Tables[0];
+            expect(table.Fields[0].IsPrimaryKey).toBe(true);
+            expect(table.Fields[0].Name).toBe('ID');
+            expect(table.Fields[0].DataType).toBe('Int32');
         });
 
         it('should load references from JSON (supports legacy SourceID/TargetID)', async () => {
@@ -1563,12 +1775,11 @@ describe('XTFXBridge', () => {
         });
 
         it('should return properties for XORMField element', async () => {
-            const mockField = new tfx.XORMField();
+            const mockField = new tfx.XORMPKField();
             mockField.ID = 'field-1';
             mockField.Name = 'UserID';
-            mockField.DataType = 'Integer' as any;
+            mockField.DataType = 'Int32' as any;
             mockField.Length = 4;
-            mockField.IsPrimaryKey = true;
             mockField.IsNullable = false;
             mockField.IsAutoIncrement = true;
             mockField.DefaultValue = '';
@@ -1586,6 +1797,9 @@ describe('XTFXBridge', () => {
             expect(props.some(p => p.Key === 'IsPrimaryKey')).toBe(true);
             expect(props.some(p => p.Key === 'IsNullable')).toBe(true);
             expect(props.some(p => p.Key === 'IsAutoIncrement')).toBe(true);
+
+            const pkProp = props.find(p => p.Key === 'IsPrimaryKey');
+            expect(pkProp?.IsReadOnly).toBe(true);
         });
 
         it('should return properties for XORMDesign element', async () => {
@@ -1884,6 +2098,21 @@ describe('XTFXBridge', () => {
             expect(info?.ID).toBe('field-1');
             expect(info?.Name).toBe('UserID');
             expect(info?.Type).toBe('XORMField');
+        });
+
+        it('should return info for XORMPKField element', () => {
+            const mockPKField = new tfx.XORMPKField();
+            mockPKField.ID = 'pk-1';
+            mockPKField.Name = 'ID';
+
+            bridge.Controller.GetElementByID = jest.fn().mockReturnValue(mockPKField);
+
+            const info = bridge.GetElementInfo('pk-1');
+
+            expect(info).not.toBeNull();
+            expect(info?.ID).toBe('pk-1');
+            expect(info?.Name).toBe('ID');
+            expect(info?.Type).toBe('XORMPKField');
         });
 
         it('should return "Unknown" type for unknown element type', () => {

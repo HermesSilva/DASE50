@@ -3,6 +3,7 @@ import { XORMDocument } from "./XORMDocument.js";
 import { XORMDesign } from "./XORMDesign.js";
 import { XORMTable } from "./XORMTable.js";
 import { XORMField } from "./XORMField.js";
+import { XORMPKField } from "./XORMPKField.js";
 import { XORMReference } from "./XORMReference.js";
 
 let _Registered = false;
@@ -39,6 +40,12 @@ export function RegisterORMElements(): void
     });
 
     registry.Register({
+        TagName: "XORMPKField",
+        Constructor: XORMPKField,
+        ClassID: "XORM-PKF-001"
+    });
+
+    registry.Register({
         TagName: "XORMReference",
         Constructor: XORMReference,
         ClassID: "XORM-REF-001"
@@ -48,6 +55,7 @@ export function RegisterORMElements(): void
     registry.RegisterChildTag("XORMDesign", "XORMTable");
     registry.RegisterChildTag("XORMDesign", "XORMReference");
     registry.RegisterChildTag("XORMTable", "XORMField");
+    registry.RegisterChildTag("XORMTable", "XORMPKField");
 
     _Registered = true;
 }

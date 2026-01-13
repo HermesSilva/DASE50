@@ -5,121 +5,124 @@
     <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">Complete Test Model</XData>
   </XValues>
   <XORMDesign>
-    <XORMTable ID="d2354a34-ff44-4b3d-90f7-7058cfd94ddb" Name="Customers">
+    <XORMTable ID="fc776ad3-c678-4cbd-a40c-76c8d12b6700" Name="Customers">
       <XValues>
-        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">d2354a34-ff44-4b3d-90f7-7058cfd94ddb</XData>
+        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">fc776ad3-c678-4cbd-a40c-76c8d12b6700</XData>
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">Customers</XData>
         <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=100;Y=150;Width=250;Height=200}</XData>
       </XValues>
-      <XORMField ID="b61367be-0398-4916-9b80-c201a9e4294f" Name="CustomerID">
+      <XORMPKField ID="7d2dbca3-a391-44a4-9287-44f4f5b727dd" Name="CustomerID">
         <XValues>
-          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">b61367be-0398-4916-9b80-c201a9e4294f</XData>
+          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">7d2dbca3-a391-44a4-9287-44f4f5b727dd</XData>
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">CustomerID</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
-          <XData Name="IsPrimaryKey" ID="00000001-0002-0003-0001-000000000004" Type="Boolean">true</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000005" Type="Boolean">false</XData>
+          <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
         </XValues>
-      </XORMField>
-      <XORMField ID="32965190-390c-4e2e-b1a6-d779e5fff930" Name="CustomerName">
+      </XORMPKField>
+      <XORMField ID="df527f4e-08a0-4392-828b-36e87441e813" Name="CustomerName">
         <XValues>
-          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">32965190-390c-4e2e-b1a6-d779e5fff930</XData>
+          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">df527f4e-08a0-4392-828b-36e87441e813</XData>
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">CustomerName</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">String</XData>
           <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000005" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
-      <XORMField ID="f801e8cf-3d85-4251-a505-5c6e4082887f" Name="Email">
+      <XORMField ID="7e29207b-c92e-4879-ba95-b2ca63c7495f" Name="Email">
         <XValues>
-          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">f801e8cf-3d85-4251-a505-5c6e4082887f</XData>
+          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">7e29207b-c92e-4879-ba95-b2ca63c7495f</XData>
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">Email</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">String</XData>
         </XValues>
       </XORMField>
     </XORMTable>
-    <XORMTable ID="4b371e7e-9f34-461b-8a11-08fdda041f71" Name="Orders">
+    <XORMTable ID="67f88465-ddc8-4ef6-a51f-4bbea363ac86" Name="Orders">
       <XValues>
-        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">4b371e7e-9f34-461b-8a11-08fdda041f71</XData>
+        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">67f88465-ddc8-4ef6-a51f-4bbea363ac86</XData>
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">Orders</XData>
         <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=450;Y=150;Width=250;Height=200}</XData>
       </XValues>
-      <XORMField ID="c2f15802-d30e-4744-9c54-4512e2d250c4" Name="OrderID">
+      <XORMPKField ID="7be066ed-6b59-479f-9a89-45223eba8da8" Name="OrderID">
         <XValues>
-          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">c2f15802-d30e-4744-9c54-4512e2d250c4</XData>
+          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">7be066ed-6b59-479f-9a89-45223eba8da8</XData>
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">OrderID</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
-          <XData Name="IsPrimaryKey" ID="00000001-0002-0003-0001-000000000004" Type="Boolean">true</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000005" Type="Boolean">false</XData>
+          <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
         </XValues>
-      </XORMField>
-      <XORMField ID="fd9d1730-66a3-4a96-bdb5-c00de7f4702c" Name="CustomerID">
+      </XORMPKField>
+      <XORMField ID="7b145f91-c799-45c8-9d9b-e82e2244df16" Name="CustomerID">
         <XValues>
-          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">fd9d1730-66a3-4a96-bdb5-c00de7f4702c</XData>
+          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">7b145f91-c799-45c8-9d9b-e82e2244df16</XData>
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">CustomerID</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
           <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000005" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
-      <XORMField ID="072e7426-e7b5-4a55-8340-6fa772d75547" Name="OrderDate">
+      <XORMField ID="5b318a08-f3b9-4132-bc74-1bae1a2e5ab1" Name="OrderDate">
         <XValues>
-          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">072e7426-e7b5-4a55-8340-6fa772d75547</XData>
+          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">5b318a08-f3b9-4132-bc74-1bae1a2e5ab1</XData>
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">OrderDate</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">DateTime</XData>
           <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000005" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
-      <XORMField ID="958880db-4aeb-4120-8ca5-45602abeeaeb" Name="ProductID">
+      <XORMField ID="04ca6e3c-9ed1-4e65-a989-d52c93b21251" Name="ProductID">
         <XValues>
-          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">958880db-4aeb-4120-8ca5-45602abeeaeb</XData>
+          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">04ca6e3c-9ed1-4e65-a989-d52c93b21251</XData>
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">ProductID</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
           <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000005" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
     </XORMTable>
-    <XORMTable ID="d1545cbc-556f-458a-96f2-826733f89011" Name="Products">
+    <XORMTable ID="10e5eb3f-fddd-49b9-8203-d5f64b5b345f" Name="Products">
       <XValues>
-        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">d1545cbc-556f-458a-96f2-826733f89011</XData>
+        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">10e5eb3f-fddd-49b9-8203-d5f64b5b345f</XData>
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">Products</XData>
         <XData Name="Bounds" ID="00000001-0001-0001-0003-000000000001" Type="Rect">{X=800;Y=150;Width=250;Height=200}</XData>
       </XValues>
-      <XORMField ID="b752bda7-dc4a-434a-94a5-8cd352b5ce28" Name="ProductID">
+      <XORMPKField ID="a09fb15c-8d80-4027-87d0-b10c28e865c1" Name="ProductID">
         <XValues>
-          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">b752bda7-dc4a-434a-94a5-8cd352b5ce28</XData>
+          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">a09fb15c-8d80-4027-87d0-b10c28e865c1</XData>
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">ProductID</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Int32</XData>
-          <XData Name="IsPrimaryKey" ID="00000001-0002-0003-0001-000000000004" Type="Boolean">true</XData>
+          <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000005" Type="Boolean">false</XData>
+          <XData Name="IsAutoIncrement" ID="00000001-0002-0003-0001-000000000006" Type="Boolean">true</XData>
         </XValues>
-      </XORMField>
-      <XORMField ID="ff5f497c-7426-4192-966c-0ae398d54b39" Name="ProductName">
+      </XORMPKField>
+      <XORMField ID="2ae2e8d8-d687-4e2c-bd85-709ce5916225" Name="ProductName">
         <XValues>
-          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">ff5f497c-7426-4192-966c-0ae398d54b39</XData>
+          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">2ae2e8d8-d687-4e2c-bd85-709ce5916225</XData>
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">ProductName</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">String</XData>
           <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000005" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
-      <XORMField ID="fe428aa2-5b95-4904-92f4-7fb3811f2959" Name="Price">
+      <XORMField ID="402f7df3-5d4f-4083-864f-bdfca421416d" Name="Price">
         <XValues>
-          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">fe428aa2-5b95-4904-92f4-7fb3811f2959</XData>
+          <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">402f7df3-5d4f-4083-864f-bdfca421416d</XData>
           <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">Price</XData>
           <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="String">Decimal</XData>
           <XData Name="IsNullable" ID="00000001-0002-0003-0001-000000000005" Type="Boolean">false</XData>
         </XValues>
       </XORMField>
     </XORMTable>
-    <XORMReference ID="20a6d3cf-cd18-441e-bc0b-f407cfe31a54" Name="FK_Orders_Customers">
+    <XORMReference ID="8298bce5-c556-4430-82c0-5c84c1c54e18" Name="FK_Orders_Customers">
       <XValues>
-        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">20a6d3cf-cd18-441e-bc0b-f407cfe31a54</XData>
+        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">8298bce5-c556-4430-82c0-5c84c1c54e18</XData>
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">FK_Orders_Customers</XData>
-        <XLinkData Name="Source" ID="00000001-0001-0001-0004-000000000010" Type="String" ElementID="fd9d1730-66a3-4a96-bdb5-c00de7f4702c" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">fd9d1730-66a3-4a96-bdb5-c00de7f4702c</XLinkData>
-        <XLinkData Name="Target" ID="00000001-0001-0001-0004-000000000011" Type="String" ElementID="d2354a34-ff44-4b3d-90f7-7058cfd94ddb" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">d2354a34-ff44-4b3d-90f7-7058cfd94ddb</XLinkData>
+        <XLinkData Name="Source" ID="00000001-0001-0001-0004-000000000010" Type="String" ElementID="7b145f91-c799-45c8-9d9b-e82e2244df16" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">7b145f91-c799-45c8-9d9b-e82e2244df16</XLinkData>
+        <XLinkData Name="Target" ID="00000001-0001-0001-0004-000000000011" Type="String" ElementID="fc776ad3-c678-4cbd-a40c-76c8d12b6700" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">fc776ad3-c678-4cbd-a40c-76c8d12b6700</XLinkData>
         <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="Point[]">{X=700;Y=250}|{X=100;Y=250}</XData>
       </XValues>
     </XORMReference>
-    <XORMReference ID="6c1eb4da-70db-483a-b50a-b669628baba3" Name="FK_Orders_Products">
+    <XORMReference ID="c157f332-0b86-445b-a3f6-02e3bb3de039" Name="FK_Orders_Products">
       <XValues>
-        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">6c1eb4da-70db-483a-b50a-b669628baba3</XData>
+        <XData Name="ID" ID="00000001-0001-0001-0001-000000000000" Type="String">c157f332-0b86-445b-a3f6-02e3bb3de039</XData>
         <XData Name="Name" ID="00000001-0001-0001-0001-000000000006" Type="String">FK_Orders_Products</XData>
-        <XLinkData Name="Source" ID="00000001-0001-0001-0004-000000000010" Type="String" ElementID="958880db-4aeb-4120-8ca5-45602abeeaeb" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">958880db-4aeb-4120-8ca5-45602abeeaeb</XLinkData>
-        <XLinkData Name="Target" ID="00000001-0001-0001-0004-000000000011" Type="String" ElementID="d1545cbc-556f-458a-96f2-826733f89011" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">d1545cbc-556f-458a-96f2-826733f89011</XLinkData>
+        <XLinkData Name="Source" ID="00000001-0001-0001-0004-000000000010" Type="String" ElementID="04ca6e3c-9ed1-4e65-a989-d52c93b21251" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">04ca6e3c-9ed1-4e65-a989-d52c93b21251</XLinkData>
+        <XLinkData Name="Target" ID="00000001-0001-0001-0004-000000000011" Type="String" ElementID="10e5eb3f-fddd-49b9-8203-d5f64b5b345f" Text="" DocumentID="" DocumentName="" ModuleID="" ModuleName="" DataEx="">10e5eb3f-fddd-49b9-8203-d5f64b5b345f</XLinkData>
         <XData Name="Points" ID="00000001-0001-0001-0004-000000000001" Type="Point[]">{X=700;Y=250}|{X=800;Y=250}</XData>
       </XValues>
     </XORMReference>

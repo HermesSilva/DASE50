@@ -18,6 +18,7 @@ import {
     XORMDesign,
     XORMTable,
     XORMField,
+    XORMPKField,
     XORMReference,
     XORMController,
     XORMValidator,
@@ -379,6 +380,9 @@ export class XTFXBridge
         if (!doc)
             return [];
 
+        // Update validator with types from configuration (or defaults if not loaded)
+        this._Validator.ValidPKTypes = this._PKDataTypes.length > 0 ? this._PKDataTypes : ["Guid", "Int32", "Int64"];
+        
         const tfxIssues = this._Validator.Validate(doc);
         const issues: XIssueItem[] = [];
 
@@ -540,6 +544,9 @@ export class XTFXBridge
             switch (pPropertyKey)
             {
                 case "DataType":
+                    // Block DataType changes on FK fields
+                    if (element.IsForeignKey)
+                        return { Success: false, Message: "Cannot change DataType of a foreign key field." };
                     element.DataType = pValue as string;
                     break;
                 case "Length":
@@ -552,8 +559,7 @@ export class XTFXBridge
                     element.IsRequired = pValue as boolean;
                     break;
                 case "IsPrimaryKey":
-                    element.IsPrimaryKey = pValue as boolean;
-                    break;
+                    return { Success: false, Message: "Primary key is structural (XORMPKField) and cannot be edited." };
                 case "IsNullable":
                     element.IsNullable = pValue as boolean;
                     break;
@@ -658,11 +664,22 @@ export class XTFXBridge
         else if (element instanceof XORMField)
         {
             const allTypes = this._AllDataTypes.length > 0 ? this._AllDataTypes : ["Boolean", "DateTime", "Guid", "Int32", "String"];
-            props.push(new XPropertyItem("DataType", "Data Type", element.DataType, XPropertyType.Enum, allTypes, "Data"));
+            
+            // Check if this field is an FK field and get expected DataType from target table
+            const isForeignKey = element.IsForeignKey;
+            const expectedDataType = element.GetExpectedDataType();
+            const dataTypeValue = isForeignKey && expectedDataType ? expectedDataType : element.DataType;
+            
+            const dataTypeProp = new XPropertyItem("DataType", "Data Type", dataTypeValue, XPropertyType.Enum, allTypes, "Data");
+            dataTypeProp.IsReadOnly = isForeignKey;
+            props.push(dataTypeProp);
+            
             props.push(new XPropertyItem("Length", "Length", element.Length, XPropertyType.Number, undefined, "Data"));
             props.push(new XPropertyItem("Scale", "Scale", element.Scale, XPropertyType.Number, undefined, "Data"));
             props.push(new XPropertyItem("IsRequired", "Required", element.IsRequired, XPropertyType.Boolean, undefined, "Behaviour"));
-            props.push(new XPropertyItem("IsPrimaryKey", "Primary Key", element.IsPrimaryKey, XPropertyType.Boolean, undefined, "Data"));
+            const pkProp = new XPropertyItem("IsPrimaryKey", "Primary Key", element.IsPrimaryKey, XPropertyType.Boolean, undefined, "Data");
+            pkProp.IsReadOnly = true;
+            props.push(pkProp);
             props.push(new XPropertyItem("IsNullable", "Nullable", element.IsNullable, XPropertyType.Boolean, undefined, "Behaviour"));
             props.push(new XPropertyItem("IsAutoIncrement", "Auto Increment", element.IsAutoIncrement, XPropertyType.Boolean, undefined, "Behaviour"));
             props.push(new XPropertyItem("DefaultValue", "Default Value", element.DefaultValue, XPropertyType.String, undefined, "Data"));
@@ -691,6 +708,8 @@ export class XTFXBridge
             typeName = "XORMTable";
         else if (element instanceof XORMReference)
             typeName = "XORMReference";
+        else if (element instanceof XORMPKField)
+            typeName = "XORMPKField";
         else if (element instanceof XORMField)
             typeName = "XORMField";
 
@@ -844,13 +863,51 @@ export class XTFXBridge
 
                 if (tData.Fields && Array.isArray(tData.Fields))
                 {
+                    const pkData = tData.Fields.find(f => f.IsPrimaryKey);
+                    if (pkData)
+                    {
+                        let pkField = table.GetPKField();
+                        if (!pkField)
+                            pkField = table.CreatePKField();
+
+                        if (pkData.Name)
+                            pkField.Name = pkData.Name;
+
+                        if (pkData.DataType)
+                        {
+                            let normalizedPKType: string = pkData.DataType;
+                            switch (normalizedPKType)
+                            {
+                                case "Integer":
+                                    normalizedPKType = "Int32";
+                                    break;
+                                case "Long":
+                                    normalizedPKType = "Int64";
+                                    break;
+                            }
+
+                            if (normalizedPKType === "Int32" || normalizedPKType === "Int64" || normalizedPKType === "Guid")
+                                pkField.DataType = normalizedPKType;
+                        }
+
+                        if (pkData.IsAutoIncrement !== undefined)
+                            pkField.IsAutoIncrement = pkData.IsAutoIncrement;
+
+                        if (pkData.ID)
+                            pkField.ID = pkData.ID;
+                        if (pkData.Description)
+                            pkField.Description = pkData.Description;
+                    }
+
                     for (const fData of tData.Fields)
                     {
+                        if (fData.IsPrimaryKey)
+                            continue;
+
                         const field = table.CreateField({
                             Name: fData.Name || "",
                             DataType: (fData.DataType as string) || "String",
                             Length: fData.Length || 0,
-                            IsPrimaryKey: fData.IsPrimaryKey || false,
                             IsNullable: fData.IsNullable !== false,
                             IsAutoIncrement: fData.IsAutoIncrement || false,
                             DefaultValue: fData.DefaultValue || ""
@@ -906,7 +963,7 @@ export class XTFXBridge
             Schema: pDoc.Design.Schema,
             Tables: tables.map((t: any) => {
                 // Get fields using GetChildrenOfType or directly from Fields array
-                const fields = t.GetChildrenOfType?.(null) ?? t.Fields ?? [];
+                const fields = t.GetChildrenOfType?.(XORMField) ?? t.Fields ?? [];
                 
                 return {
                     ID: t.ID,

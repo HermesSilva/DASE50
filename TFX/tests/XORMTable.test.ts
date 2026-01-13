@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { XORMTable } from "../src/Designers/ORM/XORMTable.js";
 import { XORMField } from "../src/Designers/ORM/XORMField.js";
+import { XORMPKField } from "../src/Designers/ORM/XORMPKField.js";
 import { XRectangle } from "../src/Design/XRectangle.js";
+import { XGuid } from "../src/Core/XGuid.js";
 
 describe("XORMTable", () =>
 {
@@ -40,7 +42,7 @@ describe("XORMTable", () =>
             expect(field.Name).toMatch(/^Field\d+$/);
             expect(field.DataType).toBe("String");
             expect(field.Length).toBe(0);
-            expect(field.IsPrimaryKey).toBe(false);
+            expect(field.IsPrimaryKey).toBe(false); // Regular fields are never PKs
             expect(field.IsNullable).toBe(true);
             expect(field.IsAutoIncrement).toBe(false);
             expect(field.DefaultValue).toBe("");
@@ -53,7 +55,6 @@ describe("XORMTable", () =>
                 Name: "CustomField",
                 DataType: "Int32",
                 Length: 100,
-                IsPrimaryKey: true,
                 IsNullable: false,
                 IsAutoIncrement: true,
                 DefaultValue: "0"
@@ -62,7 +63,7 @@ describe("XORMTable", () =>
             expect(field.Name).toBe("CustomField");
             expect(field.DataType).toBe("Int32");
             expect(field.Length).toBe(100);
-            expect(field.IsPrimaryKey).toBe(true);
+            expect(field.IsPrimaryKey).toBe(false); // Only XORMPKField can be PK
             expect(field.IsNullable).toBe(false);
             expect(field.IsAutoIncrement).toBe(true);
             expect(field.DefaultValue).toBe("0");
@@ -87,6 +88,109 @@ describe("XORMTable", () =>
             expect(field1.Name).not.toBe(field2.Name);
             expect(field2.Name).not.toBe(field3.Name);
             expect(field1.Name).not.toBe(field3.Name);
+        });
+    });
+
+    describe("PKField management", () =>
+    {
+        it("should initially have no PKField", () =>
+        {
+            const table = new XORMTable();
+            expect(table.HasPKField()).toBe(false);
+            expect(table.GetPKField()).toBeNull();
+        });
+
+        it("should create PKField with default values", () =>
+        {
+            const table = new XORMTable();
+            const pkField = table.CreatePKField();
+
+            expect(pkField).toBeInstanceOf(XORMPKField);
+            expect(pkField.Name).toBe("ID");
+            expect(pkField.DataType).toBe("Int32");
+            expect(pkField.IsPrimaryKey).toBe(true);
+            expect(pkField.IsNullable).toBe(false);
+        });
+
+        it("should create PKField with custom options", () =>
+        {
+            const table = new XORMTable();
+            const pkField = table.CreatePKField({
+                Name: "UserID",
+                DataType: "Int64",
+                IsAutoIncrement: false
+            });
+
+            expect(pkField.Name).toBe("UserID");
+            expect(pkField.DataType).toBe("Int64");
+            expect(pkField.IsAutoIncrement).toBe(false);
+        });
+
+        it("should return existing PKField instead of creating new one", () =>
+        {
+            const table = new XORMTable();
+            const pkField1 = table.CreatePKField({ Name: "ID1" });
+            const pkField2 = table.CreatePKField({ Name: "ID2" });
+
+            expect(pkField1).toBe(pkField2);
+            expect(pkField1.Name).toBe("ID1"); // Original name preserved
+        });
+
+        it("should lock DataType after creation", () =>
+        {
+            const table = new XORMTable();
+            const pkField = table.CreatePKField({ DataType: "Int64" });
+
+            expect(pkField.IsDataTypeLocked).toBe(true);
+            pkField.DataType = "Guid"; // Should be ignored
+            expect(pkField.DataType).toBe("Int64");
+        });
+
+        it("should sync table PKType with PKField DataType", () =>
+        {
+            const table = new XORMTable();
+            table.CreatePKField({ DataType: "Guid" });
+
+            expect(table.PKType).toBe("Guid");
+        });
+
+        it("should insert PKField as first child", () =>
+        {
+            const table = new XORMTable();
+            const field1 = table.CreateField({ Name: "Field1" });
+            const field2 = table.CreateField({ Name: "Field2" });
+            const pkField = table.CreatePKField();
+
+            expect(table.ChildNodes[0]).toBe(pkField);
+            expect(table.ChildNodes.length).toBe(3);
+        });
+
+        it("should correctly identify table as having PK", () =>
+        {
+            const table = new XORMTable();
+            expect(table.HasPKField()).toBe(false);
+            
+            table.CreatePKField();
+            expect(table.HasPKField()).toBe(true);
+        });
+
+        it("should EnsurePKField create PK if not exists", () =>
+        {
+            const table = new XORMTable();
+            const pkField = table.EnsurePKField();
+
+            expect(pkField).toBeDefined();
+            expect(pkField).toBeInstanceOf(XORMPKField);
+            expect(table.HasPKField()).toBe(true);
+        });
+
+        it("should EnsurePKField return existing PK if exists", () =>
+        {
+            const table = new XORMTable();
+            const existing = table.CreatePKField();
+            const ensured = table.EnsurePKField();
+
+            expect(ensured).toBe(existing);
         });
     });
 
