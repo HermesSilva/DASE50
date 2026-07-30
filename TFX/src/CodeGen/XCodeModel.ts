@@ -256,8 +256,14 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
     const temFK = (pID: string) => porCampoFK.has(pID);
     for (const t of todasTabelas)
     {
-        // O que o modelo declara vence a dedução: lookup e catálogo pequeno têm a mesma
-        // forma, e só o autor sabe qual é qual.
+        // ESPELHO SÓ NASCE DE TABELA SHADOW. `IsShadow` decide sozinho e nada o
+        // contradiz: um espelho representa uma tabela cujo dono é outro módulo, e essa
+        // origem só existe quando a tabela foi trazida como shadow. Declarar
+        // `Stereotype = "Mirror"` numa tabela própria é ignorado — sem origem, o gerador
+        // não teria de quem herdar a entidade nem que migração excluir.
+        //
+        // Para as demais, o que o modelo declara vence a dedução: lookup e catálogo
+        // pequeno têm a mesma forma, e só o autor sabe qual é qual.
         const declarado = (t.Stereotype ?? "").trim();
         const papel: XCodeStereotype = t.IsShadow
             ? "Mirror"

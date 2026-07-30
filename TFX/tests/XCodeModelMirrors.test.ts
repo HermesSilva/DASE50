@@ -93,6 +93,65 @@ describe("tabelas espelho repetidas", () => {
     });
 });
 
+describe("espelho só nasce de tabela shadow", () => {
+
+    let design: XORMDesign;
+
+    beforeEach(() => {
+        const doc = new XORMDocument();
+        doc.Initialize();
+        design = doc.Design;
+        design.Namespace = "Acme.VND";
+    });
+
+    const Montar = () => BuildCodeModel(design.ParentNode as unknown as XORMDocument, {
+        Resolver: Resolver(),
+        Namespace: "Acme.VND",
+        Projects: { Infra: "Acme.VND.Infra", Common: "Acme.VND.Common" },
+        ProjectSuffixes: ["Infra", "Common"]
+    });
+
+    /**
+     * Um espelho representa uma tabela cujo dono é outro módulo, e essa origem só existe
+     * quando a tabela veio como shadow. Sem origem, o gerador não teria de quem herdar a
+     * entidade nem que migração excluir — por isso declarar "Mirror" não basta.
+     */
+    it('declarar Stereotype "Mirror" numa tabela própria não a torna espelho', () => {
+        const t = design.CreateTable({ Name: "VNDxPedido" });
+        t.CreatePKField({ Name: "VNDxPedidoID", DataType: "Int64" });
+        t.Stereotype = "Mirror";
+
+        const modelo = Montar();
+
+        expect(modelo.Mirrors).toHaveLength(0);
+        expect(modelo.Tables[0].Stereotype).toBe("Entity");
+    });
+
+    it("tabela shadow é espelho mesmo sem Stereotype declarado", () => {
+        const t = design.CreateTable({ Name: "SYSxInquilino" });
+        t.Name = "SYSxInquilino";
+        t.IsShadow = true;
+        t.ShadowTableName = "SYSxInquilino";
+        t.CreatePKField({ Name: "SYSxInquilinoID", DataType: "Guid" });
+
+        expect(Montar().Mirrors).toHaveLength(1);
+    });
+
+    it("Stereotype declarado não sobrepõe o shadow", () => {
+        const t = design.CreateTable({ Name: "SYSxInquilino" });
+        t.Name = "SYSxInquilino";
+        t.IsShadow = true;
+        t.ShadowTableName = "SYSxInquilino";
+        t.Stereotype = "Lookup";
+        t.CreatePKField({ Name: "SYSxInquilinoID", DataType: "Guid" });
+
+        const modelo = Montar();
+
+        expect(modelo.Mirrors).toHaveLength(1);
+        expect(modelo.Lookups).toHaveLength(0);
+    });
+});
+
 describe("colisão de caminho na geração", () => {
 
     /**

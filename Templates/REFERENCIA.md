@@ -219,7 +219,7 @@ em que as tabelas foram desenhadas.
 |---|---|---|
 | `Name` | string | nome da tabela |
 | `Description` | string | descrição do modelo |
-| `Stereotype` | string | `Entity`, `Lookup` ou `Mirror` |
+| `Stereotype` | string | `Entity`, `Lookup` ou `Mirror`. **`Mirror` só vem de tabela shadow** — não se declara |
 | `IsShadow` | booleano | é espelho de outro módulo |
 | `OwnerPrefix` | string | sigla do dono, quando espelho — `SYS` |
 | `OwnerModule` | string | namespace do dono, quando espelho |

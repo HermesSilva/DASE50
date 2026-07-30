@@ -1379,6 +1379,14 @@ export class XTFXBridge {
                 case "GenerateCode":
                     element.GenerateCode = pValue as boolean;
                     break;
+                case "Stereotype": {
+                    // Espelho não se declara: nasce de tabela shadow e de mais nada.
+                    const papel = String(pValue ?? "").trim();
+                    if (papel !== "" && papel !== "Entity" && papel !== "Lookup")
+                        return { Success: false, Message: `Stereotype must be "Entity", "Lookup" or empty (a mirror comes only from a shadow table).` };
+                    element.Stereotype = papel;
+                    break;
+                }
                 case "Description":
                     element.Description = pValue as string;
                     break;
@@ -1755,6 +1763,12 @@ export class XTFXBridge {
                 const genTblProp = new XPropertyItem("GenerateCode", "Generate Code", element.GenerateCode, XPropertyType.Boolean, undefined, "CodeGen");
                 genTblProp.Hint = "Whether this table produces source code. Turn off to keep it in the diagram without generating files.";
                 props.push(genTblProp);
+
+                // Só Entity e Lookup: um espelho nasce exclusivamente de tabela shadow,
+                // e este ramo só roda para tabelas próprias (o shadow é read-only acima).
+                const stereoProp = new XPropertyItem("Stereotype", "Stereotype", element.Stereotype, XPropertyType.Enum, ["", "Entity", "Lookup"], "CodeGen");
+                stereoProp.Hint = "How this table generates: Entity or Lookup. Empty lets the generator infer from the table shape.";
+                props.push(stereoProp);
 
                 const descTblProp = new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data");
                 descTblProp.Placeholder = "Optional description...";
