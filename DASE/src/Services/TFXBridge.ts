@@ -900,15 +900,14 @@ export class XTFXBridge {
                 // Cross-model shadow: ShadowDocumentName stores the model path without extension.
                 // _ParentModelTableGroups keys include the extension — add it when looking up.
                 const shadowDocName = shadow.ShadowDocumentName;
-                const groupKey = shadowDocName.endsWith(".dsorm") ? shadowDocName : shadowDocName + ".dsorm";
-                const grp = this._ParentModelTableGroups.find(g => g.ModelName === groupKey);
+                const grp = this.FindSourceTableGroup(shadowDocName);
 
                 if (!grp) {
                     issues.push(new XIssueItem(
                         shadow.ID,
                         shadow.Name,
                         XIssueSeverity.Error,
-                        `Shadow table "${shadow.Name}" references model "${shadowDocName}" which is not available in the parent model list.`
+                        `Shadow table "${shadow.Name}" references model "${shadowDocName}" which is not listed in Parent Model or Import Models.`
                     ));
                 }
                 else {
@@ -1107,6 +1106,28 @@ export class XTFXBridge {
     }
 
     /**
+     * Acha o grupo de tabelas de um modelo de origem, olhando tanto os modelos-pai quanto
+     * os importados.
+     *
+     * As duas listas usam chaves diferentes — `ParentModel` guarda o caminho relativo à
+     * pasta do modelo, `ImportModels` o caminho relativo à raiz do repositório —, então a
+     * comparação aceita o caminho inteiro ou só o nome do arquivo. Sem isso, um espelho
+     * vindo de `Import Models` seria tratado como origem inexistente.
+     */
+    private FindSourceTableGroup(pKey: string): { Tables: Array<{ Name: string; Fill: string }> } | undefined {
+        if (!pKey)
+            return undefined;
+
+        const comExtensao = pKey.endsWith(".dsorm") ? pKey : `${pKey}.dsorm`;
+        const soNome = path.basename(comExtensao);
+
+        return this._ParentModelTableGroups.find(g => g.ModelName === comExtensao)
+            ?? this._ImportedModelTableGroups.find(g => g.ModelPath === comExtensao)
+            ?? this._ParentModelTableGroups.find(g => path.basename(g.ModelName) === soNome)
+            ?? this._ImportedModelTableGroups.find(g => path.basename(g.ModelPath) === soNome);
+    }
+
+    /**
      * Carrega as tabelas dos modelos declarados em `Import Models`.
      *
      * Os caminhos são relativos à RAIZ DO REPOSITÓRIO — ao contrário dos de `ParentModel`,
@@ -1273,12 +1294,11 @@ export class XTFXBridge {
                 table.Fill = XColor.Parse(fillStr);
         }
         else {
-            // Look in the cached parent-model groups by the relative model file path.
-            // _ParentModelTableGroups keys use the relative file path (e.g. "FolderX21/CEPx.dsorm"),
-            // which matches pPayload.ModelName exactly. pPayload.DocumentName has the extension
-            // stripped so it cannot match — always prefer ModelName for the lookup.
+            // Cor herdada da tabela de origem, seja ela de um modelo-pai ou importado.
+            // pPayload.DocumentName vem sem a extensão e por isso não casa sozinho —
+            // ModelName é a chave preferida.
             const docName = pPayload.ModelName || pPayload.DocumentName;
-            const grp = this._ParentModelTableGroups.find(g => g.ModelName === docName);
+            const grp = this.FindSourceTableGroup(docName);
             const entry = grp?.Tables.find(e => e.Name === pPayload.TableName);
             if (entry?.Fill)
                 table.Fill = XColor.Parse(entry.Fill);
@@ -1387,10 +1407,23 @@ export class XTFXBridge {
                                 /* istanbul ignore else — FindTableByID always finds the table just created by EnableStateControl */
                                 if (shadowTable) {
                                     const stateTableName = design.StateControlTable;
-                                    const grp = this._ParentModelTableGroups.find(/* istanbul ignore next */ g => g.Tables.some(e => e.Name === stateTableName));
-                                    /* istanbul ignore next — grp found only when ParentModel has matching StateControlTable */
+
+                                    // A tabela de estado pode vir de um modelo-pai ou de um
+                                    // importado — procura nas duas listas.
+                                    const daPai = this._ParentModelTableGroups
+                                        .find(/* istanbul ignore next */ g => g.Tables.some(e => e.Name === stateTableName));
+                                    const daImportada = daPai ? undefined : this._ImportedModelTableGroups
+                                        .find(/* istanbul ignore next */ g => g.Tables.some(e => e.Name === stateTableName));
+
+                                    const grp = daPai
+                                        ? { Caminho: daPai.ModelName, Tables: daPai.Tables }
+                                        : daImportada
+                                            ? { Caminho: daImportada.ModelPath, Tables: daImportada.Tables }
+                                            : null;
+
+                                    /* istanbul ignore next — grp found only when a source model has matching StateControlTable */
                                     if (grp) {
-                                        shadowTable.ShadowDocumentName = grp.ModelName.replace(/\.dsorm$/i, "");
+                                        shadowTable.ShadowDocumentName = grp.Caminho.replace(/\.dsorm$/i, "");
                                         const entry = grp.Tables.find(e => e.Name === stateTableName);
                                         /* istanbul ignore next — entry.Fill requires specific shadow config */
                                         if (entry && entry.Fill) {
@@ -1620,15 +1653,28 @@ export class XTFXBridge {
             /* istanbul ignore next */
             const currentTables = this._Controller?.Design?.GetTables?.()?.filter((t: XORMTable) => !t.IsShadow).map((t: XORMTable) => t.Name) ?? [];
             const uniqueParentGroups = this._ParentModelTableGroups.filter(g => g.ModelName !== currentModelName);
-            const parentTables = uniqueParentGroups.flatMap(g => g.Tables.map(e => e.Name));
+
+            // Modelos importados entram nas mesmas listas: uma tabela de estado ou de posse
+            // pode morar em outro módulo tanto quanto num modelo-pai.
+            const jaListados = new Set([currentModelName, ...uniqueParentGroups.map(g => g.ModelName)]);
+            const uniqueImportedGroups = this._ImportedModelTableGroups
+                .map(g => ({ Nome: path.basename(g.ModelPath), Tables: g.Tables }))
+                .filter(g => !jaListados.has(g.Nome));
+
+            const parentTables = [
+                ...uniqueParentGroups.flatMap(g => g.Tables.map(e => e.Name)),
+                ...uniqueImportedGroups.flatMap(g => g.Tables.map(e => e.Name))
+            ];
             const allTableOptions = ["", ...new Set([...currentTables, ...parentTables])].sort((a, b) => a.localeCompare(b));
 
-            // Build grouped options (tree view): current model group + one group per parent model file
+            // Build grouped options (tree view): current model group + one group per source model file
             const groupedOptions: IPropertyOptionGroup[] = [];
             if (currentTables.length > 0)
                 groupedOptions.push({ Group: currentModelName, Items: [...currentTables].sort((a, b) => a.localeCompare(b)) });
             for (const grp of uniqueParentGroups)
                 groupedOptions.push({ Group: grp.ModelName, Items: grp.Tables.map(e => e.Name).sort((a, b) => a.localeCompare(b)) });
+            for (const grp of uniqueImportedGroups)
+                groupedOptions.push({ Group: grp.Nome, Items: grp.Tables.map(e => e.Name).sort((a, b) => a.localeCompare(b)) });
 
             const sctProp = new XPropertyItem("StateControlTable", "State Control Table", element.StateControlTable, XPropertyType.Enum, allTableOptions, "Relations");
             sctProp.GroupedOptions = groupedOptions.length > 0 ? groupedOptions : null;

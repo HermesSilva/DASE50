@@ -96,8 +96,60 @@ describe('XTFXBridge — Shadow Tables', () => {
 
             const issues = bridge.ValidateOrmModel();
 
-            const shadowIssue = issues.find(i => i.ElementID === 'shadow-1' && i.Message.includes('not available'));
+            const shadowIssue = issues.find(i => i.ElementID === 'shadow-1' && i.Message.includes('not listed'));
             expect(shadowIssue).toBeDefined();
+        });
+
+        /**
+         * Espelho vindo de `Import Models` era acusado de origem inexistente: a validação
+         * só consultava os grupos de `Parent Model`, cujas chaves são relativas à pasta do
+         * modelo — nunca casariam com um caminho relativo à raiz do repositório.
+         */
+        it('accepts a shadow whose source came from Import Models', () => {
+            (bridge as any)._ImportedModelTableGroups = [{
+                ModelPath: 'Back/Modules/Tootega.CRM/MER-CRM.dsorm',
+                Namespace: 'Tootega.CRM',
+                Tables: [{ Name: 'CRMxPessoa', Fill: '' }]
+            }];
+
+            const model = JSON.stringify({
+                Name: 'TestModel',
+                Tables: [
+                    {
+                        ID: 'shadow-1', Name: 'CRMxPessoa', X: 0, Y: 0, Width: 200, Height: 28,
+                        IsShadow: true, ShadowTableID: '', ShadowTableName: 'CRMxPessoa',
+                        ShadowDocumentName: 'Back/Modules/Tootega.CRM/MER-CRM'
+                    }
+                ]
+            });
+            bridge.LoadOrmModelFromText(model);
+
+            expect(bridge.ValidateOrmModel().filter(i => i.ElementID === 'shadow-1')).toEqual([]);
+        });
+
+        it('still reports a table that vanished from an imported model', () => {
+            (bridge as any)._ImportedModelTableGroups = [{
+                ModelPath: 'Back/Modules/Tootega.CRM/MER-CRM.dsorm',
+                Namespace: 'Tootega.CRM',
+                Tables: [{ Name: 'OutraTabela', Fill: '' }]
+            }];
+
+            const model = JSON.stringify({
+                Name: 'TestModel',
+                Tables: [
+                    {
+                        ID: 'shadow-1', Name: 'CRMxPessoa', X: 0, Y: 0, Width: 200, Height: 28,
+                        IsShadow: true, ShadowTableID: '', ShadowTableName: 'CRMxPessoa',
+                        ShadowDocumentName: 'Back/Modules/Tootega.CRM/MER-CRM'
+                    }
+                ]
+            });
+            bridge.LoadOrmModelFromText(model);
+
+            const issue = bridge.ValidateOrmModel()
+                .find(i => i.ElementID === 'shadow-1' && i.Message.includes('no longer exists'));
+
+            expect(issue).toBeDefined();
         });
 
         it('should produce error for cross-model shadow when table no longer exists in parent model', async () => {

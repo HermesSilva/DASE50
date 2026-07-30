@@ -283,7 +283,7 @@ describe('XTFXBridge ShadowTable', () => {
 
             const issues = bridge.ValidateOrmModel();
 
-            const issue = issues.find(i => i.Message.includes('not available in the parent model list'));
+            const issue = issues.find(i => i.Message.includes('not listed in Parent Model or Import Models'));
             expect(issue).toBeDefined();
         });
 
