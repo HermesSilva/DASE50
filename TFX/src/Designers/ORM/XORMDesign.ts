@@ -641,6 +641,30 @@ export class XORMDesign extends XDesign
         }
     }
 
+    /**
+     * Remove as referências que saem de um campo. Chamado ao excluir o campo: uma
+     * referência é o desenho de uma chave estrangeira, e sem a coluna de origem ela não
+     * representa mais nada — ficaria como uma linha solta no diagrama, apontando para o
+     * nada e reaparecendo a cada validação.
+     *
+     * @returns quantas referências foram removidas.
+     */
+    public RemoveReferencesForField(pFieldID: string): number
+    {
+        let removidas = 0;
+
+        for (const ref of this.GetReferences())
+        {
+            if (ref.Source !== pFieldID)
+                continue;
+
+            if (this.RemoveChild(ref))
+                removidas++;
+        }
+
+        return removidas;
+    }
+
     private GenerateTableName(): string
     {
         const tables = this.GetTables();

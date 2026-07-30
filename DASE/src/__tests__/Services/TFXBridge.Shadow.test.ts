@@ -127,6 +127,38 @@ describe('XTFXBridge — Shadow Tables', () => {
             expect(bridge.ValidateOrmModel().filter(i => i.ElementID === 'shadow-1')).toEqual([]);
         });
 
+        /**
+         * A tabela espelho tem de sair da mesma cor da original: no diagrama é assim que se
+         * reconhece de onde ela veio. Sem alcançar os grupos importados, ficava transparente.
+         */
+        it('paints the shadow with the colour of the imported source table', () => {
+            (bridge as any)._ImportedModelTableGroups = [{
+                ModelPath: 'Back/Modules/Tootega.CRM/MER-CRM.dsorm',
+                Namespace: 'Tootega.CRM',
+                Tables: [{ Name: 'CRMxPessoa', Fill: 'FFFF7F50' }]
+            }];
+
+            const model = JSON.stringify({
+                Name: 'TestModel',
+                Tables: [
+                    {
+                        ID: 'shadow-1', Name: 'CRMxPessoa', X: 0, Y: 0, Width: 200, Height: 28,
+                        IsShadow: true, ShadowTableID: '', ShadowTableName: 'CRMxPessoa',
+                        ShadowDocumentName: 'Back/Modules/Tootega.CRM/MER-CRM'
+                    }
+                ]
+            });
+            bridge.LoadOrmModelFromText(model);
+
+            bridge.ValidateOrmModel();
+
+            const shadow = (bridge as any)._Controller.Design.GetTables()
+                .find((t: any) => t.ID === 'shadow-1');
+
+            expect(shadow.Fill.ToString()).toBe('FFFF7F50');
+            expect(bridge.LastSyncMutated).toBe(true);
+        });
+
         it('still reports a table that vanished from an imported model', () => {
             (bridge as any)._ImportedModelTableGroups = [{
                 ModelPath: 'Back/Modules/Tootega.CRM/MER-CRM.dsorm',

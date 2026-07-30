@@ -420,9 +420,20 @@ export class XORMTable extends XRectangle
         if (!pField.CanDelete)
             return false;
 
+        // A linha da chave estrangeira sai deste campo: sem ele, ela não representa mais
+        // nada e ficaria solta no diagrama, apontando para o nada e voltando como erro a
+        // cada validação. Some junto com a coluna que a originou.
+        const design = this.ParentNode as XORMDesign | null;
+        const removeuReferencia = (design?.RemoveReferencesForField?.(pField.ID) ?? 0) > 0;
+
         this.RemoveChild(pField);
         this.UpdateFieldIndexes();
         this.UpdateHeightForFields();
+
+        // Tirar uma linha muda o traçado das que sobraram.
+        if (removeuReferencia)
+            design?.RouteAllLines?.();
+
         return true;
     }
 
