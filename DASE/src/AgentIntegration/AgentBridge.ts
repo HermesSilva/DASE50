@@ -1250,16 +1250,31 @@ export class XAgentBridge {
                 return `Table "${table.Name}" has no seed data support.`;
 
             const cols = payload.Columns.map(c => c.Name);
+
+            // $Member é coluna virtual: guarda o identificador do membro do enum gerado a
+            // partir da linha, que não é coluna da tabela e não se deriva do texto.
+            const temMembro = payload.Rows.some(r => r.Member);
+
             let result = `## Seed Data: ${payload.TableName}\n`;
-            result += `Columns: ${cols.join(", ")}\n\n`;
+            result += `Columns: ${cols.join(", ")}\n`;
+            if (temMembro)
+                result += `$Member holds the generated enum member name (e.g. BRL for "Real brasileiro").\n`;
+            result += "\n";
+
             if (payload.Rows.length === 0) {
                 result += "_(no rows)_\n";
                 return result;
             }
-            result += `| ${cols.join(" | ")} |\n`;
-            result += `| ${cols.map(() => "---").join(" | ")} |\n`;
-            for (const row of payload.Rows)
-                result += `| ${payload.Columns.map(c => row.Values[c.FieldID] ?? "").join(" | ")} |\n`;
+
+            const cabecalho = temMembro ? ["$Member", ...cols] : cols;
+            result += `| ${cabecalho.join(" | ")} |\n`;
+            result += `| ${cabecalho.map(() => "---").join(" | ")} |\n`;
+
+            for (const row of payload.Rows) {
+                const celulas = payload.Columns.map(c => row.Values[c.FieldID] ?? "");
+                result += `| ${(temMembro ? [row.Member ?? "", ...celulas] : celulas).join(" | ")} |\n`;
+            }
+
             return result;
         }
         catch (err) {
@@ -1291,12 +1306,23 @@ export class XAgentBridge {
 
             const saveRows = pRows.map((row, i) => {
                 const values: Record<string, string> = {};
+                let member = "";
+
                 for (const [k, v] of Object.entries(row)) {
+                    // Chave reservada: identificador do membro do enum gerado a partir da
+                    // linha. Não é coluna da tabela — não se deriva do texto ("Real
+                    // brasileiro" não vira BRL), então precisa vir declarado.
+                    if (k === "$Member") {
+                        member = String(v);
+                        continue;
+                    }
+
                     const fid = nameToId.get(k.toLowerCase());
                     if (fid)
                         values[fid] = String(v);
                 }
-                return { TupleID: `row-${i}`, Values: values };
+
+                return { TupleID: `row-${i}`, Member: member, Values: values };
             });
 
             const result = bridge.SaveSeedData(table.ID, saveRows);

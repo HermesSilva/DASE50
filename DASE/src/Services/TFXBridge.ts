@@ -132,6 +132,14 @@ export interface ISeedColumn {
 
 export interface ISeedRow {
     TupleID: string;
+    /**
+     * Identificador do membro do enum gerado a partir desta linha — `BRL`, `Trial`.
+     *
+     * Não se deriva do texto da coluna de valor: "Real brasileiro" vira `BRL`, "Período de
+     * teste" vira `Trial`. Sem ele, o enum sairia com um nome inventado a partir do rótulo
+     * em português, e todo código que referencia o membro deixaria de compilar.
+     */
+    Member: string;
     Values: Record<string, string>;
 }
 
@@ -144,6 +152,8 @@ export interface ISeedEditorPayload {
 
 export interface ISeedRowSave {
     TupleID: string;
+    /** Identificador do membro do enum. Ausente mantém o que já estava gravado. */
+    Member?: string;
     Values: Record<string, string>;
 }
 
@@ -1942,7 +1952,12 @@ export class XTFXBridge {
                 const values: Record<string, string> = {};
                 for (const fv of tuple.GetFieldValues())
                     values[fv.FieldID] = fv.Value;
-                rows.push({ TupleID: tuple.ID, Values: values });
+
+                // O Name da tupla guarda o identificador do membro do enum. Quando nunca foi
+                // preenchido, ele traz o nome da classe — que não é um identificador.
+                const member = tuple.Name && tuple.Name !== "XORMDataTuple" ? tuple.Name : "";
+
+                rows.push({ TupleID: tuple.ID, Member: member, Values: values });
             }
         }
 
@@ -2098,6 +2113,11 @@ export class XTFXBridge {
         for (const rowData of pRows) {
             const tuple = new XORMDataTuple();
             tuple.ID = rowData.TupleID === "NEW" ? XGuid.NewValue() : rowData.TupleID;
+
+            // Identificador do membro do enum. Sem ele, a geração cai em derivar o nome do
+            // texto em português — e "Real brasileiro" não vira BRL.
+            if (rowData.Member)
+                tuple.Name = rowData.Member;
 
             for (const [fieldID, value] of Object.entries(rowData.Values)) {
                 const fv = new XFieldValue();
