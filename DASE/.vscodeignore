@@ -26,6 +26,12 @@ vsix-temp/**
 # tfx tarball (already extracted into node_modules by npm install)
 tootega-tfx-1.0.0.tgz
 
+# Development tooling must never ship inside the extension. The ORM code-generation
+# scripts live in tools/orm-codegen at the repo root; this rule only guards against a
+# stray copy being dropped here again.
+dase-import/**
+tools/**
+
 # Dev cruft inside node_modules (does not affect runtime). vsce already ships
 # only production dependencies; these rules just trim junk from the VSIX.
 node_modules/**/*.ts

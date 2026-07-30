@@ -102,6 +102,37 @@ export class XORMTable extends XRectangle
         false
     );
 
+    /**
+     * Esta tabela participa da geração de código. Default TRUE.
+     * Desmarcar exclui a tabela da geração sem removê-la do modelo — útil para
+     * tabela de terceiros ou ainda em estudo, que deve aparecer no diagrama mas
+     * não virar arquivo.
+     */
+    public static readonly GenerateCodeProp = XProperty.Register<XORMTable, boolean>(
+        (p: XORMTable) => p.GenerateCode,
+        "B7D3E8A1-4C56-4F29-9B7E-3A5D8C2F6E14",
+        "GenerateCode",
+        "Generate Code",
+        true
+    );
+
+    /**
+     * Papel da tabela na geração: `Entity` ou `Lookup`. Vazio (o default) deixa o gerador
+     * deduzir pela forma da tabela.
+     *
+     * O override existe porque a forma não basta: uma tabela-lookup e um catálogo pequeno
+     * são estruturalmente idênticos — chave inteira e colunas de texto —, mas geram código
+     * completamente diferente (enum + classe + config, contra entidade + config).
+     * Espelho não entra aqui: `IsShadow` já o determina.
+     */
+    public static readonly StereotypeProp = XProperty.Register<XORMTable, string>(
+        (p: XORMTable) => p.Stereotype,
+        "6E4A9C21-8D37-4B5F-A2E8-9C1B4D7F3A56",
+        "Stereotype",
+        "Stereotype",
+        ""
+    );
+
     public constructor()
     {
         super();
@@ -224,6 +255,28 @@ export class XORMTable extends XRectangle
     public set UseStateControl(pValue: boolean)
     {
         this.SetValue(XORMTable.UseStateControlProp, pValue);
+    }
+
+    /** Se esta tabela participa da geração de código. Default true. */
+    public get GenerateCode(): boolean
+    {
+        return this.GetValue(XORMTable.GenerateCodeProp) as boolean;
+    }
+
+    public set GenerateCode(pValue: boolean)
+    {
+        this.SetValue(XORMTable.GenerateCodeProp, pValue);
+    }
+
+    /** Papel na geração: "Entity", "Lookup" ou vazio para deduzir pela forma. */
+    public get Stereotype(): string
+    {
+        return this.GetValue(XORMTable.StereotypeProp) as string;
+    }
+
+    public set Stereotype(pValue: string)
+    {
+        this.SetValue(XORMTable.StereotypeProp, pValue);
     }
 
     /** Returns the XORMStateField child of this table, or null if none exists. */

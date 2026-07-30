@@ -29,6 +29,22 @@ export class XORMIndex extends XPersistableElement
         false
     );
 
+    /**
+     * Condição de índice PARCIAL — o `WHERE` do CREATE INDEX.
+     *
+     * Guarda a expressão como o modelo a entende (`CodigoIBGE <> ''`); traduzir para a
+     * sintaxe de cada banco é papel do template, que tem acesso aos helpers do projeto
+     * (no Tootega, `FiltroColunaNaoVazia`, que cita a coluna conforme o provider).
+     * Vazio significa índice completo.
+     */
+    public static readonly FilterProp = XProperty.Register<XORMIndex, string>(
+        (p: XORMIndex) => p.Filter,
+        "5C8E2B71-9A4D-4E36-8F2B-1D7A6C3E95B8",
+        "Filter",
+        "Filter",
+        ""
+    );
+
     public get IsUnique(): boolean
     {
         return this.GetValue(XORMIndex.IsUniqueProp) as boolean;
@@ -37,6 +53,16 @@ export class XORMIndex extends XPersistableElement
     public set IsUnique(pValue: boolean)
     {
         this.SetValue(XORMIndex.IsUniqueProp, pValue);
+    }
+
+    public get Filter(): string
+    {
+        return this.GetValue(XORMIndex.FilterProp) as string;
+    }
+
+    public set Filter(pValue: string)
+    {
+        this.SetValue(XORMIndex.FilterProp, pValue);
     }
 
     /**

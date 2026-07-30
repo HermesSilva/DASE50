@@ -29,13 +29,23 @@ export class XORMDocument extends XDocument<XORMDesign>
         {
             // Strategy: Keep the first design with content, merge others into it, then remove duplicates
             let primaryDesign = allDesigns[0];
-            
+
             // If first is empty but others have content, use the first non-empty one
             if (primaryDesign.ChildNodes.length === 0)
             {
                 const nonEmpty = allDesigns.find(d => d.ChildNodes.length > 0);
                 if (nonEmpty)
                     primaryDesign = nonEmpty;
+                else
+                {
+                    // Nenhum tem filhos: um modelo salvo antes da primeira tabela. Sem este
+                    // ramo, o primário seria o design VAZIO criado pelo construtor, e o
+                    // desserializado — que carrega Schema, Namespace, ParentModel… — seria
+                    // descartado com todas as propriedades.
+                    const comValores = allDesigns.find(d => d.HasStoredValues());
+                    if (comValores)
+                        primaryDesign = comValores;
+                }
             }
             
             console.log(`[XORMDocument.Initialize] Using design with ${primaryDesign.ChildNodes.length} children as primary`);

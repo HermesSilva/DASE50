@@ -55,6 +55,25 @@ export class XORMField extends XField
     );
 
     /**
+     * O valor desta coluna NUNCA é gerado pelo banco — chega pronto da aplicação.
+     *
+     * Casos típicos: identificador declarado em código, e chave compartilhada com outra
+     * tabela (1:1), em que o valor vem da tabela apontada.
+     *
+     * Existe como propriedade própria, e não derivada de `IsAutoIncrement` do PK, porque
+     * aquele campo não sobrevive ao round-trip: a desserialização não passa pelos setters
+     * e todo PK relido volta como auto-increment. Aqui o default é `false`, então `true`
+     * difere do default e é efetivamente gravado no arquivo.
+     */
+    public static readonly ValueGeneratedNeverProp = XProperty.Register<XORMField, boolean>(
+        (p: XORMField) => p.ValueGeneratedNever,
+        "9F2C6D48-1B7E-4A35-8C90-5E3B7D1F2A64",
+        "ValueGeneratedNever",
+        "Value Generated Never",
+        false
+    );
+
+    /**
      * Returns whether this field is a primary key.
      * Always false for regular fields.
      * XORMPKField overrides this getter to return true.
@@ -97,6 +116,17 @@ export class XORMField extends XField
     public set AllowedValues(pValue: string)
     {
         this.SetValue(XORMField.AllowedValuesProp, pValue.trim());
+    }
+
+    /** Se o valor desta coluna nunca é gerado pelo banco. */
+    public get ValueGeneratedNever(): boolean
+    {
+        return this.GetValue(XORMField.ValueGeneratedNeverProp) as boolean;
+    }
+
+    public set ValueGeneratedNever(pValue: boolean)
+    {
+        this.SetValue(XORMField.ValueGeneratedNeverProp, pValue);
     }
 
     /** Parsed list of allowed values, trimmed and with empty strings removed. */

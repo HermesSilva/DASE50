@@ -50,16 +50,8 @@ export const XDesignerMessageType = {
     SQLScriptProgress: "SQLScriptProgress",
     SQLScriptComplete: "SQLScriptComplete",
     SQLScriptError: "SQLScriptError",
-    // AI ORM Code Generation
-    GenerateORMCode: "GenerateORMCode",
-    ORMGenShowPicker: "ORMGenShowPicker",
-    GenerateORMCodeExecute: "GenerateORMCodeExecute",
-    ORMGenBrowseContext: "ORMGenBrowseContext",
-    ORMGenContextLoaded: "ORMGenContextLoaded",
-    ORMGenStart: "ORMGenStart",
-    ORMGenProgress: "ORMGenProgress",
-    ORMGenComplete: "ORMGenComplete",
-    ORMGenError: "ORMGenError"
+    // ORM Code Generation — dispara o comando; a geração é por template, sem diálogo.
+    GenerateORMCode: "GenerateORMCode"
 } as const;
 
 export type TDesignerMessageType = typeof XDesignerMessageType[keyof typeof XDesignerMessageType];

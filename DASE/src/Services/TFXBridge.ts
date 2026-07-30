@@ -200,6 +200,24 @@ export class XTFXBridge {
     private _AvailableOrmFiles: string[];
     private _ParentModelTableGroups: Array<{ ModelName: string, Tables: Array<{ Name: string, Fill: string }> }>;
     private _LastSyncMutated: boolean;
+    /** Perfis de template achados em .DASE/Templates — alimenta o combo de CodeTemplate. */
+    private _AvailableTemplateProfiles: string[] = [];
+    /** Modelos do repositório inteiro, menos o próprio — alimenta `Import Models`. */
+    private _AvailableRepositoryModels: string[] = [];
+
+    /**
+     * Tabelas dos modelos listados em `Import Models`, um grupo por modelo.
+     *
+     * Alimentam o seletor de tabela espelho: uma tabela escolhida daqui vem de OUTRO
+     * projeto, e é isso que a geração transforma em Espelho — entidade herdada do módulo
+     * dono, com a tabela fora da migração deste módulo. `Namespace` é o do modelo de
+     * origem, que o código gerado usa no `using`.
+     */
+    private _ImportedModelTableGroups: Array<{
+        ModelPath: string;
+        Namespace: string;
+        Tables: Array<{ Name: string; Fill: string }>;
+    }> = [];
 
     /** Fallback property hints for well-known types when config is not yet loaded. */
     private static readonly _FallbackTypeHints: Record<string, { HasLength: boolean; HasScale: boolean; CanAutoIncrement: boolean }> =
@@ -309,9 +327,51 @@ export class XTFXBridge {
         await this.LoadDataTypes();
     }
 
+    /** Pastas que nunca contêm modelo e custam caro para varrer. */
+    private static readonly _SkipScanDirs = new Set([
+        "node_modules", "bin", "obj", ".git", ".vs", ".vscode", "dist", "out", "coverage", "packages"
+    ]);
+
+    /**
+     * Raiz do repositório para a varredura de modelos: a pasta do workspace que contém o
+     * arquivo, ou o diretório com `.git` subindo a partir dele. Sem nenhum dos dois, a
+     * própria pasta do modelo — melhor listar pouco que varrer o disco inteiro.
+     */
+    private async FindRepositoryRoot(pFilePath: string): Promise<string> {
+        const folders = vscode.workspace.workspaceFolders ?? [];
+        const normalizado = pFilePath.replace(/\\/g, "/").toLowerCase();
+
+        // A pasta de workspace mais específica que contenha o arquivo.
+        let melhor = "";
+        for (const folder of folders) {
+            const raiz = folder.uri.fsPath.replace(/\\/g, "/").toLowerCase();
+            if (normalizado.startsWith(raiz + "/") && raiz.length > melhor.length)
+                melhor = folder.uri.fsPath;
+        }
+        if (melhor)
+            return melhor;
+
+        let dir = path.dirname(pFilePath);
+        for (;;) {
+            try {
+                await vscode.workspace.fs.stat(vscode.Uri.file(path.join(dir, ".git")));
+                return dir;
+            }
+            catch { /* sem .git aqui */ }
+
+            const pai = path.dirname(dir);
+            if (pai === dir)
+                return path.dirname(pFilePath);
+            dir = pai;
+        }
+    }
+
     /**
      * Scans the directory of the current design file and caches all other .dsorm file names found there.
      * Must be called after SetContextPath() with a non-empty context path.
+     *
+     * Caminhos relativos à PASTA DO MODELO — é o que a propriedade `Parent Model` usa, e
+     * o que `LoadParentModelTables` espera ao resolver cada arquivo.
      */
     async LoadAvailableOrmFiles(): Promise<void> {
         this._AvailableOrmFiles = [];
@@ -347,6 +407,102 @@ export class XTFXBridge {
 
         await scanDir(rootDir, "");
         this._AvailableOrmFiles.sort((a, b) => a.localeCompare(b));
+    }
+
+    /**
+     * Varre o REPOSITÓRIO inteiro e guarda todos os `.dsorm` menos o próprio — é a lista
+     * que alimenta a propriedade `Import Models`.
+     *
+     * O escopo é o repositório, e não a pasta do modelo, porque num repositório modular
+     * cada módulo guarda o seu MER na própria pasta: importar uma tabela do SYS de dentro
+     * do VND exige enxergar `Back/Modules/Tootega.SYS/MER-SYS.dsorm`.
+     *
+     * Os caminhos aqui são relativos à RAIZ, ao contrário dos de `LoadAvailableOrmFiles`.
+     */
+    async LoadAvailableRepositoryModels(): Promise<void> {
+        this._AvailableRepositoryModels = [];
+
+        if (!this._ContextPath)
+            return;
+
+        const raiz = await this.FindRepositoryRoot(this._ContextPath);
+        const atual = path.resolve(this._ContextPath).replace(/\\/g, "/").toLowerCase();
+
+        const scanDir = async (pAbsDir: string, pRelPrefix: string): Promise<void> => {
+            try {
+                const entries = await vscode.workspace.fs.readDirectory(vscode.Uri.file(pAbsDir));
+
+                for (const [name, type] of entries) {
+                    if (type === vscode.FileType.Directory) {
+                        if (XTFXBridge._SkipScanDirs.has(name.toLowerCase()))
+                            continue;
+                        await scanDir(
+                            path.join(pAbsDir, name),
+                            pRelPrefix ? `${pRelPrefix}/${name}` : name
+                        );
+                    }
+                    else if (type === vscode.FileType.File && name.endsWith(".dsorm")) {
+                        // Um modelo não importa a si mesmo. A comparação é pelo caminho
+                        // absoluto: dois módulos podem ter arquivos de mesmo nome.
+                        const abs = path.resolve(pAbsDir, name).replace(/\\/g, "/").toLowerCase();
+                        if (abs === atual)
+                            continue;
+
+                        this._AvailableRepositoryModels.push(pRelPrefix ? `${pRelPrefix}/${name}` : name);
+                    }
+                }
+            }
+            catch (error) {
+                GetLogService().Error(`Failed to scan directory ${pAbsDir}: ${error}`);
+            }
+        };
+
+        await scanDir(raiz, "");
+        this._AvailableRepositoryModels.sort((a, b) => a.localeCompare(b));
+    }
+
+    /**
+     * Descobre os perfis de template disponíveis: subpastas de `.DASE/Templates` que
+     * contenham `profile.json`. A busca sobe da pasta do modelo até a raiz do repositório,
+     * como o XConfigurationManager faz com os arquivos de configuração.
+     *
+     * Os perfis são DESCOBERTOS, não declarados: não há arquivo listando quais existem,
+     * justamente para que `.DASE/Templates` seja copiável entre repositórios sem edição.
+     */
+    async LoadAvailableTemplateProfiles(): Promise<void> {
+        this._AvailableTemplateProfiles = [];
+
+        if (!this._ContextPath)
+            return;
+
+        const achados = new Set<string>();
+        let dir = path.dirname(this._ContextPath);
+
+        for (;;) {
+            const templatesDir = path.join(dir, ".DASE", "Templates");
+
+            try {
+                const entradas = await vscode.workspace.fs.readDirectory(vscode.Uri.file(templatesDir));
+
+                for (const [nome, tipo] of entradas) {
+                    if (tipo !== vscode.FileType.Directory)
+                        continue;
+                    try {
+                        await vscode.workspace.fs.stat(vscode.Uri.file(path.join(templatesDir, nome, "profile.json")));
+                        achados.add(nome);
+                    }
+                    catch { /* pasta sem profile.json não é um perfil */ }
+                }
+            }
+            catch { /* sem .DASE/Templates neste nível */ }
+
+            const pai = path.dirname(dir);
+            if (pai === dir)
+                break;
+            dir = pai;
+        }
+
+        this._AvailableTemplateProfiles = [...achados].sort((a, b) => a.localeCompare(b));
     }
 
     /**
@@ -951,8 +1107,61 @@ export class XTFXBridge {
     }
 
     /**
+     * Carrega as tabelas dos modelos declarados em `Import Models`.
+     *
+     * Os caminhos são relativos à RAIZ DO REPOSITÓRIO — ao contrário dos de `ParentModel`,
+     * que são relativos à pasta do modelo. Guarda também o `Namespace` de cada origem, que
+     * é o que o código gerado precisa para referenciar a entidade do módulo dono.
+     */
+    async LoadImportedModelTables(pModels: string[]): Promise<void> {
+        this._ImportedModelTableGroups = [];
+
+        if (!this._ContextPath || pModels.length === 0)
+            return;
+
+        const raiz = await this.FindRepositoryRoot(this._ContextPath);
+        this.Initialize();
+
+        for (const relativo of pModels) {
+            if (!relativo)
+                continue;
+
+            try {
+                const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(path.join(raiz, relativo)));
+                const xml = this.NormalizeCSharpXml(Buffer.from(bytes).toString("utf8"));
+
+                const result = this._Engine?.Deserialize<XORMDocument>(xml);
+                if (!result?.Success || !result.Data)
+                    continue;
+
+                result.Data.Initialize();
+                const design = result.Data.Design;
+
+                // Só tabelas próprias: o espelho de um espelho não faz sentido — a tabela
+                // pertence a um terceiro módulo, e é dele que ela deve ser importada.
+                const tables = (design?.GetTables?.() ?? []).filter((t: XORMTable) => !t.IsShadow);
+                const entries = tables
+                    .filter((t: XORMTable) => t.Name)
+                    .map((t: XORMTable) => ({ Name: t.Name, Fill: t.Fill?.ToString() ?? "" }));
+
+                if (entries.length === 0)
+                    continue;
+
+                this._ImportedModelTableGroups.push({
+                    ModelPath: relativo,
+                    Namespace: design?.Namespace ?? "",
+                    Tables: entries
+                });
+            }
+            catch (error) {
+                GetLogService().Error(`Failed to load imported model ${relativo}: ${error}`);
+            }
+        }
+    }
+
+    /**
      * Builds the tree of available tables for the shadow table picker.
-     * Includes the current model's own tables (as the first group), 
+     * Includes the current model's own tables (as the first group),
      * then one group per parent model previously loaded into _ParentModelTableGroups.
      */
     GetShadowTablePickerData(pX: number, pY: number): IShadowTablePickerData {
@@ -991,6 +1200,28 @@ export class XTFXBridge {
                 DocumentName: grp.ModelName.replace(/\.dsorm$/i, ""),
                 ModuleID: "",
                 ModuleName: "",
+                Tables: grp.Tables.map(e => ({ ID: "", Name: e.Name }))
+                    .sort((a: IShadowTableEntry, b: IShadowTableEntry) => a.Name.localeCompare(b.Name))
+            });
+        }
+
+        // Modelos importados (`Import Models`). Uma tabela escolhida aqui vem de outro
+        // projeto, e é o que a geração transforma em Espelho — daí o ModuleName vir
+        // preenchido com o namespace da origem.
+        const jaListados = new Set(models.map(m => m.ModelName));
+
+        for (const grp of this._ImportedModelTableGroups) {
+            const nome = path.basename(grp.ModelPath);
+            if (jaListados.has(nome))
+                continue;
+            jaListados.add(nome);
+
+            models.push({
+                ModelName: nome,
+                DocumentID: "",
+                DocumentName: grp.ModelPath.replace(/\.dsorm$/i, ""),
+                ModuleID: "",
+                ModuleName: grp.Namespace,
                 Tables: grp.Tables.map(e => ({ ID: "", Name: e.Name }))
                     .sort((a: IShadowTableEntry, b: IShadowTableEntry) => a.Name.localeCompare(b.Name))
             });
@@ -1115,6 +1346,9 @@ export class XTFXBridge {
                 case "PKType":
                     element.PKType = pValue as string;
                     break;
+                case "GenerateCode":
+                    element.GenerateCode = pValue as boolean;
+                    break;
                 case "Description":
                     element.Description = pValue as string;
                     break;
@@ -1236,11 +1470,31 @@ export class XTFXBridge {
                         );
                     }
                     break;
+                case "ImportModels":
+                    element.ImportModels = pValue as string;
+                    // Recarrega as tabelas das origens: são elas que o seletor de tabela
+                    // espelho oferece logo depois.
+                    this.LoadImportedModelTables(element.GetImportedModels()).catch(err =>
+                        GetLogService().Error(`Imported model reload failed: ${err}`)
+                    );
+                    break;
                 case "StateControlTable":
                     element.StateControlTable = pValue as string;
                     break;
                 case "TenantControlTable":
                     element.TenantControlTable = pValue as string;
+                    break;
+                case "GenerateCode":
+                    element.GenerateCode = pValue as boolean;
+                    break;
+                case "CodeTemplate":
+                    element.CodeTemplate = pValue as string;
+                    break;
+                case "Namespace":
+                    element.Namespace = pValue as string;
+                    break;
+                case "OutputRoot":
+                    element.OutputRoot = pValue as string;
                     break;
                 default:
                     return { Success: false, Message: `Unknown property: ${pPropertyKey}` };
@@ -1259,6 +1513,7 @@ export class XTFXBridge {
             "Design": 5,
             "Control": 6,
             "Test": 7,
+            "CodeGen": 8,
             "General": 99
         };
 
@@ -1339,6 +1594,17 @@ export class XTFXBridge {
             const parentModelProp = new XPropertyItem("ParentModel", "Parent Model", element.ParentModel, XPropertyType.MultiFileSelect, this._AvailableOrmFiles.length > 0 ? this._AvailableOrmFiles : undefined, "Relations");
             props.push(parentModelProp);
 
+            // Import Models: qualquer modelo do REPOSITÓRIO, menos este. Escopo maior que o
+            // de Parent Model — num repositório modular, o MER de cada módulo mora na pasta
+            // dele, e importar de outro módulo exige enxergar a árvore inteira.
+            const importProp = new XPropertyItem(
+                "ImportModels", "Import Models", element.ImportModels, XPropertyType.MultiFileSelect,
+                this._AvailableRepositoryModels.length > 0 ? this._AvailableRepositoryModels : undefined,
+                "Relations"
+            );
+            importProp.Hint = "Models this one imports tables from. Paths are relative to the repository root.";
+            props.push(importProp);
+
             // Trigger async parent table load on first access if design has parent models but tables not yet loaded
             if (element.ParentModel && this._ParentModelTableGroups.length === 0) {
                 const selected = element.ParentModel.split("|").filter(f => f.length > 0);
@@ -1371,6 +1637,29 @@ export class XTFXBridge {
             const tctProp = new XPropertyItem("TenantControlTable", "Tenant Control Table", element.TenantControlTable, XPropertyType.Enum, allTableOptions, "Relations");
             tctProp.GroupedOptions = groupedOptions.length > 0 ? groupedOptions : null;
             props.push(tctProp);
+
+            // ── Geração de código ─────────────────────────────────────────────
+            // Ficam no MODELO, não nos templates: é o que muda de solução para solução,
+            // e mantém .DASE/Templates copiável entre repositórios sem edição.
+
+            const genProp = new XPropertyItem("GenerateCode", "Generate Code", element.GenerateCode, XPropertyType.Boolean, undefined, "CodeGen");
+            genProp.Hint = "Whether this model produces source code. Turn off for study or draft models.";
+            props.push(genProp);
+
+            const tplOptions = ["", ...this._AvailableTemplateProfiles];
+            const tplProp = new XPropertyItem("CodeTemplate", "Code Template", element.CodeTemplate, XPropertyType.Enum, tplOptions, "CodeGen");
+            tplProp.Hint = "Template profile under .DASE/Templates. Empty means every profile found.";
+            props.push(tplProp);
+
+            const nsProp = new XPropertyItem("Namespace", "Namespace", element.Namespace, XPropertyType.String, undefined, "CodeGen");
+            nsProp.Placeholder = "e.g. Tootega.SYS";
+            nsProp.Hint = "Root namespace/package of the code generated from this model.";
+            props.push(nsProp);
+
+            const outProp = new XPropertyItem("OutputRoot", "Output Root", element.OutputRoot, XPropertyType.String, undefined, "CodeGen");
+            outProp.Placeholder = "e.g. . or ../Back";
+            outProp.Hint = "Output root, relative to the folder holding this .dsorm file.";
+            props.push(outProp);
         }
         else if (element instanceof XORMTable) {
             if (element.IsShadow) {
@@ -1406,6 +1695,10 @@ export class XTFXBridge {
                     ? `Creates a FK to "${stateTableName}". Disabling removes the state field and its reference.`
                     : "Set the State Control Table on the design first.";
                 props.push(useStateControlProp);
+
+                const genTblProp = new XPropertyItem("GenerateCode", "Generate Code", element.GenerateCode, XPropertyType.Boolean, undefined, "CodeGen");
+                genTblProp.Hint = "Whether this table produces source code. Turn off to keep it in the diagram without generating files.";
+                props.push(genTblProp);
 
                 const descTblProp = new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data");
                 descTblProp.Placeholder = "Optional description...";

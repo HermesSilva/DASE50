@@ -5,6 +5,41 @@
 import { IConfigurationFile } from "./XConfigurationManager.js";
 
 /**
+ * Projeção de um tipo do modelo numa linguagem/framework concreto — o que a geração de
+ * código precisa saber para transformar `String(160)` em `public string Nome` mais
+ * `.HasColumnType(VarChar(160))`.
+ *
+ * Vive no MESMO registro do tipo (ORM.Types.json) e não num arquivo à parte, para que
+ * acrescentar um tipo seja UMA edição: se faltar mapeamento, o gerador acusa em vez de
+ * emitir código silenciosamente errado.
+ */
+export interface XORMTypeMapping
+{
+    /** Tipo na linguagem: `string`, `Guid`, `short`, `decimal`. */
+    Type: string;
+
+    /** Forma anulável do tipo. Nem toda linguagem usa `?`, por isso é explícito. */
+    TypeNullable?: string;
+
+    /**
+     * Expressão da coluna, com `{Length}` e `{Scale}` substituídos.
+     * Aceita string única (o helper multi-banco resolve em runtime, como o
+     * XBaseEntityConfiguration do Tootega) ou um valor por provider, quando o
+     * framework-alvo precisa do tipo SQL literal na geração.
+     */
+    Column?: string | Record<string, string>;
+
+    /** Usada no lugar de `Column` quando o campo não tem `Length` — `VarCharMax()`. */
+    ColumnMax?: string | Record<string, string>;
+
+    /** Inicializador de campo não anulável com sentinela: `""` para string. */
+    Init?: string;
+
+    /** Molde do valor num seed, com `{Value}`: `"{Value}"`, `new("{Value}")`, `{Value}m`. */
+    Literal?: string;
+}
+
+/**
  * ORM Data Type information
  */
 export interface XORMDataTypeInfo
@@ -36,6 +71,15 @@ export interface XORMDataTypeInfo
      * TS-native files never write this field.
      */
     CSharpTypeID?: string;
+
+    /**
+     * Projeção do tipo por PERFIL de template (a pasta em `.DASE/Templates/`), permitindo
+     * que o mesmo repositório gere para mais de uma linguagem.
+     *
+     * Opcional: um `ORM.Types.json` v1, sem esta chave, continua abrindo normalmente no
+     * designer — só a geração de código reclama do que faltar.
+     */
+    Mappings?: Record<string, XORMTypeMapping>;
 }
 
 /**
@@ -43,6 +87,12 @@ export interface XORMDataTypeInfo
  */
 export interface XORMTypesConfig extends IConfigurationFile
 {
+    /**
+     * Versão do formato. 2 introduziu `Mappings` nos tipos (projeção para geração de
+     * código). Ausente significa v1: abre normalmente no designer, mas não gera código.
+     */
+    Version?: number;
+
     /** Array of supported data types */
     Types: XORMDataTypeInfo[];
 }

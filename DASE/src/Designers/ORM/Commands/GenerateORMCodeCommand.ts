@@ -1,536 +1,398 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as vscode from "vscode";
 import * as path from "path";
+import {
+    XTypeResolver, BuildCodeModel, XCodeGenerator,
+    type XIProfileSpec, type XIGeneratedFile, type XORMDataTypeInfo
+} from "@tootega/tfx";
 import type { XORMDesignerEditorProvider } from "../ORMDesignerEditorProvider";
 import { GetLogService } from "../../../Services/LogService";
-import { XDesignerMessageType } from "../ORMDesignerMessages";
 
-// ── ORM target definitions ────────────────────────────────────────────────────
-
-export const ORM_TARGETS: Array<{
-    id: string;
-    language: string;
-    orm: string;
-    ext: string;
-    icon: string;
-    contextLabel: string;
-    contextFilters: Record<string, string[]>;
-}> = [
-    {
-        id: "efcore",
-        language: "C#",
-        orm: "EF Core",
-        ext: ".cs",
-        icon: "⚙️",
-        contextLabel: "DbContext file (.cs)",
-        contextFilters: { "C# Files": ["cs"] }
-    },
-    {
-        id: "prisma",
-        language: "JS / TS",
-        orm: "Prisma",
-        ext: ".prisma",
-        icon: "🔺",
-        contextLabel: "Prisma schema (.prisma)",
-        contextFilters: { "Prisma Schema": ["prisma"] }
-    },
-    {
-        id: "sqlalchemy",
-        language: "Python",
-        orm: "SQLAlchemy",
-        ext: ".py",
-        icon: "🐍",
-        contextLabel: "Models file (.py)",
-        contextFilters: { "Python Files": ["py"] }
-    },
-    {
-        id: "hibernate",
-        language: "Java",
-        orm: "Hibernate / JPA",
-        ext: ".java",
-        icon: "☕",
-        contextLabel: "Entity or persistence file (.java, .xml)",
-        contextFilters: { "Java / XML Files": ["java", "xml"] }
-    },
-    {
-        id: "gorm",
-        language: "Go",
-        orm: "GORM",
-        ext: ".go",
-        icon: "🐹",
-        contextLabel: "Go model file (.go)",
-        contextFilters: { "Go Files": ["go"] }
-    }
-];
-
-// ── DB type map: DBML generic → ORM-specific ─────────────────────────────────
-
-const TYPE_HINTS: Record<string, Record<string, string>> = {
-    efcore: {
-        hint: "string→string, int→int, bigint→long, boolean→bool, datetime→DateTime, decimal→decimal, guid→Guid, text→string, float→double"
-    },
-    prisma: {
-        hint: "string→String, int→Int, bigint→BigInt, boolean→Boolean, datetime→DateTime, decimal→Decimal, float→Float, text→String"
-    },
-    sqlalchemy: {
-        hint: "string→String(n), int→Integer, bigint→BigInteger, boolean→Boolean, datetime→DateTime, decimal→Numeric(p,s), float→Float, text→Text, guid→String(36)"
-    },
-    hibernate: {
-        hint: "string→String/@Column(length=n), int→Integer/int, bigint→Long/long, boolean→Boolean/boolean, datetime→LocalDateTime, decimal→BigDecimal, float→Double/double, guid→String(36)"
-    },
-    gorm: {
-        hint: "string→string `gorm:\"type:varchar(n)\"`, int→int `gorm:\"type:int\"`, bigint→int64, boolean→bool, datetime→time.Time, decimal→float64, uuid→string `gorm:\"type:uuid\"`"
-    }
-};
-
-// ── Command class ─────────────────────────────────────────────────────────────
-
+/**
+ * Geração de código ORM a partir de templates.
+ *
+ * O caminho é DETERMINÍSTICO: mesmo modelo e mesmos templates produzem byte a byte o mesmo
+ * código. É o que permite versionar o resultado — a geração por IA que existia aqui antes
+ * devolvia texto diferente a cada execução, num arquivo só, ignorando a convenção do projeto.
+ *
+ * Tudo que é específico da solução (namespace, raiz de saída, perfil) vem do próprio `.dsorm`;
+ * os templates em `.DASE/Templates/<perfil>/` são copiáveis entre repositórios sem edição.
+ */
 export class XGenerateORMCodeCommand {
-    private static _PendingModels: vscode.LanguageModelChat[] = [];
 
     static Register(pContext: vscode.ExtensionContext, pProvider: XORMDesignerEditorProvider): void {
-        const cmdShow = vscode.commands.registerCommand("Dase.GenerateORMCode", async () => {
-            await XGenerateORMCodeCommand.ShowPicker(pProvider);
-        });
+        pContext.subscriptions.push(
+            vscode.commands.registerCommand("Dase.GenerateORMCode", async () => {
+                await XGenerateORMCodeCommand.Execute(pProvider);
+            })
+        );
+    }
 
-        const cmdExec = vscode.commands.registerCommand(
-            "Dase.GenerateORMCodeExecute",
-            async (pModelIndex: number, pOrmId: string, pContextContent: string) => {
-                await XGenerateORMCodeCommand.Execute(pModelIndex, pOrmId, pContextContent, pProvider);
+    // ── resolução do .DASE ────────────────────────────────────────────────────
+
+    /**
+     * Sobe da pasta do modelo até a raiz procurando `.DASE/<relativo>`.
+     * Mesma hierarquia que o XConfigurationManager usa para os arquivos de configuração.
+     */
+    static async FindInDase(pStartDir: string, pRelative: string): Promise<string | null> {
+        let dir = pStartDir;
+
+        for (;;) {
+            const candidate = path.join(dir, ".DASE", pRelative);
+            try {
+                await vscode.workspace.fs.stat(vscode.Uri.file(candidate));
+                return candidate;
             }
-        );
+            catch { /* não existe neste nível */ }
 
-        const cmdBrowse = vscode.commands.registerCommand(
-            "Dase.ORMGenBrowseContext",
-            async (pOrmId: string) => {
-                await XGenerateORMCodeCommand.BrowseContext(pOrmId, pProvider);
+            const parent = path.dirname(dir);
+            if (parent === dir)
+                return null;
+            dir = parent;
+        }
+    }
+
+    /** Perfis disponíveis: subpastas de `.DASE/Templates` que tenham `profile.json`. */
+    private static async ListProfiles(pTemplatesDir: string): Promise<string[]> {
+        const found: string[] = [];
+
+        let entries: [string, vscode.FileType][];
+        try { entries = await vscode.workspace.fs.readDirectory(vscode.Uri.file(pTemplatesDir)); }
+        catch { return found; }
+
+        for (const [name, type] of entries) {
+            if (type !== vscode.FileType.Directory)
+                continue;
+            try {
+                await vscode.workspace.fs.stat(vscode.Uri.file(path.join(pTemplatesDir, name, "profile.json")));
+                found.push(name);
             }
-        );
-
-        pContext.subscriptions.push(cmdShow, cmdExec, cmdBrowse);
-    }
-
-    // ── Cost label (same heuristic as other commands) ─────────────────────────
-
-    private static GetCostLabel(pModel: vscode.LanguageModelChat): string {
-        const name   = pModel.name.toLowerCase();
-        const family = (pModel.family ?? "").toLowerCase();
-        if (family === "auto" || name === "auto")              return "10% off";
-        if (name.includes("opus") && name.includes("fast"))    return "30x";
-        if (name.includes("opus"))                             return "3x";
-        if (name.includes("haiku"))                            return "0.33x";
-        if (name.includes("grok") && name.includes("fast"))   return "0.25x";
-        if (name.includes("flash") || (name.includes("mini") && name.includes("codex"))) return "0.33x";
-        if (name.includes("gpt-4.1") || name.includes("gpt-4o") ||
-            name.includes("raptor mini") || name.includes("gpt-5 mini")) return "0x";
-        return "1x";
-    }
-
-    // ── Prompt preview ────────────────────────────────────────────────────────
-
-    static BuildPromptPreview(
-        pOrmLabel:   string,
-        pTableCount: number,
-        pRefCount:   number,
-        pHasContext: boolean
-    ): string {
-        return (
-            `Target ORM: ${pOrmLabel}\n\n` +
-            `Model: ${pTableCount} table${pTableCount !== 1 ? "s" : ""}, ` +
-            `${pRefCount} FK reference${pRefCount !== 1 ? "s" : ""}\n\n` +
-            `The AI will receive the full DBML schema and generate:\n` +
-            `  • Entity / model classes for every table\n` +
-            `  • Primary key and identity configuration\n` +
-            `  • Foreign key associations and navigation properties\n` +
-            `  • ${pOrmLabel}-specific annotations and conventions\n` +
-            (pHasContext ? `  • Code adapted to match your existing context file\n\n` : "\n") +
-            `Output: single source file saved alongside the .dsorm model.`
-        );
-    }
-
-    // ── AI prompt per ORM ─────────────────────────────────────────────────────
-
-    static BuildAIPrompt(
-        pOrmId:          string,
-        pOrmLabel:       string,
-        pDbml:           string,
-        pSchema:         string,
-        pContextContent: string
-    ): string {
-        const schema  = pSchema || "dbo";
-        const typeMap = TYPE_HINTS[pOrmId]?.hint ?? "";
-        const ctx     = pContextContent?.trim()
-            ? `\n\nExisting context file (use this as reference for naming, namespaces, base classes, configuration):\n\`\`\`\n${pContextContent.trim()}\n\`\`\`\n`
-            : "";
-
-        const orm_instructions: Record<string, string> = {
-            efcore:
-                `Generate complete C# 12 / .NET 8 EF Core source code:\n` +
-                `- One class per table, using [Table("{name}", Schema="{schema}")] attribute.\n` +
-                `- [Key] on the primary key property; [DatabaseGenerated(DatabaseGeneratedOption.Identity)] for auto-increment PK.\n` +
-                `- [Required] for NOT NULL columns; [StringLength(n)] for string columns with length defined.\n` +
-                `- [Column("{colName}")] when the property name differs from the column name.\n` +
-                `- [ForeignKey] + virtual navigation properties (ICollection<T> and T) for FK relationships.\n` +
-                `- One DbContext class (use existing class name if context file provided, else "{Schema}DbContext").\n` +
-                `- DbSet<T> for each entity; override OnModelCreating for fluent API where needed.\n` +
-                `- Namespace: deduce from context file if provided, otherwise use "{Schema}".\n` +
-                `- Add a // File: {ClassName}.cs comment above each class to help the user split to separate files.\n` +
-                `- Type mapping: ${typeMap}.`,
-
-            prisma:
-                `Generate a complete Prisma schema file:\n` +
-                `- datasource db block with provider placeholder (\"postgresql\") and env(\"DATABASE_URL\").\n` +
-                `- generator client block with provider = \"prisma-client-js\".\n` +
-                `- One model block per table with @id, @default(autoincrement()), @map, @@map, @@schema.\n` +
-                `- @relation(fields: [...], references: [...]) for FK associations with back-references.\n` +
-                `- Use @unique for fields that should be unique.\n` +
-                `- Respect the schema name "${schema}" using @@schema.\n` +
-                `- If an existing schema is provided, update/merge it preserving existing configuration.\n` +
-                `- Type mapping: ${typeMap}.`,
-
-            sqlalchemy:
-                `Generate complete Python SQLAlchemy 2.x ORM models:\n` +
-                `- Use DeclarativeBase subclass as Base; import Column, Integer, String, etc. from sqlalchemy.orm.\n` +
-                `- One class per table with __tablename__ = "{name}" and __table_args__ = {\"schema\": \"${schema}\"}.\n` +
-                `- Mapped[T] annotation style (SQLAlchemy 2.x): id: Mapped[int] = mapped_column(primary_key=True)\n` +
-                `- ForeignKey constraints and relationship() with back_populates for bi-directional navigation.\n` +
-                `- Optional[T] for nullable columns, enforce non-nullable with nullable=False.\n` +
-                `- If a context/base file is provided, extend the same Base class and match import style.\n` +
-                `- Type mapping: ${typeMap}.`,
-
-            hibernate:
-                `Generate complete Java 17 JPA / Hibernate entity classes:\n` +
-                `- @Entity, @Table(name=\"{name}\", schema=\"${schema}\") on each class.\n` +
-                `- @Id + @GeneratedValue(strategy = GenerationType.IDENTITY) on the PK field.\n` +
-                `- @Column(name=\"{col}\", nullable=false, length=n) on all fields.\n` +
-                `- @ManyToOne(fetch = FetchType.LAZY) + @JoinColumn for FK fields; \n` +
-                `  @OneToMany(mappedBy = \"{field}\", cascade = CascadeType.ALL) on the owning side.\n` +
-                `- Add Lombok annotations: @Data, @Builder, @NoArgsConstructor, @AllArgsConstructor.\n` +
-                `- Package: deduce from context file if provided, otherwise use "com.${schema.toLowerCase()}.model".\n` +
-                `- Add // File: {ClassName}.java comment above each class.\n` +
-                `- Type mapping: ${typeMap}.`,
-
-            gorm:
-                `Generate complete Go GORM (v2) model structs:\n` +
-                `- Package name: models (or deduce from context file if provided).\n` +
-                `- One exported struct per table.\n` +
-                `- Use gorm:\"column:x;primaryKey;autoIncrement\" tags; also add json:\"x\" tags.\n` +
-                `- Embed gorm.Model for tables that have id, created_at, updated_at, deleted_at (otherwise define fields manually).\n` +
-                `- FK associations: BelongsTo with foreign key field + struct pointer; HasMany with slice pointer.\n` +
-                `- Use TableName() method to return the schema-qualified table name ("${schema}.{tableName}").\n` +
-                `- Type mapping: ${typeMap}.`
-        };
-
-        const instructions = orm_instructions[pOrmId] ??
-            `Generate ${pOrmLabel} ORM model code for all tables and relationships.`;
-
-        return (
-            `You are a senior software engineer. Generate complete, production-ready ${pOrmLabel} ORM source code.\n\n` +
-            `DBML model:\n\`\`\`dbml\n${pDbml}\n\`\`\`\n` +
-            ctx +
-            `\nInstructions:\n${instructions}\n\n` +
-            `- Emit clean, well-formatted code with appropriate spacing.\n` +
-            `- Do NOT include any explanation or markdown — output ONLY source code.\n` +
-            `- Ensure referential integrity: all FK relationships are represented in both directions.\n`
-        );
-    }
-
-    // ── Sequential output path ────────────────────────────────────────────────
-
-    static async FindOutputPath(pDocFsPath: string, pExt: string): Promise<vscode.Uri> {
-        const dir      = path.dirname(pDocFsPath);
-        const baseName = path.basename(pDocFsPath, path.extname(pDocFsPath));
-
-        const firstUri = vscode.Uri.file(path.join(dir, `${baseName}${pExt}`));
-        try { await vscode.workspace.fs.stat(firstUri); }
-        catch { return firstUri; }
-
-        for (let seq = 1; seq <= 999; seq++) {
-            const seqUri = vscode.Uri.file(path.join(dir, `${baseName}_${seq}${pExt}`));
-            try { await vscode.workspace.fs.stat(seqUri); }
-            catch { return seqUri; }
+            catch { /* pasta sem profile.json não é perfil */ }
         }
 
-        return vscode.Uri.file(path.join(dir, `${baseName}_${Date.now()}${pExt}`));
+        return found.sort((a, b) => a.localeCompare(b));
     }
 
-    // ── Phase 1: browse context file ──────────────────────────────────────────
+    private static async ReadText(pPath: string): Promise<string> {
+        const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(pPath));
+        return Buffer.from(bytes).toString("utf-8");
+    }
 
-    private static async BrowseContext(
-        pOrmId:    string,
-        pProvider: XORMDesignerEditorProvider
-    ): Promise<void> {
-        const target  = ORM_TARGETS.find(t => t.id === pOrmId) ?? ORM_TARGETS[0];
-        const filters: Record<string, string[]> = {
-            ...target.contextFilters,
-            "All Files": ["*"]
+    /**
+     * Descobre o namespace raiz a partir da estrutura, para não obrigar a redigitar o que a
+     * pasta já diz. O `Namespace` declarado no modelo continua vencendo — isto é o default.
+     *
+     * Ordem: prefixo comum dos projetos vizinhos (`Tootega.SYS.API`, `Tootega.SYS.Infra`, …
+     * ⇒ `Tootega.SYS`), depois o nome da pasta que contém o `.dsorm`.
+     */
+    static async DeriveNamespace(pModelDir: string): Promise<string> {
+        const projetos = await XGenerateORMCodeCommand.ListProjects(pModelDir);
+        const pasta = path.basename(pModelDir);
+
+        // Sinal mais forte: a pasta se chama como os projetos que ela contém
+        // (`Tootega.ID/` com `Tootega.ID.Infra`). É a convenção de módulo do repositório.
+        if (projetos.some(p => p === pasta || p.startsWith(pasta + ".")))
+            return pasta;
+
+        if (projetos.length === 1)
+            return projetos[0];
+
+        if (projetos.length > 1) {
+            // Prefixo por SEGMENTOS, escolhendo o mais longo que cubra a maioria dos projetos.
+            //
+            // Prefixo comum de TODOS não serve: basta um projeto fora do padrão — um
+            // `TID.Launcher` ao lado de sete `Tootega.ID.*` — para o comum virar "T" e o
+            // código inteiro ir parar numa pasta `T.Infra`.
+            const votos = new Map<string, number>();
+
+            for (const nome of projetos) {
+                const partes = nome.split(".");
+                for (let i = 1; i <= partes.length; i++) {
+                    const candidato = partes.slice(0, i).join(".");
+                    votos.set(candidato, (votos.get(candidato) ?? 0) + 1);
+                }
+            }
+
+            const minimo = Math.ceil(projetos.length / 2);
+            let melhor = "";
+
+            for (const [candidato, quantos] of votos) {
+                if (quantos < minimo) continue;
+                if (candidato.length > melhor.length) melhor = candidato;
+            }
+
+            if (melhor.length > 0) return melhor;
+        }
+
+        return pasta;
+    }
+
+    /** Nomes de projeto encontrados na pasta do modelo e nas filhas diretas. */
+    static async ListProjects(pModelDir: string): Promise<string[]> {
+        const projetos: string[] = [];
+
+        const coletar = async (pDir: string) => {
+            let entries: [string, vscode.FileType][];
+            try { entries = await vscode.workspace.fs.readDirectory(vscode.Uri.file(pDir)); }
+            catch { return; }
+
+            for (const [name, type] of entries)
+                if (type === vscode.FileType.File && /\.(csproj|vbproj|fsproj)$/i.test(name))
+                    projetos.push(name.replace(/\.(csproj|vbproj|fsproj)$/i, ""));
         };
 
-        const uris = await vscode.window.showOpenDialog({
-            canSelectFiles: true,
-            canSelectFolders: false,
-            canSelectMany: false,
-            openLabel: "Select context file",
-            filters
-        });
-
-        if (!uris || uris.length === 0) return;
-
-        const uri = uris[0];
-        let content = "";
+        await coletar(pModelDir);
         try {
-            const bytes = await vscode.workspace.fs.readFile(uri);
-            content = Buffer.from(bytes).toString("utf-8");
+            for (const [name, type] of await vscode.workspace.fs.readDirectory(vscode.Uri.file(pModelDir)))
+                if (type === vscode.FileType.Directory)
+                    await coletar(path.join(pModelDir, name));
         }
-        catch {
-            vscode.window.showWarningMessage("Could not read context file.");
-            return;
-        }
+        catch { /* pasta ilegível */ }
 
-        const panel = pProvider.GetActivePanel();
-        panel?.webview.postMessage({
-            Type: XDesignerMessageType.ORMGenContextLoaded,
-            Payload: {
-                fileName: path.basename(uri.fsPath),
-                content
-            }
-        });
+        return projetos;
     }
 
-    // ── Phase 1: show picker ──────────────────────────────────────────────────
+    /**
+     * Casa cada sufixo declarado pelo perfil com o projeto real correspondente:
+     * `"Infra"` ⇒ `"Tootega.ID.Infra"`.
+     *
+     * Havendo mais de um candidato, vence o de nome mais curto — `Tootega.ID.Test` antes de
+     * `Tootega.ID.Test.Integration`, que é o projeto de teste específico, não a raiz.
+     */
+    static MatchProjects(pProjects: string[], pSuffixes: string[]): Record<string, string> {
+        const mapa: Record<string, string> = {};
 
-    private static async ShowPicker(pProvider: XORMDesignerEditorProvider): Promise<void> {
+        for (const sufixo of pSuffixes) {
+            const candidatos = pProjects
+                .filter(p => p === sufixo || p.endsWith("." + sufixo))
+                .sort((a, b) => a.length - b.length || a.localeCompare(b));
+
+            if (candidatos.length > 0) mapa[sufixo] = candidatos[0];
+        }
+
+        return mapa;
+    }
+
+    /**
+     * Namespace de cada módulo dono citado por tabela espelho, lido do `.dsorm` do dono.
+     * É de lá que sai o `using` da entidade espelho — o espelho herda o tipo do dono.
+     */
+    private static async ResolveOwnerNamespaces(
+        pDoc: any,
+        pModelDir: string
+    ): Promise<Record<string, string>> {
+        const owners: Record<string, string> = {};
+
+        for (const table of pDoc.Design?.GetTables?.() ?? []) {
+            if (!table.IsShadow)
+                continue;
+
+            const prefix = (table.Name.match(/^([A-Z]{2,4})x/) ?? [])[1];
+            if (!prefix || owners[prefix])
+                continue;
+
+            // Convenção do repositório: cada módulo guarda o próprio MER ao lado do código.
+            const ownerMer = path.join(path.dirname(pModelDir), `Tootega.${prefix}`, `MER-${prefix}.dsorm`);
+            let resolved = table.ShadowModuleName || "";
+
+            try {
+                const text = await XGenerateORMCodeCommand.ReadText(ownerMer);
+                const match = text.match(/Name="Namespace"[^>]*>([^<]+)</);
+                if (match) resolved = match[1];
+            }
+            catch { /* sem o MER do dono, fica o que o espelho registrou */ }
+
+            if (resolved) owners[prefix] = resolved;
+        }
+
+        return owners;
+    }
+
+    // ── execução ──────────────────────────────────────────────────────────────
+
+    private static async Execute(pProvider: XORMDesignerEditorProvider): Promise<void> {
+        const log = GetLogService();
+
         const state = pProvider.GetActiveState();
         if (!state) {
             vscode.window.showWarningMessage("No ORM Designer is open. Open a .dsorm file first.");
             return;
         }
 
-        const modelData  = state.GetModelData();
-        const tableCount = modelData?.Tables?.length ?? 0;
-        if (tableCount === 0) {
-            vscode.window.showInformationMessage("The model has no tables to generate ORM code from.");
+        const docUri = pProvider.GetActiveUri();
+        if (!docUri || docUri.scheme === "untitled") {
+            vscode.window.showWarningMessage("Save the model to a file before generating code.");
             return;
         }
-        const refCount = modelData?.References?.length ?? 0;
 
-        let allModels: vscode.LanguageModelChat[];
-        try { allModels = await vscode.lm.selectChatModels(); }
-        catch { allModels = []; }
+        const ormDoc = state.Bridge?.Document;
+        const design = ormDoc?.Design;
+        if (!design) {
+            vscode.window.showWarningMessage("The model could not be read.");
+            return;
+        }
 
-        if (!allModels || allModels.length === 0) {
-            vscode.window.showWarningMessage(
-                "No AI language model available. Please install GitHub Copilot or another LLM extension."
+        if (design.GenerateCode === false) {
+            vscode.window.showInformationMessage(
+                "This model has Generate Code turned off. Enable it in the model properties to generate."
             );
             return;
         }
 
-        const sorted = [...allModels].sort((a, b) => {
-            const v = a.vendor.localeCompare(b.vendor);
-            return v !== 0 ? v : a.family.localeCompare(b.family);
-        });
+        const modelDir = path.dirname(docUri.fsPath);
 
-        XGenerateORMCodeCommand._PendingModels = sorted;
-
-        const panel = pProvider.GetActivePanel();
-        panel?.webview.postMessage({
-            Type: XDesignerMessageType.ORMGenShowPicker,
-            Payload: {
-                tableCount,
-                refCount,
-                ormTargets: ORM_TARGETS.map(t => ({
-                    id:       t.id,
-                    language: t.language,
-                    orm:      t.orm,
-                    ext:      t.ext,
-                    icon:     t.icon,
-                    contextLabel: t.contextLabel
-                })),
-                promptPreview: XGenerateORMCodeCommand.BuildPromptPreview(
-                    "C# / EF Core", tableCount, refCount, false
-                ),
-                models: sorted.map((m, i) => ({
-                    index:       i,
-                    name:        m.name,
-                    vendor:      m.vendor,
-                    family:      m.family,
-                    costLabel:   XGenerateORMCodeCommand.GetCostLabel(m)
-                }))
+        try {
+            // ── perfil ────────────────────────────────────────────────────────
+            const templatesDir = await XGenerateORMCodeCommand.FindInDase(modelDir, "Templates");
+            if (!templatesDir) {
+                vscode.window.showErrorMessage(
+                    "No .DASE/Templates folder found above this model. Add a template profile to generate code."
+                );
+                return;
             }
-        });
+
+            const profiles = await XGenerateORMCodeCommand.ListProfiles(templatesDir);
+            if (profiles.length === 0) {
+                vscode.window.showErrorMessage(`No template profile found in ${templatesDir} (a profile needs a profile.json).`);
+                return;
+            }
+
+            const declared = (design.CodeTemplate ?? "").trim();
+            let chosen = declared || profiles[0];
+
+            if (declared && !profiles.includes(declared)) {
+                vscode.window.showErrorMessage(
+                    `Template profile "${declared}" not found. Available: ${profiles.join(", ")}`
+                );
+                return;
+            }
+
+            // Vários perfis e nenhum declarado: quem escolhe é o usuário, não a ordem alfabética.
+            if (!declared && profiles.length > 1) {
+                const picked = await vscode.window.showQuickPick(profiles, {
+                    title: "Generate ORM Code",
+                    placeHolder: "Select the template profile to use"
+                });
+                if (!picked) return;
+                chosen = picked;
+            }
+
+            const profileDir = path.join(templatesDir, chosen);
+            const profile = JSON.parse(
+                await XGenerateORMCodeCommand.ReadText(path.join(profileDir, "profile.json"))
+            ) as XIProfileSpec;
+
+            const templates = new Map<string, string>();
+            for (const [name, type] of await vscode.workspace.fs.readDirectory(vscode.Uri.file(profileDir)))
+                if (type === vscode.FileType.File && name.endsWith(".tpl"))
+                    templates.set(name, await XGenerateORMCodeCommand.ReadText(path.join(profileDir, name)));
+
+            if (templates.size === 0) {
+                vscode.window.showErrorMessage(`Profile "${chosen}" has no .tpl templates.`);
+                return;
+            }
+
+            // ── tipos ─────────────────────────────────────────────────────────
+            const typesPath = await XGenerateORMCodeCommand.FindInDase(modelDir, "ORM.Types.json");
+            if (!typesPath) {
+                vscode.window.showErrorMessage("No .DASE/ORM.Types.json found above this model.");
+                return;
+            }
+
+            const types = JSON.parse(await XGenerateORMCodeCommand.ReadText(typesPath)).Types as XORMDataTypeInfo[];
+            const resolver = new XTypeResolver(types, profile.Id);
+
+            // Tipo sem mapeamento produziria código silenciosamente errado — melhor parar aqui.
+            const unmapped = resolver.GetUnmappedTypes();
+            if (unmapped.length > 0) {
+                vscode.window.showErrorMessage(
+                    `ORM.Types.json has no Mappings["${profile.Id}"] for: ${unmapped.join(", ")}`
+                );
+                return;
+            }
+
+            // ── geração ───────────────────────────────────────────────────────
+            const owners = await XGenerateORMCodeCommand.ResolveOwnerNamespaces(ormDoc, modelDir);
+
+            // Declarado no modelo vence; sem ele, a estrutura de pastas e projetos responde.
+            const declaredNs = (design.Namespace ?? "").trim();
+            const namespace = declaredNs || await XGenerateORMCodeCommand.DeriveNamespace(modelDir);
+
+            // Projetos REAIS para os sufixos que o perfil declara. É daqui que o template tira
+            // o caminho de saída e o namespace de cada arquivo — nada de concatenar à mão.
+            const suffixes = profile.ProjectSuffixes ?? [];
+            const projects = XGenerateORMCodeCommand.MatchProjects(
+                await XGenerateORMCodeCommand.ListProjects(modelDir),
+                suffixes
+            );
+
+            const naoAchados = suffixes.filter(s => !projects[s]);
+            if (naoAchados.length > 0)
+                log.Info(`GenerateORMCode: sem projeto para ${naoAchados.join(", ")} — usando "${namespace}.<sufixo>"`);
+
+            const model = BuildCodeModel(ormDoc, {
+                Resolver: resolver,
+                OwnerNamespaces: owners,
+                Namespace: namespace,
+                Projects: projects,
+                ProjectSuffixes: suffixes
+            });
+
+            if (!declaredNs)
+                log.Info(`GenerateORMCode: namespace derivado da estrutura: "${namespace}"`);
+
+            if (model.Tables.length === 0) {
+                vscode.window.showInformationMessage("The model has no tables to generate.");
+                return;
+            }
+
+            const files = new XCodeGenerator(profile, templates).Generate(model);
+            const outputRoot = path.resolve(modelDir, model.OutputRoot || ".");
+
+            const written = await XGenerateORMCodeCommand.WriteFiles(files, outputRoot);
+
+            const summary =
+                `${written.Created} created, ${written.Updated} updated, ${written.Unchanged} unchanged` +
+                ` — ${model.Entities.length} entities, ${model.Lookups.length} lookups, ${model.Mirrors.length} mirrors.`;
+
+            log.Info(`GenerateORMCode: ${files.length} files with profile "${chosen}" — ${summary}`);
+
+            const action = await vscode.window.showInformationMessage(
+                `ORM code generated — ${chosen} / ${model.Namespace}${declaredNs ? "" : " (derived)"}: ${summary}`,
+                "Show Folder"
+            );
+            if (action === "Show Folder")
+                await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputRoot));
+        }
+        catch (err: any) {
+            const message = err?.message ?? String(err);
+            log.Error("GenerateORMCode failed", err);
+            vscode.window.showErrorMessage(`ORM code generation failed: ${message}`);
+        }
     }
 
-    // ── Phase 2: execute ──────────────────────────────────────────────────────
+    /**
+     * Grava os arquivos, pulando os que já estão idênticos — assim regenerar não
+     * marca meia centena de arquivos como modificados no controle de versão.
+     */
+    static async WriteFiles(
+        pFiles: XIGeneratedFile[],
+        pOutputRoot: string
+    ): Promise<{ Created: number; Updated: number; Unchanged: number }> {
+        let created = 0, updated = 0, unchanged = 0;
 
-    private static async Execute(
-        pModelIndex:     number,
-        pOrmId:          string,
-        pContextContent: string,
-        pProvider:       XORMDesignerEditorProvider
-    ): Promise<void> {
-        const log    = GetLogService();
-        const models = XGenerateORMCodeCommand._PendingModels;
+        for (const file of pFiles) {
+            const target = vscode.Uri.file(path.join(pOutputRoot, file.Path));
 
-        if (pModelIndex < 0 || pModelIndex >= models.length) {
-            vscode.window.showWarningMessage("Invalid model selection.");
-            return;
+            let previous: string | null = null;
+            try { previous = Buffer.from(await vscode.workspace.fs.readFile(target)).toString("utf-8"); }
+            catch { previous = null; }
+
+            if (previous === file.Content) { unchanged++; continue; }
+
+            await vscode.workspace.fs.writeFile(target, Buffer.from(file.Content, "utf-8"));
+            if (previous === null) created++; else updated++;
         }
 
-        const state = pProvider.GetActiveState();
-        if (!state) {
-            vscode.window.showWarningMessage("No ORM Designer is open.");
-            return;
-        }
-
-        const modelData  = state.GetModelData();
-        const tableCount = modelData?.Tables?.length ?? 0;
-        if (tableCount === 0) {
-            vscode.window.showInformationMessage("The model has no tables.");
-            return;
-        }
-
-        const target  = ORM_TARGETS.find(t => t.id === pOrmId) ?? ORM_TARGETS[0];
-        const model   = models[pModelIndex];
-        const panel   = pProvider.GetActivePanel();
-        const ormLabel = `${target.language} / ${target.orm}`;
-
-        panel?.webview.postMessage({
-            Type: XDesignerMessageType.ORMGenStart,
-            Payload: { model: model.name, vendor: model.vendor, orm: ormLabel }
-        });
-
-        const sendProgress = (pMsg: string, pPct: number, pStep: string) => {
-            panel?.webview.postMessage({
-                Type: XDesignerMessageType.ORMGenProgress,
-                Payload: { message: pMsg, percent: pPct, step: pStep }
-            });
-        };
-
-        const docUri  = pProvider.GetActiveUri();
-        const docPath = docUri?.fsPath ?? "";
-
-        await vscode.window.withProgress({
-            location:    vscode.ProgressLocation.Notification,
-            title:       `⚙️ Generating ${ormLabel} code with ${model.name}…`,
-            cancellable: true
-        }, async (progress, token) => {
-            try {
-                progress.report({ message: "Exporting model to DBML…", increment: 5 });
-                sendProgress("Exporting model to DBML…", 5, "export");
-
-                const dbml = state.ExportToDBML();
-                if (!dbml || dbml.trim().length < 10) {
-                    panel?.webview.postMessage({
-                        Type: XDesignerMessageType.ORMGenError,
-                        Payload: { message: "DBML export returned empty content." }
-                    });
-                    return;
-                }
-
-                const schema = (modelData as any)?.Schema ?? "dbo";
-                const prompt = XGenerateORMCodeCommand.BuildAIPrompt(
-                    pOrmId, ormLabel, dbml, schema, pContextContent ?? ""
-                );
-
-                progress.report({ message: `Sending to ${model.name}…`, increment: 10 });
-                sendProgress(`Sending schema to ${model.name}…`, 15, "sending");
-
-                const messages = [vscode.LanguageModelChatMessage.User(prompt)];
-                const response = await model.sendRequest(messages, {}, token);
-
-                progress.report({ message: "AI is generating ORM code…", increment: 15 });
-                sendProgress("Generating ORM classes…", 30, "generating");
-
-                let codeText  = "";
-                let charCount = 0;
-
-                for await (const fragment of response.text) {
-                    if (token.isCancellationRequested) {
-                        panel?.webview.postMessage({
-                            Type: XDesignerMessageType.ORMGenError,
-                            Payload: { message: "Cancelled." }
-                        });
-                        return;
-                    }
-                    codeText  += fragment;
-                    charCount += fragment.length;
-                    if (charCount % 100 < fragment.length) {
-                        const lines = codeText.split("\n").length;
-                        const pct   = 30 + Math.min(Math.floor(charCount / 30), 55);
-                        sendProgress(`Generating… ${lines} lines`, pct, "streaming");
-                    }
-                }
-
-                // Strip markdown fences if the AI wrapped the response
-                codeText = codeText
-                    .replace(/^```[a-z]*\n?/m, "")
-                    .replace(/```\s*$/m, "")
-                    .trim();
-
-                if (!codeText || codeText.length < 20) {
-                    panel?.webview.postMessage({
-                        Type: XDesignerMessageType.ORMGenError,
-                        Payload: { message: "AI returned empty or too-short code." }
-                    });
-                    return;
-                }
-
-                progress.report({ message: "Saving file…", increment: 10 });
-                sendProgress("Saving generated file…", 88, "saving");
-
-                if (!docPath) {
-                    panel?.webview.postMessage({
-                        Type: XDesignerMessageType.ORMGenError,
-                        Payload: { message: "Cannot determine model file path." }
-                    });
-                    return;
-                }
-
-                const outputUri  = await XGenerateORMCodeCommand.FindOutputPath(docPath, target.ext);
-                await vscode.workspace.fs.writeFile(outputUri, Buffer.from(codeText, "utf-8"));
-
-                const fileName  = path.basename(outputUri.fsPath);
-                const lineCount = codeText.split("\n").length;
-
-                progress.report({ message: "Done!", increment: 5 });
-                sendProgress(`Saved ${fileName} (${lineCount} lines).`, 100, "done");
-
-                panel?.webview.postMessage({
-                    Type: XDesignerMessageType.ORMGenComplete,
-                    Payload: {
-                        success:   true,
-                        filePath:  outputUri.fsPath,
-                        fileName,
-                        lineCount,
-                        orm:       ormLabel
-                    }
-                });
-
-                vscode.window.showInformationMessage(
-                    `✅ ORM code saved: ${fileName} (${lineCount} lines)`,
-                    "Open File"
-                ).then(action => {
-                    if (action === "Open File")
-                        vscode.window.showTextDocument(outputUri);
-                });
-            }
-            catch (err: any) {
-                if (err?.name === "CancellationError" || token.isCancellationRequested) {
-                    panel?.webview.postMessage({
-                        Type: XDesignerMessageType.ORMGenError,
-                        Payload: { message: "Cancelled." }
-                    });
-                    vscode.window.showInformationMessage("ORM code generation cancelled.");
-                    return;
-                }
-                log.Error("GenerateORMCode failed", err);
-                const errMsg = err?.message ?? String(err);
-                panel?.webview.postMessage({
-                    Type: XDesignerMessageType.ORMGenError,
-                    Payload: { message: `Error: ${errMsg}` }
-                });
-                vscode.window.showErrorMessage(`ORM code generation failed: ${errMsg}`);
-            }
-        });
+        return { Created: created, Updated: updated, Unchanged: unchanged };
     }
 }

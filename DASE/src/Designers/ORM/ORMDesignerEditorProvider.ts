@@ -109,12 +109,6 @@ interface ICreateSQLScriptExecutePayload {
     CustomDB: string;
 }
 
-interface IGenerateORMCodeExecutePayload {
-    ModelIndex:     number;
-    OrmId:          string;
-    ContextContent: string;
-}
-
 interface IDesignerMessage {
     Type: string;
     Payload?: unknown;
@@ -433,36 +427,12 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             }
 
             // ----------------------------------------------------
-            // AI ORM Code Generation
+            // ORM Code Generation
             // ----------------------------------------------------
             case XDesignerMessageType.GenerateORMCode:
                 /* istanbul ignore next */
                 vscode.commands.executeCommand("Dase.GenerateORMCode");
                 break;
-
-            case XDesignerMessageType.GenerateORMCodeExecute: {
-                /* istanbul ignore next */
-                const ormPayload = payload as IGenerateORMCodeExecutePayload;
-                /* istanbul ignore next */
-                vscode.commands.executeCommand(
-                    "Dase.GenerateORMCodeExecute",
-                    ormPayload.ModelIndex     ?? 0,
-                    ormPayload.OrmId          ?? "efcore",
-                    ormPayload.ContextContent ?? ""
-                );
-                break;
-            }
-
-            case XDesignerMessageType.ORMGenBrowseContext: {
-                /* istanbul ignore next */
-                const browsePayload = payload as { OrmId: string };
-                /* istanbul ignore next */
-                vscode.commands.executeCommand(
-                    "Dase.ORMGenBrowseContext",
-                    browsePayload.OrmId ?? "efcore"
-                );
-                break;
-            }
 
             default:
                 console.warn("Unknown message type:", type);

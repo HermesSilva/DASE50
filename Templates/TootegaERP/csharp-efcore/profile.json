@@ -1,0 +1,78 @@
+{
+  "Id": "csharp-efcore",
+  "Language": "C#",
+  "Framework": "EF Core",
+
+  "_comment": [
+    "Perfil PORTÁVEL: nada aqui cita uma solução. Namespace, raiz de saída e a escolha",
+    "deste perfil vivem no .dsorm — copie esta pasta para outro repositório e ela funciona.",
+    "O mapa de tipos vive em .DASE/ORM.Types.json, no campo Mappings['csharp-efcore']."
+  ],
+
+  "_comment_projects": [
+    "ProjectSuffixes diz quais projetos localizar junto ao modelo. O gerador procura o",
+    "projeto cujo nome termina em cada sufixo e publica o nome REAL em Model.Projects.<sufixo>.",
+    "Use SEMPRE {{ Model.Projects.Infra }} — nunca {{ Model.Namespace }}.Infra: um módulo com",
+    "um projeto fora do padrão ao lado (TID.Launcher junto de Tootega.ID.*) faria a",
+    "concatenação apontar para uma pasta inexistente."
+  ],
+  "ProjectSuffixes": ["Infra", "Common"],
+
+  "Artifacts": [
+    {
+      "Id": "entity",
+      "Scope": "Table",
+      "Where": "Stereotype == \"Entity\"",
+      "Template": "Entity.tpl",
+      "Output": "{{ Model.Projects.Infra }}/Persistencia/Entidades/{{ Table.Name }}.Design.cs"
+    },
+    {
+      "Id": "configuration",
+      "Scope": "Table",
+      "Where": "Stereotype == \"Entity\"",
+      "Template": "Configuration.tpl",
+      "Output": "{{ Model.Projects.Infra }}/Persistencia/Configurations/{{ Table.Name }}Configuration.cs"
+    },
+    {
+      "Id": "lookup-enum",
+      "Scope": "Table",
+      "Where": "Stereotype == \"Lookup\"",
+      "Template": "LookupEnum.tpl",
+      "Output": "{{ Model.Projects.Common }}/Lookups/{{ Table.Name }}.cs"
+    },
+    {
+      "Id": "lookup-class",
+      "Scope": "Table",
+      "Where": "Stereotype == \"Lookup\"",
+      "Template": "LookupClass.tpl",
+      "Output": "{{ Model.Projects.Infra }}/Persistencia/Lookups/{{ Table.Name }}.cs"
+    },
+    {
+      "Id": "lookup-configuration",
+      "Scope": "Table",
+      "Where": "Stereotype == \"Lookup\"",
+      "Template": "LookupConfiguration.tpl",
+      "Output": "{{ Model.Projects.Infra }}/Persistencia/Configurations/{{ Table.Name }}Configuration.cs"
+    },
+    {
+      "Id": "mirror-entity",
+      "Scope": "Table",
+      "Where": "Stereotype == \"Mirror\"",
+      "Template": "MirrorEntity.tpl",
+      "Output": "{{ Model.Projects.Infra }}/Persistencia/Entidades/Espelho/{{ Table.Name }}.cs"
+    },
+    {
+      "Id": "mirror-configuration",
+      "Scope": "Table",
+      "Where": "Stereotype == \"Mirror\"",
+      "Template": "MirrorConfiguration.tpl",
+      "Output": "{{ Model.Projects.Infra }}/Persistencia/Configurations/{{ Table.Name }}EspelhoConfiguration.cs"
+    },
+    {
+      "Id": "dbcontext",
+      "Scope": "Model",
+      "Template": "DbContext.tpl",
+      "Output": "{{ Model.Projects.Infra }}/Persistencia/{{ Model.Prefix }}DBContext.Design.cs"
+    }
+  ]
+}

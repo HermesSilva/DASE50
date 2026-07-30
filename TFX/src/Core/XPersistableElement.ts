@@ -372,6 +372,18 @@ export abstract class XPersistableElement extends XElement
         return this._Values;
     }
 
+    /**
+     * Se o elemento já tem algum valor gravado — isto é, alguma propriedade que difere do
+     * default e por isso foi persistida.
+     *
+     * Serve para distinguir uma instância recém-construída de uma que veio de um arquivo,
+     * quando as duas ainda estão sem filhos.
+     */
+    public HasStoredValues(): boolean
+    {
+        return (this._Values?.ChildNodes?.length ?? 0) > 0;
+    }
+
     public GetValue(pProperty: XProperty): unknown
     {
         const data = this.Values.GetChildById<XData>(pProperty.ID);

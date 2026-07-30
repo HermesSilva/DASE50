@@ -2,7 +2,7 @@
     "name": "dase",
     "displayName": "DASE - Design-Aided Software Engineering",
     "description": "Visual design environment for multi-tier, multi-platform web applications",
-    "version": "1.0.41889",
+    "version": "1.0.41900",
     "publisher": "HermesSilva",
     "license": "MIT",
     "icon": "media/icon.png",
@@ -128,7 +128,7 @@
             },
             {
                 "command": "Dase.GenerateORMCode",
-                "title": "Generate ORM Code using AI",
+                "title": "Generate ORM Code",
                 "category": "DASE",
                 "icon": "$(code)"
             },

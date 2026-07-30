@@ -85,12 +85,76 @@ export class XORMDesign extends XDesign
         ""
     );
 
+    /**
+     * Modelos que este importa — os `.dsorm` do repositório de onde ele pode trazer
+     * tabelas. Vários caminhos separados por `|`, relativos à **raiz do repositório**,
+     * o que permite importar de qualquer módulo, não só da pasta vizinha.
+     *
+     * Propriedade distinta de `ParentModel`, que responde por outra finalidade.
+     */
+    public static readonly ImportModelsProp = XProperty.Register<XORMDesign, string>(
+        (p: XORMDesign) => p.ImportModels,
+        "8B14C6E9-3A57-4D2B-9F60-C4E7A1B85D32",
+        "ImportModels",
+        "Import Models",
+        ""
+    );
+
     public static readonly StateControlTableProp = XProperty.Register<XORMDesign, string>(
         (p: XORMDesign) => p.StateControlTable,
         "3A8B7C2D-1E4F-4D6A-89C5-2D7E1F8A3B4C",
         "StateControlTable",
         "State Control Table",
         ""
+    );
+
+    /**
+     * Este modelo participa da geração de código. Default TRUE: um modelo novo já gera.
+     * Desmarcar é a forma de manter um MER de estudo ou rascunho no repositório sem que
+     * ele produza arquivos.
+     */
+    public static readonly GenerateCodeProp = XProperty.Register<XORMDesign, boolean>(
+        (p: XORMDesign) => p.GenerateCode,
+        "C1A7E4F2-9B3D-4E68-A5C1-7D2F8B4E93A0",
+        "GenerateCode",
+        "Generate Code",
+        true
+    );
+
+    /**
+     * Perfil de template a aplicar — o nome da pasta em `.DASE/Templates/`.
+     * Vazio significa "todos os perfis encontrados", que é o caso comum de um
+     * repositório com uma linguagem só.
+     */
+    public static readonly CodeTemplateProp = XProperty.Register<XORMDesign, string>(
+        (p: XORMDesign) => p.CodeTemplate,
+        "D4B8C1E7-2F6A-4B95-8E3D-6A1C9F5B72E4",
+        "CodeTemplate",
+        "Code Template",
+        ""
+    );
+
+    /**
+     * Namespace/pacote raiz do código gerado a partir deste modelo (`Tootega.SYS`).
+     *
+     * Mora AQUI, e não nos templates, porque é o que muda de solução para solução —
+     * assim a pasta `.DASE/Templates/` é copiável entre repositórios sem edição.
+     */
+    public static readonly NamespaceProp = XProperty.Register<XORMDesign, string>(
+        (p: XORMDesign) => p.Namespace,
+        "E9C2A5D8-7B41-4F3E-9A6C-2D8E5B1F4C73",
+        "Namespace",
+        "Namespace",
+        ""
+    );
+
+    /** Raiz de saída do código gerado, relativa à PASTA DO PRÓPRIO .dsorm. */
+    public static readonly OutputRootProp = XProperty.Register<XORMDesign, string>(
+        (p: XORMDesign) => p.OutputRoot,
+        "A3F6D9B2-5E8C-4172-B4A9-8C3E7D2F6B15",
+        "OutputRoot",
+        "Output Root",
+        "."
     );
 
     public static readonly TenantControlTableProp = XProperty.Register<XORMDesign, string>(
@@ -155,6 +219,27 @@ export class XORMDesign extends XDesign
         this.SetValue(XORMDesign.ParentModelProp, pValue);
     }
 
+    /**
+     * Modelos importados, separados por `|` e relativos à RAIZ DO REPOSITÓRIO —
+     * `"Back/Modules/Tootega.SYS/MER-SYS.dsorm|Back/Modules/Tootega.CRM/MER-CRM.dsorm"`.
+     * Vazio significa nenhum.
+     */
+    public get ImportModels(): string
+    {
+        return this.GetValue(XORMDesign.ImportModelsProp) as string;
+    }
+
+    public set ImportModels(pValue: string)
+    {
+        this.SetValue(XORMDesign.ImportModelsProp, pValue);
+    }
+
+    /** Os modelos importados como lista, já sem entradas vazias. */
+    public GetImportedModels(): string[]
+    {
+        return this.ImportModels.split("|").filter(m => m.length > 0);
+    }
+
     /** Name of the table that controls state (state machine) for this design. */
     public get StateControlTable(): string
     {
@@ -175,6 +260,50 @@ export class XORMDesign extends XDesign
     public set TenantControlTable(pValue: string)
     {
         this.SetValue(XORMDesign.TenantControlTableProp, pValue);
+    }
+
+    /** Se este modelo participa da geração de código. Default true. */
+    public get GenerateCode(): boolean
+    {
+        return this.GetValue(XORMDesign.GenerateCodeProp) as boolean;
+    }
+
+    public set GenerateCode(pValue: boolean)
+    {
+        this.SetValue(XORMDesign.GenerateCodeProp, pValue);
+    }
+
+    /** Perfil de template (pasta em .DASE/Templates/). Vazio = todos. */
+    public get CodeTemplate(): string
+    {
+        return this.GetValue(XORMDesign.CodeTemplateProp) as string;
+    }
+
+    public set CodeTemplate(pValue: string)
+    {
+        this.SetValue(XORMDesign.CodeTemplateProp, pValue);
+    }
+
+    /** Namespace raiz do código gerado a partir deste modelo. */
+    public get Namespace(): string
+    {
+        return this.GetValue(XORMDesign.NamespaceProp) as string;
+    }
+
+    public set Namespace(pValue: string)
+    {
+        this.SetValue(XORMDesign.NamespaceProp, pValue);
+    }
+
+    /** Raiz de saída, relativa à pasta do .dsorm. */
+    public get OutputRoot(): string
+    {
+        return this.GetValue(XORMDesign.OutputRootProp) as string;
+    }
+
+    public set OutputRoot(pValue: string)
+    {
+        this.SetValue(XORMDesign.OutputRootProp, pValue);
     }
 
     public override Initialize(): void

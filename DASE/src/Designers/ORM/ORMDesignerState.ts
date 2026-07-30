@@ -87,6 +87,12 @@ export class XORMDesignerState {
             // Load available .dsorm files from the same directory (for ParentModel property)
             await this._Bridge.LoadAvailableOrmFiles();
 
+            // Every .dsorm in the repository except this one (for the Import Models property)
+            await this._Bridge.LoadAvailableRepositoryModels();
+
+            // Discover code-generation template profiles under .DASE/Templates (for CodeTemplate)
+            await this._Bridge.LoadAvailableTemplateProfiles();
+
             // Handle untitled files
             if (uri.scheme === "untitled") {
                 this._Bridge.LoadOrmModelFromText("{}");
@@ -106,6 +112,12 @@ export class XORMDesignerState {
                 if (selected.length > 0)
                     await this._Bridge.LoadParentModelTables(selected);
             }
+
+            // Idem para os modelos importados: é deles que sai boa parte do que o seletor
+            // de tabela espelho oferece, e ele pode ser aberto logo no primeiro clique.
+            const imported = this._Bridge.Controller?.Design?.GetImportedModels?.() as string[] | undefined;
+            if (imported && imported.length > 0)
+                await this._Bridge.LoadImportedModelTables(imported);
 
             this._IsDirty = false;
         }

@@ -153,8 +153,37 @@ try {
         if ($LASTEXITCODE -ne 0) { Write-Err "DASE dependency install failed!"; exit 1 }
     }
 
+    # npm resolves a file: dependency through the cache entry recorded in package-lock.json.
+    # TFX always packs as tootega-tfx-1.0.0.tgz, so a rebuilt tarball carries the same name
+    # and version and does NOT invalidate that entry - npm then quietly restores the PREVIOUS
+    # build into node_modules and the DASE compile fails against a stale .d.ts. Reinstall
+    # straight from the tarball on disk to defeat the cache.
+    Write-Host "  Reinstalling TFX from the freshly packed tarball..."
+    Invoke-Native "npm install `"$ExpectedTgz`" --no-save --no-audit --no-fund --silent" | Out-Null
+    if ($LASTEXITCODE -ne 0) { Write-Err "TFX reinstall from tarball failed!"; exit 1 }
+
     $tfxIndex = Join-Path $TfxTarget "dist\index.js"
     if (-not (Test-Path $tfxIndex)) { Write-Err "TFX not materialized in node_modules!"; exit 1 }
+
+    # Sanity check: what landed in node_modules must be byte-identical to what TFX just built.
+    # Without this the build can still ship a stale TFX and only fail much later, at runtime.
+    $builtDist     = Join-Path $TfxDir "dist"
+    $installedDist = Join-Path $TfxTarget "dist"
+    $stale = @()
+    foreach ($file in Get-ChildItem $builtDist -Recurse -File -Filter *.js) {
+        $rel = $file.FullName.Substring($builtDist.Length + 1)
+        $mirror = Join-Path $installedDist $rel
+        if (-not (Test-Path $mirror)) { $stale += "missing: $rel"; continue }
+        if ((Get-FileHash $file.FullName -Algorithm SHA256).Hash -ne
+            (Get-FileHash $mirror -Algorithm SHA256).Hash) { $stale += "differs: $rel" }
+    }
+    if ($stale.Count -gt 0) {
+        Write-Err "Installed TFX does not match the one just built ($($stale.Count) file(s)):"
+        $stale | Select-Object -First 10 | ForEach-Object { Write-Err "    $_" }
+        Write-Err "  Try: npm cache clean --force"
+        exit 1
+    }
+    Write-Success "  TFX in node_modules matches the build"
 
     # Determine version - increment the patch segment unless one was passed.
     if ([string]::IsNullOrEmpty($Version)) {
