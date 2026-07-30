@@ -131,12 +131,15 @@ export class XCodeGenerator
                 const caminho = this.Caminho(artefato.Output, escopo);
                 const conteudo = this._Engine.RenderCompiled(template, escopo, { Partials: this._Compilados });
 
-                // Dois artefatos gravando no mesmo caminho seria perda silenciosa de
-                // arquivo — quase sempre um Output mal formado.
+                // Dois alvos gravando no mesmo caminho seria perda silenciosa de arquivo.
+                // A comparação inclui o MESMO artefato repetindo o caminho: duas tabelas de
+                // nome igual, ou um Output que não usa nada que as distinga.
                 const anterior = vistos.get(caminho);
-                if (anterior !== undefined && anterior !== artefato.Id)
+                if (anterior !== undefined)
                     throw new XCodeGenerationError(
-                        `artefatos '${anterior}' e '${artefato.Id}' geram o mesmo arquivo: ${caminho}`);
+                        anterior === artefato.Id
+                            ? `o artefato '${artefato.Id}' gera duas vezes o mesmo arquivo: ${caminho}`
+                            : `artefatos '${anterior}' e '${artefato.Id}' geram o mesmo arquivo: ${caminho}`);
                 vistos.set(caminho, artefato.Id);
 
                 arquivos.push({ Path: caminho, Content: conteudo, ArtifactId: artefato.Id });

@@ -427,6 +427,24 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
     // ordem em que as tabelas foram desenhadas.
     tabelas.sort((a, b) => a.Name < b.Name ? -1 : a.Name > b.Name ? 1 : 0);
 
+    // O mesmo espelho pode aparecer VÁRIAS VEZES no diagrama — desenhar duas cópias de
+    // SYSxInquilino perto de quem as referencia evita atravessar o canvas com uma linha.
+    // São o mesmo espelho: uma tabela, uma entidade, um DbSet. Sem esta redução sairiam
+    // arquivos duplicados e um DbContext com o membro repetido, que nem compila.
+    const espelhoVisto = new Set<string>();
+    const semEspelhoRepetido = tabelas.filter(t =>
+    {
+        if (t.Stereotype !== "Mirror")
+            return true;
+        if (espelhoVisto.has(t.Name))
+            return false;
+        espelhoVisto.add(t.Name);
+        return true;
+    });
+
+    tabelas.length = 0;
+    tabelas.push(...semEspelhoRepetido);
+
     const espelhos = tabelas.filter(t => t.Stereotype === "Mirror");
     const modulosDonos = [...new Map(
         espelhos
