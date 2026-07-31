@@ -191,13 +191,19 @@ export class XGenerateORMCodeCommand {
                 continue;
 
             // Convenção do repositório: cada módulo guarda o próprio MER ao lado do código.
-            const ownerMer = path.join(path.dirname(pModelDir), `Tootega.${prefix}`, `MER-${prefix}.dsorm`);
+            const ownerDir = `Tootega.${prefix}`;
+            const ownerMer = path.join(path.dirname(pModelDir), ownerDir, `MER-${prefix}.dsorm`);
             let resolved = table.ShadowModuleName || "";
 
             try {
                 const text = await XGenerateORMCodeCommand.ReadText(ownerMer);
                 const match = text.match(/Name="Namespace"[^>]*>([^<]+)</);
                 if (match) resolved = match[1];
+
+                // O MER do dono existe mas não declara Namespace — modelo importado, por exemplo.
+                // A pasta dele responde: é dado do disco, não palpite, e o espelho precisa herdar
+                // de ALGUM tipo. Sem isso o template escreveria `.Infra.Persistencia.Entidades.X`.
+                else if (!resolved) resolved = ownerDir;
             }
             catch { /* sem o MER do dono, fica o que o espelho registrou */ }
 
@@ -329,12 +335,20 @@ export class XGenerateORMCodeCommand {
             if (naoAchados.length > 0)
                 log.Info(`GenerateORMCode: sem projeto para ${naoAchados.join(", ")} — usando "${namespace}.<sufixo>"`);
 
+            // Tabelas da árvore inteira de modelos alcançáveis: sem elas, uma tabela que herda
+            // de fora sairia com menos colunas do que o modelo declara. Recarregadas aqui, e
+            // não só na abertura, porque gerar contra um modelo-origem editado nesta sessão —
+            // noutra janela ou por outro agente — tem de sair com o que está no disco AGORA.
+            await state.Bridge?.LoadInheritanceSources?.();
+            const external = state.Bridge?.GetExternalInheritanceTables?.() ?? [];
+
             const model = BuildCodeModel(ormDoc, {
                 Resolver: resolver,
                 OwnerNamespaces: owners,
                 Namespace: namespace,
                 Projects: projects,
-                ProjectSuffixes: suffixes
+                ProjectSuffixes: suffixes,
+                ExternalTables: external
             });
 
             if (!declaredNs)

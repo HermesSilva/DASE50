@@ -133,6 +133,41 @@ export class XORMTable extends XRectangle
         ""
     );
 
+    /**
+     * Tabela-modelo: existe para ser herdada, e não para virar tabela.
+     *
+     * Marcada, a tabela sai INTEIRA da geração — nenhum arquivo nasce dela, e nem
+     * migração —, e seus campos só aparecem achatados dentro de quem a declara em
+     * {@link Inheritance}. É o que separa a base comum (auditoria, posse, versionamento)
+     * de uma entidade real que por acaso também é herdada.
+     *
+     * Distinta de `GenerateCode = false`, que é a tabela ainda em estudo: aquela não gera
+     * nem cede nada; esta não gera, mas é a origem dos campos de outras.
+     */
+    public static readonly IsModelProp = XProperty.Register<XORMTable, boolean>(
+        (p: XORMTable) => p.IsModel,
+        "5C1D8A34-9F62-4E7B-B03A-6D2F91C4E87A",
+        "IsModel",
+        "Is Model Table",
+        false
+    );
+
+    /**
+     * Nome da tabela cujos campos esta também gera. Vazio (o default) é o normal.
+     *
+     * Guarda NOME, e não ID, porque a base pode morar em outro modelo — pai ou importado —,
+     * exatamente como `StateControlTable` no design. Quem resolve procura primeiro no
+     * próprio modelo e depois nos modelos declarados; não achando em lugar nenhum, a
+     * validação acusa em vez de gerar uma tabela com colunas faltando.
+     */
+    public static readonly InheritanceProp = XProperty.Register<XORMTable, string>(
+        (p: XORMTable) => p.Inheritance,
+        "2B9F4E17-6A3C-4D58-9E12-7C4A0B8D5F3E",
+        "Inheritance",
+        "Inheritance",
+        ""
+    );
+
     public constructor()
     {
         super();
@@ -277,6 +312,28 @@ export class XORMTable extends XRectangle
     public set Stereotype(pValue: string)
     {
         this.SetValue(XORMTable.StereotypeProp, pValue);
+    }
+
+    /** Tabela-modelo: não gera nada; só cede campos a quem a herda. Default false. */
+    public get IsModel(): boolean
+    {
+        return this.GetValue(XORMTable.IsModelProp) as boolean;
+    }
+
+    public set IsModel(pValue: boolean)
+    {
+        this.SetValue(XORMTable.IsModelProp, pValue);
+    }
+
+    /** Nome da tabela-base cujos campos esta também gera, ou vazio. */
+    public get Inheritance(): string
+    {
+        return this.GetValue(XORMTable.InheritanceProp) as string;
+    }
+
+    public set Inheritance(pValue: string)
+    {
+        this.SetValue(XORMTable.InheritanceProp, pValue);
     }
 
     /** Returns the XORMStateField child of this table, or null if none exists. */

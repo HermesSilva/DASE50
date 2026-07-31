@@ -213,6 +213,11 @@ de arquivo.
 `Tables` já vem ordenada e as sublistas preservam essa ordem — a saída não depende da ordem
 em que as tabelas foram desenhadas.
 
+Tabela marcada como **tabela-modelo** (`IsModel` no designer) **não aparece em `Tables`** nem
+em nenhuma sublista: ela existe só para ser herdada, e seus campos chegam achatados dentro de
+cada tabela que a declara em `Inheritance`. Gerá-la duplicaria no banco as colunas que já
+emprestou às filhas.
+
 ### `Table`
 
 | Campo | Tipo | Conteúdo |
@@ -226,9 +231,11 @@ em que as tabelas foram desenhadas.
 | `PKType` | string | tipo da chave, no vocabulário do modelo |
 | `PK` | campo\|nulo | o campo chave |
 | `PKValueGeneratedNever` | booleano | a chave nunca é gerada pelo banco |
-| `Fields` | lista | todos os campos, **chave inclusa** |
+| `Fields` | lista | todos os campos, **chave inclusa** — os próprios e, depois, os herdados |
 | `DataFields` | lista | todos menos a chave |
 | `ForeignKeys` | lista | só os campos que são chave estrangeira |
+| `Inheritance` | string | nome da tabela-base declarada, ou vazio |
+| `InheritedFields` | lista | os campos que vieram da base, na ordem em que entram em `Fields` |
 | `Indexes` | lista | índices |
 | `Seed` | lista | linhas de carga inicial |
 | `HasTenant` | booleano | tem coluna de posse |

@@ -119,6 +119,11 @@ export class XORMDesignerState {
             if (imported && imported.length > 0)
                 await this._Bridge.LoadImportedModelTables(imported);
 
+            // Árvore inteira de modelos alcançáveis: a herança sobe além do que este modelo
+            // declara, e a validação precisa disso já na primeira passada — senão uma base
+            // legítima, herdada de dois níveis acima, apareceria como não encontrada.
+            await this._Bridge.LoadInheritanceSources();
+
             this._IsDirty = false;
         }
         catch (error) {

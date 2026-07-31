@@ -137,6 +137,33 @@ describe("espelho só nasce de tabela shadow", () => {
         expect(Montar().Mirrors).toHaveLength(1);
     });
 
+    /**
+     * O namespace do dono entra na herança da entidade espelho — `X : Tootega.SYS.Infra…X`.
+     * Vazio ali sairia `.Infra.Persistencia.Entidades.X`, arquivo que nem compila, e é o que
+     * acontecia quando o `.dsorm` do dono não declarava Namespace e o espelho tinha vindo de
+     * um import antigo, sem ShadowModuleName. Na falta dos dois, vale a convenção de irmãos.
+     */
+    it("espelho sem dono resolvido cai na convenção de irmãos, nunca em vazio", () => {
+        const t = design.CreateTable({ Name: "CRMxPessoa" });
+        t.Name = "CRMxPessoa";
+        t.IsShadow = true;
+        t.ShadowTableName = "CRMxPessoa";
+        t.CreatePKField({ Name: "CRMxPessoaID", DataType: "Int64" });
+
+        expect(Montar().Mirrors[0].OwnerModule).toBe("Acme.CRM");
+    });
+
+    it("o que o espelho registrou vence a convenção", () => {
+        const t = design.CreateTable({ Name: "CRMxPessoa" });
+        t.Name = "CRMxPessoa";
+        t.IsShadow = true;
+        t.ShadowTableName = "CRMxPessoa";
+        t.ShadowModuleName = "Outra.Casa.CRM";
+        t.CreatePKField({ Name: "CRMxPessoaID", DataType: "Int64" });
+
+        expect(Montar().Mirrors[0].OwnerModule).toBe("Outra.Casa.CRM");
+    });
+
     it("Stereotype declarado não sobrepõe o shadow", () => {
         const t = design.CreateTable({ Name: "SYSxInquilino" });
         t.Name = "SYSxInquilino";

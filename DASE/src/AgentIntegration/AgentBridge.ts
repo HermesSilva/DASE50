@@ -236,6 +236,12 @@ export class XAgentBridge {
                 if (table.ShadowTableName)
                     result += `- **Source Table:** ${table.ShadowTableName}\n`;
             }
+            // A lista de campos abaixo é só a dos campos PRÓPRIOS. Sem dizer de quem a tabela
+            // herda, o código gerado apareceria com colunas que a listagem não explica.
+            if (table.IsModel)
+                result += `- **Model Table:** Yes — generates nothing of its own; only lends its fields to the tables that inherit it\n`;
+            if (table.Inheritance)
+                result += `- **Inherits:** ${table.Inheritance} (its fields are generated here too, on top of the ones listed below)\n`;
 
             result += `\n### Fields (${table.Fields?.length ?? 0})\n`;
             if (table.Fields) {

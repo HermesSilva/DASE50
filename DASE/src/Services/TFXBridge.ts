@@ -38,8 +38,28 @@ import {
     XORMDataTypeInfo,
     XORMDataSet,
     XORMDataTuple,
-    XFieldValue
+    XFieldValue,
+    DescribeInheritableFields,
+    ResolveInheritance,
+    type XIExternalTable,
+    type XIInheritedField
 } from "@tootega/tfx";
+
+/**
+ * Tabela de um modelo EXTERNO (pai ou importado), como este bridge a mantém em cache.
+ *
+ * `Fill` e `PKType` servem ao espelho, que copia a aparência e o tipo da chave da origem.
+ * `Fields` e `Inheritance` servem à herança: quem herda de uma tabela de outro modelo
+ * precisa das colunas dela, e este cache é o único lugar onde elas existem deste lado —
+ * o arquivo de origem não fica aberto.
+ */
+interface IExternalTableEntry {
+    Name: string;
+    Fill: string;
+    PKType: string;
+    Fields: XIInheritedField[];
+    Inheritance: string;
+}
 
 // Data interfaces for webview communication (JSON-serializable)
 // These mirror TFX types but are plain objects for webview transfer
@@ -76,6 +96,10 @@ export interface ITableData {
     ShadowTableName?: string;
     ShadowModuleID?: string;
     ShadowModuleName?: string;
+    /** Tabela-modelo: não gera nada; só cede campos a quem a herda. */
+    IsModel?: boolean;
+    /** Nome da tabela-base cujos campos esta também gera, ou vazio. */
+    Inheritance?: string;
     Fields: IFieldData[];
     SeedData?: {
         Headers: string[];
@@ -208,8 +232,9 @@ export class XTFXBridge {
     private _TypeInfos: XORMDataTypeInfo[];
     private _TypesLoaded: boolean;
     private _AvailableOrmFiles: string[];
-    private _ParentModelTableGroups: Array<{ ModelName: string, Tables: Array<{ Name: string, Fill: string }> }>;
+    private _ParentModelTableGroups: Array<{ ModelName: string, Tables: IExternalTableEntry[] }>;
     private _LastSyncMutated: boolean;
+    private _LastValidationMutated: boolean = false;
     /** Perfis de template achados em .DASE/Templates — alimenta o combo de CodeTemplate. */
     private _AvailableTemplateProfiles: string[] = [];
     /** Modelos do repositório inteiro, menos o próprio — alimenta `Import Models`. */
@@ -226,8 +251,15 @@ export class XTFXBridge {
     private _ImportedModelTableGroups: Array<{
         ModelPath: string;
         Namespace: string;
-        Tables: Array<{ Name: string; Fill: string }>;
+        Tables: IExternalTableEntry[];
     }> = [];
+
+    /**
+     * Toda tabela alcançável pela árvore de modelos declarados — inclusive as dos modelos que
+     * só os modelos declarados conhecem. Existe para a herança subir até o fim da cadeia; os
+     * seletores de tabela continuam mostrando apenas o que ESTE modelo declara.
+     */
+    private _InheritanceTableClosure: IExternalTableEntry[] = [];
 
     /** Fallback property hints for well-known types when config is not yet loaded. */
     private static readonly _FallbackTypeHints: Record<string, { HasLength: boolean; HasScale: boolean; CanAutoIncrement: boolean }> =
@@ -516,6 +548,216 @@ export class XTFXBridge {
     }
 
     /**
+     * Tipo da chave primária de uma tabela, como um espelho dela deve herdá-lo.
+     *
+     * O campo PK vence a propriedade da tabela: `PKType` só é reconciliado com o campo
+     * durante a validação, e uma origem recém-lida — de um modelo-pai, de um importado ou
+     * do próprio design antes de validar — ainda pode carregar o default `Int32` enquanto
+     * o campo já diz `Int16` ou `Guid`.
+     */
+    private PKTypeDaOrigem(pTable: XORMTable): string {
+        return pTable.GetPKField()?.DataType ?? pTable.PKType;
+    }
+
+    /**
+     * Congela uma tabela de modelo externo no que este modelo precisa dela: aparência e tipo
+     * de chave para o espelho, campos e base declarada para a herança.
+     *
+     * Os campos vêm do documento de origem, que é lido uma vez e descartado — guardar o
+     * objeto vivo prenderia dois designs na memória e faria uma edição lá refletir aqui
+     * sem passar por validação nenhuma.
+     */
+    private DescreverTabelaExterna(pTable: XORMTable, pDesign: XORMDesign | null): IExternalTableEntry {
+        return {
+            Name: pTable.Name,
+            /* istanbul ignore next — Fill is always set (default XColor.Transparent) */
+            Fill: pTable.Fill?.ToString() ?? "",
+            PKType: this.PKTypeDaOrigem(pTable),
+            Fields: DescribeInheritableFields(pTable, pDesign),
+            Inheritance: (pTable.Inheritance ?? "").trim()
+        };
+    }
+
+    /**
+     * Tabelas oferecidas por qualquer seletor de TABELA do painel: as do modelo aberto,
+     * depois as de cada modelo-pai e cada modelo importado, uma por grupo — a mesma árvore
+     * que o seletor de tabela espelho mostra.
+     *
+     * Grupo que repete o nome do modelo aberto é descartado: o autor pode ter listado o
+     * próprio arquivo em `Parent Model`, e a tabela apareceria duas vezes na árvore.
+     *
+     * @param pExcluir Nome a tirar da lista — uma tabela não é candidata a base de si mesma.
+     */
+    private BuildTablePickerOptions(pExcluir?: string): { Options: string[]; Groups: IPropertyOptionGroup[] } {
+        /* istanbul ignore next */
+        const nomeDoModelo = this._ContextPath ? path.basename(this._ContextPath) : (this._Controller?.Document?.Name ?? "Current Model");
+        const excluir = (pExcluir ?? "").toLowerCase();
+
+        /* istanbul ignore next */
+        const doModelo = (this._Controller?.Design?.GetTables?.() ?? [])
+            .filter((t: XORMTable) => !t.IsShadow && t.Name.toLowerCase() !== excluir)
+            .map((t: XORMTable) => t.Name);
+
+        const gruposPai = this._ParentModelTableGroups.filter(g => g.ModelName !== nomeDoModelo);
+
+        // Modelos importados entram na mesma árvore: uma tabela de estado, de posse ou uma
+        // base de herança pode morar em outro módulo tanto quanto num modelo-pai.
+        const jaListados = new Set([nomeDoModelo, ...gruposPai.map(g => g.ModelName)]);
+        const gruposImportados = this._ImportedModelTableGroups
+            .map(g => ({ Nome: path.basename(g.ModelPath), Tables: g.Tables }))
+            .filter(g => !jaListados.has(g.Nome));
+
+        const nomesExternos = (pEntries: IExternalTableEntry[]) => pEntries
+            .map(e => e.Name)
+            .filter(n => n.toLowerCase() !== excluir)
+            .sort((a, b) => a.localeCompare(b));
+
+        const externas = [
+            ...gruposPai.flatMap(g => nomesExternos(g.Tables)),
+            ...gruposImportados.flatMap(g => nomesExternos(g.Tables))
+        ];
+
+        const groups: IPropertyOptionGroup[] = [];
+        if (doModelo.length > 0)
+            groups.push({ Group: nomeDoModelo, Items: [...doModelo].sort((a, b) => a.localeCompare(b)) });
+        for (const grp of gruposPai)
+            groups.push({ Group: grp.ModelName, Items: nomesExternos(grp.Tables) });
+        for (const grp of gruposImportados)
+            groups.push({ Group: grp.Nome, Items: nomesExternos(grp.Tables) });
+
+        return {
+            Options: ["", ...new Set([...doModelo, ...externas])].sort((a, b) => a.localeCompare(b)),
+            Groups: groups
+        };
+    }
+
+    /**
+     * Carrega as tabelas de TODO modelo alcançável a partir deste: os que ele declara, os que
+     * ELES declaram, e assim por diante, até fechar a árvore.
+     *
+     * Herança sobe até onde a cadeia for. Uma tabela deste modelo pode herdar de uma do módulo
+     * SYS, que por sua vez herda de uma base comum guardada num terceiro modelo — que este aqui
+     * não declara, nem tem por que declarar: quem depende dela é o SYS. Parar nos modelos
+     * declarados deixaria a tabela gerada sem as colunas desse último nível, e o defeito só
+     * apareceria na migração.
+     *
+     * Alimenta apenas a herança. Os seletores de tabela continuam oferecendo só o que o modelo
+     * declara — um espelho contra origem não declarada seria um erro de validação na hora.
+     */
+    async LoadInheritanceSources(): Promise<void> {
+        this._InheritanceTableClosure = [];
+
+        if (!this._ContextPath)
+            return;
+
+        this.Initialize();
+
+        const raiz = await this.FindRepositoryRoot(this._ContextPath);
+        const chave = (pCaminho: string) => path.normalize(pCaminho).toLowerCase();
+
+        const visitados = new Set<string>([chave(this._ContextPath)]);
+        const porNome = new Set<string>();
+
+        /** `ParentModel` é relativo à pasta do modelo que o declara; `ImportModels`, à raiz. */
+        const declaradosPor = (pDoc: XORMDocument, pCaminho: string): string[] => {
+            const design = pDoc.Design;
+            /* istanbul ignore next — Design sempre existe após desserialização bem-sucedida */
+            const pais = (design?.ParentModel ?? "").split("|").filter(m => m.length > 0);
+            /* istanbul ignore next */
+            const importados = design?.GetImportedModels?.() ?? [];
+
+            return [
+                ...pais.map(m => path.join(path.dirname(pCaminho), m)),
+                ...importados.map(m => path.join(raiz, m))
+            ];
+        };
+
+        const doc = this._Controller?.Document as XORMDocument | undefined;
+        const fila: string[] = doc ? declaradosPor(doc, this._ContextPath) : [];
+
+        while (fila.length > 0) {
+            const caminho = fila.shift()!;
+            if (visitados.has(chave(caminho)))
+                continue;
+            visitados.add(chave(caminho));
+
+            try {
+                const externo = await this.ReadModelDocument(caminho);
+                if (!externo)
+                    continue;
+
+                /* istanbul ignore next — Design sempre existe após desserialização bem-sucedida */
+                for (const table of (externo.Design?.GetTables?.() ?? []) as XORMTable[]) {
+                    // Espelho não tem campos: quem tem é a original, no modelo dono — que a
+                    // própria árvore alcança, porque o modelo que espelha o declara.
+                    if (table.IsShadow || !table.Name || porNome.has(table.Name.toLowerCase()))
+                        continue;
+                    porNome.add(table.Name.toLowerCase());
+                    this._InheritanceTableClosure.push(this.DescreverTabelaExterna(table, externo.Design));
+                }
+
+                fila.push(...declaradosPor(externo, caminho));
+            }
+            catch (error) {
+                GetLogService().Error(`Failed to load inheritance source ${caminho}: ${error}`);
+            }
+        }
+    }
+
+    /**
+     * Tabelas de todos os modelos alcançáveis, no formato que o TFX usa para resolver herança.
+     *
+     * Uma tabela-base pode aparecer em mais de um modelo; vence a primeira, na ordem em que os
+     * modelos foram declarados — a mesma ordem que o seletor mostra.
+     */
+    GetExternalInheritanceTables(): XIExternalTable[] {
+        const saida: XIExternalTable[] = [];
+        const vistos = new Set<string>();
+
+        const acrescentar = (pEntries: IExternalTableEntry[]) => {
+            for (const entry of pEntries) {
+                const chave = entry.Name.toLowerCase();
+                if (vistos.has(chave))
+                    continue;
+                vistos.add(chave);
+                saida.push({ Name: entry.Name, Fields: entry.Fields, Inheritance: entry.Inheritance });
+            }
+        };
+
+        for (const grp of this._ParentModelTableGroups)
+            acrescentar(grp.Tables);
+        for (const grp of this._ImportedModelTableGroups)
+            acrescentar(grp.Tables);
+        acrescentar(this._InheritanceTableClosure);
+
+        return saida;
+    }
+
+    /**
+     * Lê um `.dsorm` do disco como documento pronto para consulta, ou null se não der.
+     *
+     * Sempre passa pelo NormalizeCSharpXml, para um arquivo em formato C# (raiz `<XORMDesigner>`)
+     * ser embrulhado antes da desserialização — o mesmo que LoadOrmModelFromText faz. Em arquivo
+     * no formato TS a normalização não muda nada.
+     */
+    private async ReadModelDocument(pFilePath: string): Promise<XORMDocument | null> {
+        this.Initialize();
+
+        const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(pFilePath));
+        const xml = this.NormalizeCSharpXml(Buffer.from(bytes).toString("utf8"));
+
+        const result = this._Engine?.Deserialize<XORMDocument>(xml);
+        if (!result?.Success || !result.Data)
+            return null;
+
+        result.Data.Initialize();
+        // Mesma migração do documento aberto: num modelo vindo do C# o tipo da PK é um GUID,
+        // e o espelho herdaria o GUID em vez de "Int16".
+        this.MigrateLegacyDataTypeGUIDs(result.Data);
+        return result.Data;
+    }
+
+    /**
      * Loads table names from the given parent model files (relative to the current context directory).
      * Results are cached in _ParentModelTableGroups (one group per model file).
      */
@@ -532,26 +774,14 @@ export class XTFXBridge {
             if (!modelName)
                 continue;
             try {
-                const filePath = path.join(dirPath, modelName);
-                const fileUri = vscode.Uri.file(filePath);
-                const bytes = await vscode.workspace.fs.readFile(fileUri);
-                const text = Buffer.from(bytes).toString("utf8");
-
-                // Parse the file using the serialization engine to extract table names.
-                // Always call NormalizeCSharpXml so that C# format files (<XORMDesigner> root)
-                // are wrapped in <XORMDocument> before deserialization — matching LoadOrmModelFromText.
-                // NormalizeCSharpXml is a no-op for TS-format files (returns the input unchanged).
-                const xmlText = this.NormalizeCSharpXml(text);
-                const result = this._Engine?.Deserialize<XORMDocument>(xmlText);
-                if (result?.Success && result.Data) {
-                    result.Data.Initialize();
+                const doc = await this.ReadModelDocument(path.join(dirPath, modelName));
+                if (doc) {
                     /* istanbul ignore next — Design always has GetTables after successful deserialization */
-                    const tables = result.Data.Design?.GetTables?.() ?? [];
-                    const tableEntries: Array<{ Name: string, Fill: string }> = [];
+                    const tables = doc.Design?.GetTables?.() ?? [];
+                    const tableEntries: IExternalTableEntry[] = [];
                     for (const table of tables) {
                         if (table.Name)
-                            /* istanbul ignore next — Fill is always set (default XColor.Transparent) */
-                            tableEntries.push({ Name: table.Name, Fill: table.Fill?.ToString() ?? "" });
+                            tableEntries.push(this.DescreverTabelaExterna(table, doc.Design));
                     }
                     if (tableEntries.length > 0)
                         this._ParentModelTableGroups.push({ ModelName: modelName, Tables: tableEntries });
@@ -859,16 +1089,28 @@ export class XTFXBridge {
     }
 
     /**
+     * A última validação CONSERTOU alguma coisa no modelo — chave que faltava, tipo de FK
+     * divergente, coluna de índice presa a um campo que não existe mais.
+     *
+     * Sinal separado do sync de espelhos de propósito: são causas diferentes, e juntá-las faria
+     * "o espelho mudou" mentir. Quem valida precisa dos dois para redesenhar a tela e marcar o
+     * documento como sujo — conserto que não chega ao arquivo volta a quebrar a geração.
+     */
+    get LastValidationMutated(): boolean {
+        return this._LastValidationMutated;
+    }
+
+    /**
      * Synchronises every shadow table in the current design against its source.
      *
      * Same-model shadows (ShadowTableID points to a real table in the current design):
-     *   - Table still exists → update Name, ShadowTableName and Fill to match.
+     *   - Table still exists → update Name, ShadowTableName, Fill and PKType to match.
      *   - Table removed → error issue.
      *
      * Cross-model shadows (ShadowTableID is empty / not in current design):
      *   - Parent model not in _ParentModelTableGroups → error issue.
      *   - Table name not found in the parent model group → error issue.
-     *   - Table found → update Fill to match the cached entry.
+     *   - Table found → update Fill and PKType to match the cached entry.
      *
      * Returns extra XIssueItem[] for missing originals; structural updates are applied
      * directly to the shadow table objects. Sets _LastSyncMutated when any update is made.
@@ -893,7 +1135,7 @@ export class XTFXBridge {
                 : null;
 
             if (sameModelOriginal) {
-                // Same-model shadow: sync name and fill
+                // Same-model shadow: sync name, fill and PK type
                 if (sameModelOriginal.Name !== shadow.ShadowTableName) {
                     shadow.Name = sameModelOriginal.Name;
                     shadow.ShadowTableName = sameModelOriginal.Name;
@@ -903,6 +1145,16 @@ export class XTFXBridge {
                 const dstFill = shadow.Fill?.ToString();
                 if (srcFill && srcFill !== dstFill) {
                     shadow.Fill = XColor.Parse(srcFill);
+                    this._LastSyncMutated = true;
+                }
+
+                // Espelho de tabela do próprio modelo: o tipo da chave é o da original, e não
+                // uma cópia que envelhece. Trocar a PK da tabela para Int16 e deixar o espelho
+                // em Int32 faria as FKs que apontam o espelho gerarem coluna de tipo diferente
+                // da chave que referenciam.
+                const srcPKType = this.PKTypeDaOrigem(sameModelOriginal);
+                if (srcPKType !== shadow.PKType) {
+                    shadow.PKType = srcPKType;
                     this._LastSyncMutated = true;
                 }
             }
@@ -936,6 +1188,14 @@ export class XTFXBridge {
                             shadow.Fill = XColor.Parse(tableEntry.Fill);
                             this._LastSyncMutated = true;
                         }
+
+                        // O PKType do espelho segue o da origem: é dele que as FKs apontando
+                        // este espelho tiram o tipo da coluna. Sem esta reconciliação, abrir o
+                        // modelo rebaixaria uma FK Guid/Int64 ao default Int32 do espelho.
+                        if (tableEntry.PKType && tableEntry.PKType !== shadow.PKType) {
+                            shadow.PKType = tableEntry.PKType;
+                            this._LastSyncMutated = true;
+                        }
                     }
                 }
             }
@@ -953,6 +1213,87 @@ export class XTFXBridge {
         return issues;
     }
 
+    /**
+     * Herança cuja base mora FORA do modelo aberto.
+     *
+     * O XORMValidator resolve o que enxerga no documento — ciclo, espelho, colisão com base
+     * do mesmo modelo — e cala sobre um nome que não existe ali, porque a base pode estar num
+     * modelo pai ou importado. Quem lê esses arquivos é este bridge, então é aqui que a base
+     * não encontrada vira erro e que a colisão com campo de base externa é acusada.
+     *
+     * Sem isto, o nome errado passava calado e a tabela saía gerada com menos colunas do que
+     * o modelo declara — defeito que só aparece na migração, longe de onde foi criado.
+     */
+    private ValidateInheritanceSources(): XIssueItem[] {
+        const issues: XIssueItem[] = [];
+        const design = this._Controller?.Design as XORMDesign | null;
+        if (!design)
+            return issues;
+
+        const externas = this.GetExternalInheritanceTables();
+
+        /* istanbul ignore next — design is null-checked above */
+        for (const table of (design.GetTables?.() ?? []) as XORMTable[]) {
+            if (table.IsShadow || !(table.Inheritance ?? "").trim())
+                continue;
+
+            const resultado = ResolveInheritance(table, design, externas);
+            const soInternas = ResolveInheritance(table, design);
+
+            if (resultado.Cycle) {
+                // Ciclo inteiramente interno é do XORMValidator, que enxerga a cadeia toda —
+                // repetir aqui poria a mesma linha duas vezes na lista de problemas. Já o que
+                // atravessa modelos só se fecha com as tabelas externas em mãos, e sem esta
+                // linha ficaria sem dono: a cadeia pararia calada e a tabela sairia gerada
+                // com menos colunas.
+                if (soInternas.Cycle)
+                    continue;
+
+                issues.push(new XIssueItem(
+                    table.ID,
+                    table.Name,
+                    XIssueSeverity.Error,
+                    `Inheritance cycle: ${[table.Name, ...resultado.Chain, resultado.Cycle].join(" -> ")}.`,
+                    "Inheritance"
+                ));
+                continue;
+            }
+
+            if (resultado.Missing) {
+                issues.push(new XIssueItem(
+                    table.ID,
+                    table.Name,
+                    XIssueSeverity.Error,
+                    `Table "${table.Name}" inherits from "${resultado.Missing}", which is not in this model nor in any model listed in Parent Model or Import Models.`,
+                    "Inheritance"
+                ));
+                continue;
+            }
+
+            // Colisão: entra só o campo que veio de FORA. O que a cadeia interna já trazia foi
+            // acusado pelo XORMValidator, campo a campo — repetir aqui poria a mesma linha
+            // duas vezes na lista de problemas.
+            const jaAcusados = new Set(soInternas.Fields.map(f => f.Name.toLowerCase()));
+            const herdados = new Set(resultado.Fields.map(f => f.Name.toLowerCase()));
+
+            for (const campo of table.GetFields()) {
+                const chave = campo.Name.toLowerCase();
+                if (!herdados.has(chave) || jaAcusados.has(chave))
+                    continue;
+
+                issues.push(new XIssueItem(
+                    campo.ID,
+                    campo.Name,
+                    XIssueSeverity.Error,
+                    `Field "${campo.Name}" in table "${table.Name}" collides with the field inherited from "${resultado.Chain.join(" -> ")}".`,
+                    "Name"
+                ));
+            }
+        }
+
+        return issues;
+    }
+
     ValidateOrmModel(): XIssueItem[] {
         this.Initialize();
 
@@ -962,12 +1303,19 @@ export class XTFXBridge {
 
         // Sync shadow tables first: update name/fill from source, collect missing-source errors
         const shadowIssues = this.SyncShadowTables();
+        const inheritanceIssues = this.ValidateInheritanceSources();
 
         // Update validator with types from configuration (or defaults if not loaded)
         this._Validator.ValidPKTypes = this._PKDataTypes.length > 0 ? this._PKDataTypes : ["Guid", "Int32", "Int64"];
 
         const tfxIssues = this._Validator.Validate(doc);
-        const issues: XIssueItem[] = [...shadowIssues];
+
+        // O validador não só olha: cria chave que falta, acerta tipo de FK, religa ou remove
+        // coluna de índice que perdeu o campo. Sem avisar aqui, o conserto ficava só na memória
+        // e o documento voltava do disco com o mesmo defeito na próxima abertura.
+        this._LastValidationMutated = this._Validator.Mutated;
+
+        const issues: XIssueItem[] = [...shadowIssues, ...inheritanceIssues];
 
         for (const issue of tfxIssues) {
             const severity: TIssueSeverity = issue.Severity === tfx.XDesignerErrorSeverity?.Error
@@ -1064,14 +1412,41 @@ export class XTFXBridge {
     }
 
     /**
+     * Identidade da tabela que um alvo de referência representa: a tabela própria é ela
+     * mesma; um espelho é a tabela de ORIGEM que ele desenha.
+     *
+     * O `ShadowTableID` só identifica a origem quando ela está NESTE modelo. Num espelho de
+     * outro modelo não há tabela local para apontar, e `AddShadowTable` grava ali o ID do
+     * próprio espelho — duas cópias do mesmo espelho ficariam com identidades diferentes.
+     * Para essas, quem identifica a origem é o par modelo + tabela, comparado pelo nome do
+     * arquivo porque `ParentModel` e `ImportModels` guardam o caminho a partir de raízes
+     * diferentes, e a mesma origem pode chegar pelos dois.
+     */
+    private OrigemDoAlvo(pTable: XORMTable, pDesign: XORMDesign): string {
+        if (!pTable.IsShadow)
+            return pTable.ID;
+
+        const originalLocal = pDesign.GetTables()
+            .find((t: XORMTable) => !t.IsShadow && t.ID === pTable.ShadowTableID);
+        if (originalLocal)
+            return originalLocal.ID;
+
+        if (!pTable.ShadowTableName)
+            return "";
+
+        const modelo = path.basename(pTable.ShadowDocumentName).replace(/\.dsorm$/i, "");
+        return `${modelo}::${pTable.ShadowTableName}`;
+    }
+
+    /**
      * Re-points an existing FK reference to a different target table.
      *
-     * Only allowed between tables that share the same "origin identity":
-     *   originID(t) = t.IsShadow ? t.ShadowTableID : t.ID
+     * Only allowed between tables that share the same origin — see {@link OrigemDoAlvo}.
      *
      * This permits swapping a reference between a real table and a same-model shadow
-     * of it (in either direction), or between two shadows of the same origin — but
-     * never re-targeting to an unrelated table.
+     * of it (in either direction), or between two shadows of the same origin, including
+     * two copies of the same table mirrored from another model — but never re-targeting
+     * to an unrelated table.
      */
     MoveReferenceTarget(pReferenceID: string, pTargetTableID: string): XIOperationResult {
         const design = this._Controller?.Design as XORMDesign | null;
@@ -1093,9 +1468,8 @@ export class XTFXBridge {
         if (newTarget.ID === currentTarget.ID)
             return { Success: false, Message: "The reference already targets this table." };
 
-        const originOf = (t: XORMTable): string => (t.IsShadow ? (t.ShadowTableID || "") : t.ID);
-        const currentOrigin = originOf(currentTarget);
-        const newOrigin = originOf(newTarget);
+        const currentOrigin = this.OrigemDoAlvo(currentTarget, design);
+        const newOrigin = this.OrigemDoAlvo(newTarget, design);
 
         if (!currentOrigin || !newOrigin || currentOrigin !== newOrigin)
             return {
@@ -1124,7 +1498,7 @@ export class XTFXBridge {
      * comparação aceita o caminho inteiro ou só o nome do arquivo. Sem isso, um espelho
      * vindo de `Import Models` seria tratado como origem inexistente.
      */
-    private FindSourceTableGroup(pKey: string): { Tables: Array<{ Name: string; Fill: string }> } | undefined {
+    private FindSourceTableGroup(pKey: string): { Tables: IExternalTableEntry[] } | undefined {
         if (!pKey)
             return undefined;
 
@@ -1158,22 +1532,18 @@ export class XTFXBridge {
                 continue;
 
             try {
-                const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(path.join(raiz, relativo)));
-                const xml = this.NormalizeCSharpXml(Buffer.from(bytes).toString("utf8"));
-
-                const result = this._Engine?.Deserialize<XORMDocument>(xml);
-                if (!result?.Success || !result.Data)
+                const doc = await this.ReadModelDocument(path.join(raiz, relativo));
+                if (!doc)
                     continue;
 
-                result.Data.Initialize();
-                const design = result.Data.Design;
+                const design = doc.Design;
 
                 // Só tabelas próprias: o espelho de um espelho não faz sentido — a tabela
                 // pertence a um terceiro módulo, e é dele que ela deve ser importada.
                 const tables = (design?.GetTables?.() ?? []).filter((t: XORMTable) => !t.IsShadow);
                 const entries = tables
                     .filter((t: XORMTable) => t.Name)
-                    .map((t: XORMTable) => ({ Name: t.Name, Fill: t.Fill?.ToString() ?? "" }));
+                    .map((t: XORMTable) => this.DescreverTabelaExterna(t, design));
 
                 if (entries.length === 0)
                     continue;
@@ -1302,16 +1672,22 @@ export class XTFXBridge {
             /* istanbul ignore next — fillStr is always truthy since Fill defaults to XColor.Transparent */
             if (fillStr)
                 table.Fill = XColor.Parse(fillStr);
+            table.PKType = this.PKTypeDaOrigem(originalInDesign);
         }
         else {
-            // Cor herdada da tabela de origem, seja ela de um modelo-pai ou importado.
+            // Cor e PKType herdados da tabela de origem, seja ela de um modelo-pai ou importado.
             // pPayload.DocumentName vem sem a extensão e por isso não casa sozinho —
             // ModelName é a chave preferida.
+            //
+            // O PKType não é enfeite: uma FK que aponta o espelho toma dele o tipo da coluna,
+            // e o default (Int32) transformaria em `int` uma chave Guid ou Int64 do módulo dono.
             const docName = pPayload.ModelName || pPayload.DocumentName;
             const grp = this.FindSourceTableGroup(docName);
             const entry = grp?.Tables.find(e => e.Name === pPayload.TableName);
             if (entry?.Fill)
                 table.Fill = XColor.Parse(entry.Fill);
+            if (entry?.PKType)
+                table.PKType = entry.PKType;
         }
 
         // Shadow tables are locked and cannot be renamed or deleted accidentally
@@ -1387,6 +1763,18 @@ export class XTFXBridge {
                     element.Stereotype = papel;
                     break;
                 }
+                case "IsModel":
+                    element.IsModel = pValue as boolean;
+                    break;
+                case "Inheritance": {
+                    const base = String(pValue ?? "").trim();
+                    // Herdar de si mesma não é ciclo raro nem caso de borda: é o erro que o
+                    // seletor já evita, e que só chega aqui por agente ou arquivo editado à mão.
+                    if (base.toLowerCase() === element.Name.toLowerCase())
+                        return { Success: false, Message: `Table ${element.Name} cannot inherit from itself.` };
+                    element.Inheritance = base;
+                    break;
+                }
                 case "Description":
                     element.Description = pValue as string;
                     break;
@@ -1447,6 +1835,13 @@ export class XTFXBridge {
                                         if (entry && entry.Fill) {
                                             shadowTable.Fill = XColor.Parse(entry.Fill);
                                         }
+
+                                        // O campo de estado nasceu com o PKType default do espelho,
+                                        // porque a origem só é conhecida aqui. Herdar o tipo agora
+                                        // reescreve o campo: o setter de PKType propaga para toda FK
+                                        // que aponta este espelho, e a de estado é uma delas.
+                                        if (entry && entry.PKType)
+                                            shadowTable.PKType = entry.PKType;
                                     }
                                 }
                             }
@@ -1519,6 +1914,9 @@ export class XTFXBridge {
                         this.LoadParentModelTables(selected).catch(err =>
                             GetLogService().Error(`Parent model table reload failed: ${err}`)
                         );
+                        this.LoadInheritanceSources().catch(err =>
+                            GetLogService().Error(`Inheritance source reload failed: ${err}`)
+                        );
                     }
                     break;
                 case "ImportModels":
@@ -1527,6 +1925,10 @@ export class XTFXBridge {
                     // espelho oferece logo depois.
                     this.LoadImportedModelTables(element.GetImportedModels()).catch(err =>
                         GetLogService().Error(`Imported model reload failed: ${err}`)
+                    );
+                    // E a árvore inteira atrás delas, que é até onde a herança sobe.
+                    this.LoadInheritanceSources().catch(err =>
+                        GetLogService().Error(`Inheritance source reload failed: ${err}`)
                     );
                     break;
                 case "StateControlTable":
@@ -1664,42 +2066,14 @@ export class XTFXBridge {
                     this.LoadParentModelTables(selected).catch(() => { /* background load */ });
             }
 
-            // Tables for lookup: current model tables (excluding shadows) + tables from parent models
-            // Exclude parent groups that duplicate the current model name (user may have added the file to its own parent list)
-            /* istanbul ignore next */
-            const currentModelName = this._ContextPath ? path.basename(this._ContextPath) : (this._Controller?.Document?.Name ?? "Current Model");
-            /* istanbul ignore next */
-            const currentTables = this._Controller?.Design?.GetTables?.()?.filter((t: XORMTable) => !t.IsShadow).map((t: XORMTable) => t.Name) ?? [];
-            const uniqueParentGroups = this._ParentModelTableGroups.filter(g => g.ModelName !== currentModelName);
+            const picker = this.BuildTablePickerOptions();
 
-            // Modelos importados entram nas mesmas listas: uma tabela de estado ou de posse
-            // pode morar em outro módulo tanto quanto num modelo-pai.
-            const jaListados = new Set([currentModelName, ...uniqueParentGroups.map(g => g.ModelName)]);
-            const uniqueImportedGroups = this._ImportedModelTableGroups
-                .map(g => ({ Nome: path.basename(g.ModelPath), Tables: g.Tables }))
-                .filter(g => !jaListados.has(g.Nome));
-
-            const parentTables = [
-                ...uniqueParentGroups.flatMap(g => g.Tables.map(e => e.Name)),
-                ...uniqueImportedGroups.flatMap(g => g.Tables.map(e => e.Name))
-            ];
-            const allTableOptions = ["", ...new Set([...currentTables, ...parentTables])].sort((a, b) => a.localeCompare(b));
-
-            // Build grouped options (tree view): current model group + one group per source model file
-            const groupedOptions: IPropertyOptionGroup[] = [];
-            if (currentTables.length > 0)
-                groupedOptions.push({ Group: currentModelName, Items: [...currentTables].sort((a, b) => a.localeCompare(b)) });
-            for (const grp of uniqueParentGroups)
-                groupedOptions.push({ Group: grp.ModelName, Items: grp.Tables.map(e => e.Name).sort((a, b) => a.localeCompare(b)) });
-            for (const grp of uniqueImportedGroups)
-                groupedOptions.push({ Group: grp.Nome, Items: grp.Tables.map(e => e.Name).sort((a, b) => a.localeCompare(b)) });
-
-            const sctProp = new XPropertyItem("StateControlTable", "State Control Table", element.StateControlTable, XPropertyType.Enum, allTableOptions, "Relations");
-            sctProp.GroupedOptions = groupedOptions.length > 0 ? groupedOptions : null;
+            const sctProp = new XPropertyItem("StateControlTable", "State Control Table", element.StateControlTable, XPropertyType.Enum, picker.Options, "Relations");
+            sctProp.GroupedOptions = picker.Groups.length > 0 ? picker.Groups : null;
             props.push(sctProp);
 
-            const tctProp = new XPropertyItem("TenantControlTable", "Tenant Control Table", element.TenantControlTable, XPropertyType.Enum, allTableOptions, "Relations");
-            tctProp.GroupedOptions = groupedOptions.length > 0 ? groupedOptions : null;
+            const tctProp = new XPropertyItem("TenantControlTable", "Tenant Control Table", element.TenantControlTable, XPropertyType.Enum, picker.Options, "Relations");
+            tctProp.GroupedOptions = picker.Groups.length > 0 ? picker.Groups : null;
             props.push(tctProp);
 
             // ── Geração de código ─────────────────────────────────────────────
@@ -1741,6 +2115,13 @@ export class XTFXBridge {
                 tblProp.IsReadOnly = true;
                 props.push(tblProp);
 
+                // Herdado da origem e mostrado porque é o que decide o tipo das colunas FK
+                // que apontam este espelho — sem ele, só o código gerado revelaria a diferença.
+                const pkTypeProp = new XPropertyItem("PKType", "PK Type", element.PKType, XPropertyType.String, undefined, "Shadow");
+                pkTypeProp.IsReadOnly = true;
+                pkTypeProp.Hint = "Primary key type inherited from the source table.";
+                props.push(pkTypeProp);
+
                 if (element.ShadowModuleName) {
                     const modProp = new XPropertyItem("ShadowModuleName", "Module", element.ShadowModuleName, XPropertyType.String, undefined, "Shadow");
                     modProp.IsReadOnly = true;
@@ -1769,6 +2150,21 @@ export class XTFXBridge {
                 const stereoProp = new XPropertyItem("Stereotype", "Stereotype", element.Stereotype, XPropertyType.Enum, ["", "Entity", "Lookup"], "CodeGen");
                 stereoProp.Hint = "How this table generates: Entity or Lookup. Empty lets the generator infer from the table shape.";
                 props.push(stereoProp);
+
+                const isModelProp = new XPropertyItem("IsModel", "Is Model Table", element.IsModel, XPropertyType.Boolean, undefined, "CodeGen");
+                isModelProp.Hint = "A model table generates nothing of its own — it only lends its fields to the tables that inherit it.";
+                props.push(isModelProp);
+
+                // Seletor de tabela igual ao do espelho: o modelo aberto e cada modelo pai ou
+                // importado, um grupo por arquivo. A base pode morar em outro módulo.
+                //
+                // Fica em CodeGen, ao lado de IsModel: herdar não muda o desenho nem o banco
+                // desta tabela no diagrama — muda o que ela gera.
+                const inhPicker = this.BuildTablePickerOptions(element.Name);
+                const inhProp = new XPropertyItem("Inheritance", "Inheritance", element.Inheritance, XPropertyType.Enum, inhPicker.Options, "CodeGen");
+                inhProp.GroupedOptions = inhPicker.Groups.length > 0 ? inhPicker.Groups : null;
+                inhProp.Hint = "Base table whose fields this table also generates. Empty means none.";
+                props.push(inhProp);
 
                 const descTblProp = new XPropertyItem("Description", "Description", element.Description, XPropertyType.String, undefined, "Data");
                 descTblProp.Placeholder = "Optional description...";
@@ -2260,6 +2656,8 @@ export class XTFXBridge {
                 ShadowTableName: t.ShadowTableName || undefined,
                 ShadowModuleID: t.ShadowModuleID || undefined,
                 ShadowModuleName: t.ShadowModuleName || undefined,
+                IsModel: t.IsModel || false,
+                Inheritance: t.Inheritance || undefined,
                 Fields: fields.map((f: any) => ({
                     ID: f.ID,
                     Name: f.Name,
@@ -2381,6 +2779,12 @@ export class XTFXBridge {
                 if (tData.Description)
                     table.Description = tData.Description;
 
+                // Um espelho não tem campos, então o tipo da chave só chega por aqui.
+                // Numa tabela própria o campo PK é a fonte da verdade e a validação
+                // reconcilia os dois logo em seguida.
+                if (tData.PKType)
+                    table.PKType = tData.PKType;
+
                 // Restore shadow metadata
                 if (tData.IsShadow) {
                     table.IsShadow = true;
@@ -2413,8 +2817,11 @@ export class XTFXBridge {
                                     break;
                             }
 
+                            // Pela tabela, não pelo campo: CreatePKField trava o DataType, e
+                            // atribuí-lo direto é silenciosamente ignorado — a chave importada
+                            // ficaria Int32 qualquer que fosse o tipo declarado.
                             if (normalizedPKType === "Int32" || normalizedPKType === "Int64" || normalizedPKType === "Guid")
-                                pkField.DataType = normalizedPKType;
+                                table.PKType = normalizedPKType;
                         }
 
                         if (pkData.IsAutoIncrement !== undefined)
@@ -2495,6 +2902,8 @@ export class XTFXBridge {
                     Y: t.Bounds.Top,
                     Width: t.Bounds.Width,
                     Height: t.Bounds.Height,
+                    // Escrito para o espelho, que não tem campo PK de onde o tipo se deduza.
+                    PKType: t.PKType,
                     IsShadow: t.IsShadow || undefined,
                     ShadowDocumentID: t.ShadowDocumentID || undefined,
                     ShadowDocumentName: t.ShadowDocumentName || undefined,

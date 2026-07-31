@@ -9,7 +9,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync, statSy
 import { dirname, join, resolve, basename } from "node:path";
 import {
     XSerializationEngine, RegisterORMElements,
-    XTypeResolver, BuildCodeModel, XCodeGenerator
+    XTypeResolver, BuildCodeModel, XCodeGenerator, DescribeInheritableFields
 } from "../../TFX/dist/index.js";
 
 RegisterORMElements();
@@ -198,12 +198,75 @@ const semProjeto = sufixos.filter(s => !projetos[s]);
 if (semProjeto.length)
     console.log(`   aviso: sem projeto para ${semProjeto.join(", ")} — usando "${namespace}.<sufixo>"`);
 
+// ── bases de herança: a árvore INTEIRA de modelos alcançáveis ─────────────────
+//
+// Uma tabela pode herdar de outra que mora em outro modelo — e essa, de uma terceira, num
+// modelo que só o segundo declara. Parar nos modelos declarados por ESTE aqui deixaria a
+// tabela gerada sem as colunas do último nível, e o defeito só apareceria na migração.
+
+/** Procura um modelo declarado subindo da pasta dada: `ParentModel` é relativo a ela, `ImportModels` à raiz do repositório. */
+function AcharModeloDeclarado(pPartida, pRelativo) {
+    let dir = pPartida;
+    for (;;) {
+        const candidato = join(dir, pRelativo);
+        if (existsSync(candidato)) return candidato;
+        const pai = dirname(dir);
+        if (pai === dir) return null;
+        dir = pai;
+    }
+}
+
+/** Modelos que um documento declara, resolvidos a partir da pasta dele. */
+function ModelosDeclarados(pDoc, pPasta) {
+    const d = pDoc.Design;
+    return [...(d.ParentModel ?? "").split("|"), ...d.GetImportedModels()]
+        .filter(Boolean)
+        .map(rel => ({ Relativo: rel, Caminho: AcharModeloDeclarado(pPasta, rel) }));
+}
+
+const externas = [];
+const tabelasVistas = new Set();
+const modelosVistos = new Set([resolve(alvo).toLowerCase()]);
+const fila = ModelosDeclarados(doc, pastaModelo);
+
+while (fila.length > 0) {
+    const { Relativo: relativo, Caminho: caminho } = fila.shift();
+
+    if (!caminho) {
+        console.log(`   aviso: modelo declarado não encontrado: ${relativo}`);
+        continue;
+    }
+
+    const chaveModelo = resolve(caminho).toLowerCase();
+    if (modelosVistos.has(chaveModelo)) continue;
+    modelosVistos.add(chaveModelo);
+
+    try {
+        const outro = LerDocumento(caminho);
+        for (const t of outro.Design?.GetTables?.() ?? []) {
+            const chave = (t.Name ?? "").toLowerCase();
+            if (t.IsShadow || !chave || tabelasVistas.has(chave)) continue;
+            tabelasVistas.add(chave);
+            externas.push({
+                Name: t.Name,
+                Fields: DescribeInheritableFields(t, outro.Design),
+                Inheritance: (t.Inheritance ?? "").trim()
+            });
+        }
+        fila.push(...ModelosDeclarados(outro, dirname(caminho)));
+    }
+    catch (erro) {
+        console.log(`   aviso: falha ao ler ${relativo}: ${erro.message}`);
+    }
+}
+
 const modelo = BuildCodeModel(doc, {
     Resolver: resolver,
     OwnerNamespaces: ownerNamespaces,
     Namespace: namespace,
     Projects: projetos,
-    ProjectSuffixes: sufixos
+    ProjectSuffixes: sufixos,
+    ExternalTables: externas
 });
 const gerador = new XCodeGenerator(profile, templates);
 const arquivos = gerador.Generate(modelo);

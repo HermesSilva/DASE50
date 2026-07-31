@@ -19,6 +19,7 @@ import type { XORMField } from "../Designers/ORM/XORMField.js";
 import { XORMDataSet } from "../Designers/ORM/XORMDataSet.js";
 import { XORMIndex } from "../Designers/ORM/XORMIndex.js";
 import { XORMReference } from "../Designers/ORM/XORMReference.js";
+import { ResolveInheritance, type XIExternalTable, type XIInheritedField } from "../Designers/ORM/XORMInheritance.js";
 import { XTypeResolver } from "./XTypeResolver.js";
 
 /** Papel da tabela na geração. Decide qual conjunto de artefatos ela produz. */
@@ -91,11 +92,17 @@ export interface XICodeTable
     /** Chave nunca gerada pelo banco — vira ValueGeneratedNever(). */
     PKValueGeneratedNever: boolean;
 
+    /** Campos próprios e herdados, nesta ordem. */
     Fields: XICodeField[];
     /** Campos exceto a PK. */
     DataFields: XICodeField[];
     /** Campos que são chave estrangeira. */
     ForeignKeys: XICodeField[];
+
+    /** Nome da tabela-base declarada em `Inheritance`, ou vazio. */
+    Inheritance: string;
+    /** Campos que vieram da herança, na ordem em que entram em `Fields`. */
+    InheritedFields: XICodeField[];
 
     Indexes: XICodeIndex[];
     Seed: XICodeSeedRow[];
@@ -176,6 +183,15 @@ export interface XICodeModelOptions
 
     /** Sufixos declarados pelo perfil, para completar o que não foi achado. */
     ProjectSuffixes?: string[];
+
+    /**
+     * Tabelas dos modelos pai e importados, para resolver `Inheritance` que aponta para fora
+     * do modelo aberto. Quem chama é que lê os arquivos — o TFX não toca no disco.
+     *
+     * Sem elas a cadeia simplesmente para na primeira base externa, e a tabela sai gerada com
+     * menos colunas do que o modelo diz. É por isso que a validação acusa a base não resolvida.
+     */
+    ExternalTables?: XIExternalTable[];
 }
 
 // ── heurísticas ───────────────────────────────────────────────────────────────
@@ -187,10 +203,15 @@ export interface XICodeModelOptions
  * outras com uma `Sigla` ao lado.
  *
  * Uma tabela com FK não é lookup: passou a se relacionar, e isso é entidade.
+ *
+ * Herdar também tira a tabela da dedução: quem participa de uma hierarquia é entidade, e
+ * sem esta linha um catálogo de duas colunas que herda campos de auditoria seria lido como
+ * enum — a forma própria continua a de lookup, mas o achatado não é.
  */
 function EhLookup(pTabela: XORMTable, pCampos: XORMField[], pTemFK: (pID: string) => boolean): boolean
 {
     if (pTabela.IsShadow) return false;
+    if ((pTabela.Inheritance ?? "").trim().length > 0) return false;
 
     const pk = pTabela.GetPKField();
     if (!pk) return false;
@@ -239,6 +260,25 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
 
     const resolver = pOpcoes.Resolver;
     const donos = pOpcoes.OwnerNamespaces ?? {};
+    const namespaceModelo = pOpcoes.Namespace ?? design.Namespace ?? "";
+
+    /**
+     * Namespace do módulo dono de um espelho. O `.dsorm` do dono vence; depois o que o próprio
+     * espelho registrou; e, faltando os dois, a convenção de irmãos — mesma raiz do módulo que
+     * espelha, trocando a sigla (`Tootega.VND` + `CRM` = `Tootega.CRM`).
+     *
+     * Nunca vazio: o template escreve `{OwnerModule}.Infra.Persistencia.Entidades.X`, e um dono
+     * em branco produzia `.Infra.Persistencia.Entidades.X` — arquivo que nem compila. Errar o
+     * namespace acusa na hora; deixá-lo vazio gera lixo em silêncio.
+     */
+    const NamespaceDono = (pPrefixo: string, pRegistrado: string): string =>
+    {
+        if (!pPrefixo)
+            return pRegistrado;
+
+        const raiz = namespaceModelo.split(".").slice(0, -1).join(".");
+        return donos[pPrefixo] || pRegistrado || (raiz ? `${raiz}.${pPrefixo}` : pPrefixo);
+    };
 
     const todasTabelas = design.GetTables();
     const referencias = design.GetChildrenOfType(XORMReference);
@@ -298,11 +338,61 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
 
     const tenantTable = design.TenantControlTable ?? "";
 
+    /**
+     * Campo herdado → campo do template. Passa pelo mesmo resolvedor de tipos dos próprios,
+     * porque a coluna gerada é igual: o que muda é de onde veio a definição.
+     *
+     * A FK do herdado é reconhecida pelo NOME da tabela apontada, e não pela referência do
+     * design — a origem pode estar em outro documento, onde o ID não significa nada aqui.
+     */
+    const ProjetarHerdado = (pCampo: XIInheritedField): XICodeField =>
+    {
+        const tipo = resolver.Resolve({
+            DataType: pCampo.DataType,
+            Length: pCampo.Length,
+            Scale: pCampo.Scale,
+            IsRequired: pCampo.IsRequired
+        });
+
+        const alvoLocal = pCampo.TargetTable
+            ? todasTabelas.find(t => t.Name === pCampo.TargetTable) ?? null
+            : null;
+        const alvoEhLookup = alvoLocal !== null && estereotipos.get(alvoLocal.ID) === "Lookup";
+
+        return {
+            Name: pCampo.Name,
+            Description: pCampo.Description,
+            DataType: pCampo.DataType,
+            Length: pCampo.Length,
+            Scale: pCampo.Scale,
+            IsRequired: pCampo.IsRequired,
+            IsPrimaryKey: false,
+            IsForeignKey: pCampo.TargetTable.length > 0,
+            IsAutoIncrement: pCampo.IsAutoIncrement,
+            DefaultValue: pCampo.DefaultValue,
+
+            Type: tipo.Type,
+            BaseType: tipo.BaseType,
+            ColumnType: tipo.ColumnType,
+            Init: tipo.Init,
+
+            TargetTable: pCampo.TargetTable,
+            IsOneToOne: pCampo.IsOneToOne,
+            LookupEnum: alvoEhLookup ? pCampo.TargetTable : ""
+        };
+    };
+
     const tabelas: XICodeTable[] = [];
 
     for (const t of todasTabelas)
     {
         if (!t.GenerateCode) continue;
+
+        // TABELA-MODELO NÃO GERA. Ela existe para ser herdada: seus campos saem achatados
+        // dentro de cada tabela que a declara, e dela própria não nasce entidade, tabela
+        // nem migração. Gerá-la duplicaria no banco exatamente as colunas que ela já
+        // emprestou a todas as filhas.
+        if (t.IsModel) continue;
 
         const estereotipo = estereotipos.get(t.ID)!;
         const campos = t.GetFields();
@@ -344,6 +434,18 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
             };
         });
 
+        // Herança: o campo PRÓPRIO vence o de mesmo nome vindo da base. É a leitura natural
+        // de quem escreveu os dois — redeclarar na filha é especializar —, e emitir as duas
+        // colunas produziria uma classe que nem compila. A colisão continua sendo acusada
+        // pela validação, para o autor saber que redeclarou.
+        const heranca = ResolveInheritance(t, design, pOpcoes.ExternalTables);
+        const nomesProprios = new Set(campos.map(f => f.Name.toLowerCase()));
+        const herdados: XICodeField[] = heranca.Fields
+            .filter(f => !nomesProprios.has(f.Name.toLowerCase()))
+            .map(ProjetarHerdado);
+
+        projetados.push(...herdados);
+
         const pk = projetados.find(f => f.IsPrimaryKey) ?? null;
 
         // ValueGeneratedNever vem do campo (propriedade explícita do modelo) ou da chave ser
@@ -356,6 +458,9 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
         const pkNuncaGerada = pk !== null
             && ((pkBrutoCampo?.ValueGeneratedNever ?? false) || pk.IsForeignKey);
 
+        // Índice que perdeu TODAS as colunas não sai: viraria `HasIndex(e => e.)`, C# inválido.
+        // Quem acusa e conserta o vínculo morto é o XORMValidator, no Validate Model — aqui o
+        // gerador só se recusa a escrever código quebrado com o que sobrou.
         const indices: XICodeIndex[] = t.GetChildrenOfType(XORMIndex).map(ix => ({
             Name: ix.Name,
             IsUnique: ix.IsUnique,
@@ -363,7 +468,7 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
             Fields: ix.GetIndexFields()
                 .map(f => campos.find(c => c.ID === f.ParentID)?.Name ?? "")
                 .filter(n => n.length > 0)
-        }));
+        })).filter(ix => ix.Fields.length > 0);
 
         // Seed: as colunas vêm por FieldID; o Name da tupla é o identificador do membro
         // do enum, que não se deriva do texto (BRL, Trial, Z0Confiavel).
@@ -409,7 +514,7 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
 
             IsShadow: t.IsShadow,
             OwnerPrefix: t.IsShadow ? PrefixoDe(t.Name) : "",
-            OwnerModule: t.IsShadow ? (donos[PrefixoDe(t.Name)] ?? t.ShadowModuleName ?? "") : "",
+            OwnerModule: t.IsShadow ? NamespaceDono(PrefixoDe(t.Name), t.ShadowModuleName ?? "") : "",
 
             PKType: pkBruto?.DataType ?? t.PKType,
             PK: pk,
@@ -418,6 +523,9 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
             Fields: projetados,
             DataFields: projetados.filter(f => !f.IsPrimaryKey),
             ForeignKeys: projetados.filter(f => f.IsForeignKey),
+
+            Inheritance: (t.Inheritance ?? "").trim(),
+            InheritedFields: herdados,
 
             Indexes: indices,
             Seed: seed,
@@ -457,8 +565,6 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
             .filter(t => t.OwnerPrefix)
             .map(t => [t.OwnerPrefix, { Prefix: t.OwnerPrefix, Module: t.OwnerModule }])
     ).values()].sort((a, b) => a.Prefix < b.Prefix ? -1 : 1);
-
-    const namespaceModelo = pOpcoes.Namespace ?? design.Namespace ?? "";
 
     // Sigla do módulo: o prefixo que a maioria das tabelas PRÓPRIAS compartilha. Cair no
     // último segmento do namespace cobre o modelo que ainda não tem tabela nomeada.

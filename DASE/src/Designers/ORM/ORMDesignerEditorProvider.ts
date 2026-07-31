@@ -791,9 +791,10 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
     async OnValidateModel(pPanel: vscode.WebviewPanel, pState: XORMDesignerState): Promise<void> {
         const issues = await pState.Validate();
 
-        // If shadow-table sync mutated any element (name or colour changed),
-        // refresh the canvas and mark the document as dirty.
-        if (pState.Bridge.LastSyncMutated) {
+        // If shadow-table sync mutated any element (name or colour changed), or the validator
+        // repaired the model (missing key, FK type, orphan index column), refresh the canvas and
+        // mark the document as dirty — a repair that never reaches the file is no repair.
+        if (pState.Bridge.LastSyncMutated || pState.Bridge.LastValidationMutated) {
             const modelData = await pState.GetModelData();
             pPanel.webview.postMessage({ Type: XDesignerMessageType.LoadModel, Payload: modelData });
             this.NotifyDocumentChanged(pState);

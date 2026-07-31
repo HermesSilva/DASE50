@@ -1,8 +1,6 @@
 {{ include "_Header.tpl" }}
 #nullable enable
 
-using {{ Table.OwnerPrefix | lower | capitalize }} = {{ Table.OwnerModule }}.Infra.Persistencia.Entidades;
-
 namespace {{ Model.Projects.Infra }}.Persistencia.Entidades.Espelho;
 
 /// <summary>
@@ -16,4 +14,6 @@ namespace {{ Model.Projects.Infra }}.Persistencia.Entidades.Espelho;
 /// <b>aqui</b> — e aí o schema muda e o MER manda.
 /// </para>
 /// </summary>
-public sealed class {{ Table.Name }} : {{ Table.OwnerPrefix | lower | capitalize }}.{{ Table.Name }};
+{{# A base vem com o namespace INTEIRO, sem apelido: espelho e original têm o MESMO nome de
+    classe, e um `using` que só encurta o caminho obriga o leitor a subir o arquivo para saber
+    de quem se herda. É também a forma que o DbContext já usa no `Ignore<>`. #}}public sealed class {{ Table.Name }} : {{ Table.OwnerModule }}.Infra.Persistencia.Entidades.{{ Table.Name }};

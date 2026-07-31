@@ -13,6 +13,7 @@ export * from "./XFieldValue.js";
 export * from "./XORMIndex.js";
 export * from "./XORMIndexField.js";
 export * from "./XORMController.js";
+export * from "./XORMInheritance.js";
 export * from "./XORMValidator.js";
 export * from "./XORMRegistry.js";
 export * from "./XORMFieldMetadataProvider.js";

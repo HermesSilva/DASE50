@@ -168,6 +168,8 @@ Only the entries an ORM author will realistically touch are listed; the full 36-
 | `ShadowTableName` | `E1A8F5C3-B7D4-4A2C-E9B6-4F1D8A3C7E5B` | String | `""` | |
 | `ShadowModuleID` | `F3D2A7E6-C8B1-4D5A-F2C9-7B4E1A6D3F8C` | String (Guid) | `""` | |
 | `ShadowModuleName` | `A7C5E1F4-D9B2-4B8A-E5D3-1C6F9A4E7B2D` | String | `""` | |
+| `IsModel` | `5C1D8A34-9F62-4E7B-B03A-6D2F91C4E87A` | Boolean | `false` | Model table: generates nothing of its own; exists only to be inherited. |
+| `Inheritance` | `2B9F4E17-6A3C-4D58-9E12-7C4A0B8D5F3E` | String | `""` | NAME of the base table whose fields this table also generates. May live in this model or in one listed in `ParentModel`/`ImportModels`. Its PK is never inherited, and a field name that collides with an inherited one is a validation error. |
 
 ### 3.6 `XField` (inherited by all field types)
 

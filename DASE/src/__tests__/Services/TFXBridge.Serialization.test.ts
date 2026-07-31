@@ -61,6 +61,16 @@ describe('XTFXBridge', () => {
                             Height: options.Height || 150,
                             Bounds: new tfx.XRect(options.X || 0, options.Y || 0, options.Width || 200, options.Height || 150),
                             Fields: [],
+                            // PKType é a fonte da verdade do tipo da chave, como em XORMTable:
+                            // o campo PK tem o DataType travado e só muda por aqui.
+                            _PKType: 'Int32',
+                            get PKType(): string { return this._PKType; },
+                            set PKType(pValue: string) {
+                                this._PKType = pValue;
+                                const pk = table.GetPKField();
+                                if (pk)
+                                    pk.DataType = pValue;
+                            },
                             GetPKField: jest.fn(() => {
                                 for (const f of table.Fields)
                                 {
@@ -77,7 +87,7 @@ describe('XTFXBridge', () => {
                                 const pk: any = {
                                     ID: tfx.XGuid.NewValue(),
                                     Name: 'ID',
-                                    DataType: 'Int32',
+                                    DataType: table.PKType,
                                     Length: 0,
                                     IsPrimaryKey: true,
                                     IsRequired: true,

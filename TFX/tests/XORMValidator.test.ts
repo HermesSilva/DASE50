@@ -3,6 +3,8 @@ import { XORMValidator } from "../src/Designers/ORM/XORMValidator.js";
 import { XORMDocument } from "../src/Designers/ORM/XORMDocument.js";
 import { XORMTable } from "../src/Designers/ORM/XORMTable.js";
 import { XORMField } from "../src/Designers/ORM/XORMField.js";
+import { XORMIndex } from "../src/Designers/ORM/XORMIndex.js";
+import { XORMIndexField } from "../src/Designers/ORM/XORMIndexField.js";
 import { XORMReference } from "../src/Designers/ORM/XORMReference.js";
 import { XDesignerErrorSeverity } from "../src/Core/XValidation.js";
 import { XGuid } from "../src/Core/XGuid.js";
@@ -927,6 +929,126 @@ describe("XORMValidator", () =>
                 i.Message.includes("AllowedValues") || i.Message.includes("mutually exclusive")
             );
             expect(avIssues.length).toBe(0);
+        });
+    });
+
+    /**
+     * O XORMIndexField guarda o campo por ID. Campo apagado e desenhado de novo deixa o índice
+     * apontando para um ID morto — coluna que some da tela do índice e só existe no arquivo, sem
+     * lugar onde consertar. A geração escrevia `HasIndex(e => e.)`, C# que não compila; validar
+     * tem de deixar o modelo íntegro, não só reclamar dele.
+     */
+    describe("Index validation", () =>
+    {
+        /** Coluna `Orfa` nasce apontando para um ID morto; a íntegra aponta para o campo real. */
+        function Montar(pColunas: Array<{ Name: string; Orfa: boolean }>)
+        {
+            const doc = new XORMDocument();
+            doc.Design.Name = "Test";
+
+            const table = doc.Design.CreateTable({ Name: "VNDxNumeracao" });
+            // PK explícita: sem ela o validador cria uma e a mutação do índice não se distinguiria.
+            table.CreatePKField({ Name: "VNDxNumeracaoID", DataType: "Int32" });
+            const inquilino = table.CreateField({ Name: "SYSxInquilinoID", DataType: "Guid" });
+            const pessoa = table.CreateField({ Name: "SYSxPessoaID", DataType: "Int64" });
+
+            const index = new XORMIndex();
+            index.ID = XGuid.NewValue();
+            index.Name = "IX_VNDxNumeracao_SYSxInquilinoID_SYSxPessoaID";
+            index.IsUnique = true;
+            table.AppendChild(index);
+
+            for (const c of pColunas)
+            {
+                const coluna = new XORMIndexField();
+                coluna.ID = XGuid.NewValue();
+                coluna.Name = c.Name;
+                coluna.ParentID = c.Orfa
+                    ? XGuid.NewValue()
+                    : table.GetFields().find(f => f.Name === c.Name)!.ID;
+                index.AppendChild(coluna);
+            }
+
+            return { doc, table, index, inquilino, pessoa };
+        }
+
+        it("religa pelo nome a coluna que aponta para campo inexistente", () =>
+        {
+            const { doc, index, inquilino, pessoa } = Montar([
+                { Name: "SYSxInquilinoID", Orfa: true },
+                { Name: "SYSxPessoaID", Orfa: true }
+            ]);
+
+            const issues = new XORMValidator().Validate(doc);
+
+            expect(index.GetIndexFields().map(f => f.ParentID)).toEqual([inquilino.ID, pessoa.ID]);
+            expect(issues.filter(i => i.Message.includes("was relinked")).length).toBe(2);
+        });
+
+        it("remove a coluna que não tem campo de mesmo nome, e acusa", () =>
+        {
+            const { doc, index, inquilino } = Montar([
+                { Name: "SYSxInquilinoID", Orfa: false },
+                { Name: "ColunaQueSumiu", Orfa: true }
+            ]);
+
+            const issues = new XORMValidator().Validate(doc);
+
+            expect(index.GetIndexFields().map(f => f.Name)).toEqual(["SYSxInquilinoID"]);
+            expect(index.GetIndexFields()[0].ParentID).toBe(inquilino.ID);
+
+            const erro = issues.find(i => i.Message.includes("ColunaQueSumiu"));
+            expect(erro?.Severity).toBe(XDesignerErrorSeverity.Error);
+        });
+
+        it("remove o índice que ficou sem coluna nenhuma", () =>
+        {
+            const { doc, table } = Montar([{ Name: "ColunaQueSumiu", Orfa: true }]);
+
+            const issues = new XORMValidator().Validate(doc);
+
+            expect(table.GetChildrenOfType(XORMIndex).length).toBe(0);
+
+            const erro = issues.find(i => i.Message.includes("has no column left"));
+            expect(erro?.Severity).toBe(XDesignerErrorSeverity.Error);
+        });
+
+        it("acusa mutação quando conserta, para o conserto chegar ao arquivo", () =>
+        {
+            const { doc } = Montar([{ Name: "SYSxInquilinoID", Orfa: true }]);
+            const validator = new XORMValidator();
+
+            validator.Validate(doc);
+
+            expect(validator.Mutated).toBe(true);
+        });
+
+        it("não mexe no índice íntegro", () =>
+        {
+            const doc = new XORMDocument();
+            doc.Design.Name = "Test";
+
+            const table = doc.Design.CreateTable({ Name: "VNDxPedido" });
+            table.CreatePKField({ Name: "VNDxPedidoID", DataType: "Int32" });
+            const numero = table.CreateField({ Name: "Numero", DataType: "Int64" });
+
+            const index = new XORMIndex();
+            index.ID = XGuid.NewValue();
+            index.Name = "IX_VNDxPedido_Numero";
+            table.AppendChild(index);
+
+            const coluna = new XORMIndexField();
+            coluna.ID = XGuid.NewValue();
+            coluna.Name = "Numero";
+            coluna.ParentID = numero.ID;
+            index.AppendChild(coluna);
+
+            const validator = new XORMValidator();
+            const issues = validator.Validate(doc);
+
+            expect(index.GetIndexFields().length).toBe(1);
+            expect(issues.filter(i => i.Message.includes("Index ")).length).toBe(0);
+            expect(validator.Mutated).toBe(false);
         });
     });
 });
