@@ -36,6 +36,19 @@ configuration, em particular, é 100% derivada do MER: tudo de que ela precisa �
 Espelho segue a mesma regra: campo próprio do módulo sobre entidade alheia muda o esquema,
 e esquema começa no MER.
 
+## Nomes de tipo: caminho inteiro, nunca apelido
+
+**Nenhum template declara alias de namespace** (`using Lk = …`). Onde dois tipos disputam o
+mesmo nome — e disputam sempre, porque a lookup gera um enum no `Common` e uma classe na
+`Infra` com o nome da tabela —, o tipo sai pelo **caminho inteiro na própria linha**. Quem lê
+o gerado vê ali qual dos dois é, sem subir o arquivo para decifrar um apelido de duas letras.
+
+A mesma regra decide a **classe-mãe** de quem declara `Inheritance`: a base é a tabela
+declarada, e vindo de outro módulo ela sai qualificada — `Tootega.SYS.Infra.Persistencia.
+Entidades.SYSxEntidadeAuditavel`. O nome curto não resolveria no módulo que herda, ou
+resolveria para um homônimo local. Sem herança declarada, vale a base convencional do
+próprio módulo (`{Prefixo}EntidadeAuditavel`).
+
 ## O que NÃO pode entrar aqui
 
 Nada específico de uma solução — nome de módulo, namespace, caminho absoluto. Esses valores

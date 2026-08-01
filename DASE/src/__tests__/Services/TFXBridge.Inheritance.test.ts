@@ -181,6 +181,35 @@ describe('XTFXBridge — herança de tabela', () => {
             expect(externas.map(t => t.Name)).toEqual(['SYSxAuditavel']);
             expect(externas[0].Fields.map(f => f.Name)).toEqual(['CriadoEm']);
         });
+
+        /**
+         * Quem herda de fora precisa do namespace da origem: a classe-mãe sai pelo caminho
+         * inteiro, e o nome curto não resolveria no módulo que herda. Sem `Namespace` no
+         * `.dsorm`, responde a pasta que guarda o arquivo — convenção do repositório, em que
+         * cada módulo mantém o próprio MER ao lado do código.
+         */
+        it('a tabela externa carrega o módulo de origem — declarado ou pela pasta', async () => {
+            const Documento = (pNamespace: string) => '<?xml version="1.0" encoding="utf-8"?>' +
+                '<XORMDocument ID="11111111-1111-1111-1111-111111111111" Name="M">' +
+                '<XORMDesign Name="D"><XValues>' +
+                (pNamespace
+                    ? `<XData Name="Namespace" ID="E9C2A5D8-7B41-4F3E-9A6C-2D8E5B1F4C73" Type="String">${pNamespace}</XData>`
+                    : '') +
+                '</XValues>' +
+                '<XORMTable ID="22222222-2222-2222-2222-222222222222" Name="SYSxAuditavel">' +
+                '<XValues><XData Name="Name" ID="18043B8B-C189-4FE3-A3C6-552B5C87C7CE" Type="String">SYSxAuditavel</XData></XValues>' +
+                '</XORMTable></XORMDesign></XORMDocument>';
+
+            const Carregar = async (pXml: string) => {
+                (vscode.workspace.fs.readFile as jest.Mock).mockImplementation(async () => Buffer.from(pXml, 'utf-8'));
+                bridge.SetContextPath('/repo/VND/MER-VND.dsorm');
+                await bridge.LoadParentModelTables(['MER-SYS.dsorm']);
+                return bridge.GetExternalInheritanceTables()[0].Module;
+            };
+
+            expect(await Carregar(Documento('Tootega.SYS'))).toBe('Tootega.SYS');
+            expect(await Carregar(Documento(''))).toBe('VND');
+        });
     });
 
     describe('LoadInheritanceSources', () => {

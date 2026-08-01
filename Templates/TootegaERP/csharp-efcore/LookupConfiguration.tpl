@@ -1,12 +1,10 @@
 {{ include "_Header.tpl" }}
 #nullable enable
 
-using En = {{ Model.Projects.Common }}.Lookups;
-using Lk = {{ Model.Projects.Infra }}.Persistencia.Lookups;
-
 namespace {{ Model.Projects.Infra }}.Persistencia.Configurations;
 
-public sealed class {{ Table.Name }}Configuration : {{ Model.Prefix }}LookupConfiguration<Lk.{{ Table.Name }}, En.{{ Table.Name }}>
+{{# Classe da lookup e enum têm o MESMO nome, em projetos diferentes. Sem apelido de namespace:
+    cada um sai pelo caminho inteiro, e a linha diz sozinha quem é quem. #}}public sealed class {{ Table.Name }}Configuration : {{ Model.Prefix }}LookupConfiguration<{{ Model.Projects.Infra }}.Persistencia.Lookups.{{ Table.Name }}, {{ Model.Projects.Common }}.Lookups.{{ Table.Name }}>
 {
-    protected override string NomeChave => nameof(Lk.{{ Table.Name }}.{{ Table.PK.Name }});
+    protected override string NomeChave => nameof({{ Model.Projects.Infra }}.Persistencia.Lookups.{{ Table.Name }}.{{ Table.PK.Name }});
 }

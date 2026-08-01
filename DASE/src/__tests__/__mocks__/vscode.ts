@@ -274,7 +274,8 @@ export const window = {
     showQuickPick: jest.fn(() => Promise.resolve(undefined)),
     registerCustomEditorProvider: jest.fn(),
     registerWebviewViewProvider: jest.fn(),
-    activeTextEditor: undefined as { document: TextDocument } | undefined
+    activeTextEditor: undefined as { document: TextDocument } | undefined,
+    onDidChangeActiveTextEditor: jest.fn(() => ({ dispose: () => { } }))
 };
 
 export const commands = {
@@ -292,6 +293,7 @@ export const workspace = {
         readDirectory: jest.fn(() => Promise.resolve([]))
     },
     openTextDocument: jest.fn(),
+    getConfiguration: jest.fn(() => ({ get: (_key: string, pDefault?: unknown) => pDefault })),
     workspaceFolders: []
 };
 

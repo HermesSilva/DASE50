@@ -145,10 +145,78 @@ describe("herança na geração", () => {
         const tabela = Montar([{
             Name: "SYSxAuditavel",
             Inheritance: "",
+            Module: "Tootega.SYS",
             Fields: [CampoExterno("CriadoEm", { DataType: "DateTime", Length: 0 })]
         }]).Tables.find(t => t.Name === "VNDxPedido")!;
 
         expect(tabela.Fields.map(f => f.Name)).toEqual(["VNDxPedidoID", "Numero", "CriadoEm"]);
+    });
+
+    /**
+     * A classe-mãe do código gerado é a base declarada. Vindo de outro módulo, o gerado precisa
+     * nomeá-la por inteiro — sem o namespace da origem, o nome curto não resolveria lá.
+     */
+    it("base de outro módulo publica o namespace da origem", () => {
+        const filha = CriarTabela("VNDxPedido", ["Numero"]);
+        filha.Inheritance = "SYSxAuditavel";
+
+        const tabela = Montar([{
+            Name: "SYSxAuditavel",
+            Inheritance: "",
+            Module: "Tootega.SYS",
+            Fields: [CampoExterno("CriadoEm", { DataType: "DateTime", Length: 0 })]
+        }]).Tables.find(t => t.Name === "VNDxPedido")!;
+
+        expect(tabela.Inheritance).toBe("SYSxAuditavel");
+        expect(tabela.BaseModule).toBe("Tootega.SYS");
+    });
+
+    /** Base do próprio modelo não se qualifica: mesmo namespace, nome curto basta. */
+    it("base local não publica namespace", () => {
+        CriarTabela("VNDxAuditavel", ["CriadoEm"]);
+        const filha = CriarTabela("VNDxPedido", ["Numero"]);
+        filha.Inheritance = "VNDxAuditavel";
+
+        expect(Montar().Tables.find(t => t.Name === "VNDxPedido")!.BaseModule).toBe("");
+    });
+
+    /**
+     * Modelo importado do PRÓPRIO módulo devolve o namespace daqui. Qualificar nesse caso só
+     * encomprida a linha: a classe base nasce no mesmo namespace da filha.
+     */
+    it("base de modelo importado do mesmo módulo não se qualifica", () => {
+        const filha = CriarTabela("VNDxPedido", ["Numero"]);
+        filha.Inheritance = "VNDxBase";
+
+        const tabela = Montar([{
+            Name: "VNDxBase",
+            Inheritance: "",
+            Module: "Acme.VND",
+            Fields: [CampoExterno("CriadoEm", { DataType: "DateTime", Length: 0 })]
+        }]).Tables.find(t => t.Name === "VNDxPedido")!;
+
+        expect(tabela.BaseModule).toBe("");
+    });
+
+    /**
+     * Só a base IMEDIATA vira classe-mãe. O ancestral distante chega achatado em colunas, e
+     * publicar o módulo DELE faria a filha herdar a classe errada.
+     */
+    it("o módulo publicado é o da base imediata, não o do ancestral", () => {
+        const local = CriarTabela("VNDxVersionavel", ["Origem"]);
+        local.Inheritance = "SYSxAuditavel";
+        const filha = CriarTabela("VNDxPedido", ["Numero"]);
+        filha.Inheritance = "VNDxVersionavel";
+
+        const tabela = Montar([{
+            Name: "SYSxAuditavel",
+            Inheritance: "",
+            Module: "Tootega.SYS",
+            Fields: [CampoExterno("CriadoEm", { DataType: "DateTime", Length: 0 })]
+        }]).Tables.find(t => t.Name === "VNDxPedido")!;
+
+        expect(tabela.Inheritance).toBe("VNDxVersionavel");
+        expect(tabela.BaseModule).toBe("");
     });
 
     /**

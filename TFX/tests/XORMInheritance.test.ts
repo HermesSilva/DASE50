@@ -121,6 +121,7 @@ describe("ResolveInheritance", () => {
         const r = ResolveInheritance(t, design, [{
             Name: "SYSxAuditavel",
             Inheritance: "",
+            Module: "Tootega.SYS",
             Fields: [{
                 Name: "CriadoEm", Description: "", DataType: "DateTime", Length: 0, Scale: 0,
                 IsRequired: true, IsAutoIncrement: false, DefaultValue: "", TargetTable: "", IsOneToOne: false
@@ -141,6 +142,7 @@ describe("ResolveInheritance", () => {
         const r = ResolveInheritance(filha, design, [{
             Name: "SYSxBase",
             Inheritance: "",
+            Module: "Tootega.SYS",
             Fields: [{
                 Name: "Versao", Description: "", DataType: "Int32", Length: 0, Scale: 0,
                 IsRequired: true, IsAutoIncrement: false, DefaultValue: "", TargetTable: "", IsOneToOne: false
@@ -167,6 +169,7 @@ describe("ResolveInheritance", () => {
         const r = ResolveInheritance(filha, design, [{
             Name: "SYSxAuditavel",
             Inheritance: "",
+            Module: "Tootega.SYS",
             Fields: [{
                 Name: "CriadoEm", Description: "", DataType: "DateTime", Length: 0, Scale: 0,
                 IsRequired: true, IsAutoIncrement: false, DefaultValue: "", TargetTable: "", IsOneToOne: false
@@ -196,8 +199,8 @@ describe("ResolveInheritance", () => {
         });
 
         const r = ResolveInheritance(t, design, [
-            { Name: "SYSxBase", Inheritance: "", Fields: [campo("DoPrimeiro")] },
-            { Name: "SYSxBase", Inheritance: "", Fields: [campo("DoSegundo")] }
+            { Name: "SYSxBase", Module: "Tootega.SYS", Inheritance: "", Fields: [campo("DoPrimeiro")] },
+            { Name: "SYSxBase", Module: "Tootega.SYS", Inheritance: "", Fields: [campo("DoSegundo")] }
         ]);
 
         expect(r.Fields.map(f => f.Name)).toEqual(["DoPrimeiro"]);

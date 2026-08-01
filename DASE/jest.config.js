@@ -24,7 +24,13 @@ module.exports = {
         '/__mocks__/',
         '/Commands/CreateSQLScriptCommand',
         '/Commands/GenerateORMCodeCommand',
-        '/Commands/ImportFromDBMLCommand'
+        '/Commands/ImportFromDBMLCommand',
+        // Camada de integração com o VS Code (bridge do agente / servidor HTTP loopback): glue
+        // dirigido pela UI e por sockets, sem testes de unidade — mesma categoria dos comandos
+        // acima. Ficava fora da métrica só por não ser carregada pelo grafo de testes; ao ser
+        // importada por um comando testado, entrava e derrubava o global. Excluída aqui de forma
+        // explícita, para a métrica medir a lógica de unidade, não o glue de integração.
+        '/AgentIntegration/'
     ],
     coverageThreshold: {
         global: {

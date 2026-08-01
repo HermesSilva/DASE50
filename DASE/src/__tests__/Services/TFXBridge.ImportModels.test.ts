@@ -223,6 +223,83 @@ describe('XTFXBridge — Import Models', () => {
         });
     });
 
+    /**
+     * O modelo é o elemento que carrega Import Models, e é o único sem identidade própria:
+     * `XORMDesign` nunca grava o seu ID, então ele vale o GUID vazio. Quem chega de fora do
+     * designer — um agente pelo MCP — precisa endereçá-lo de alguma forma, e escrever ali
+     * tem de acertar o modelo, não o documento que o embrulha.
+     */
+    describe('endereçar o modelo para escrever propriedade', () => {
+
+        const GUID_VAZIO = '00000000-0000-0000-0000-000000000000';
+
+        function ModeloCarregado() {
+            bridge.LoadOrmModelFromText(JSON.stringify({ Name: 'M', Tables: [] }));
+            return (bridge as any).Controller.Design;
+        }
+
+        it('aceita o alias "model"', () => {
+            const design = ModeloCarregado();
+
+            const r = bridge.UpdateProperty('model', 'ImportModels', 'Mod/SYS/MER-SYS.dsorm');
+
+            expect(r.Success).toBe(true);
+            expect(design.ImportModels).toBe('Mod/SYS/MER-SYS.dsorm');
+        });
+
+        it('aceita o GUID vazio, que é o ID real do design', () => {
+            const design = ModeloCarregado();
+
+            const r = bridge.UpdateProperty(GUID_VAZIO, 'ImportModels', 'A.dsorm|B.dsorm');
+
+            expect(r.Success).toBe(true);
+            expect(design.GetImportedModels()).toEqual(['A.dsorm', 'B.dsorm']);
+        });
+
+        /**
+         * Num documento recém-criado o XORMDocument também está com o ID vazio, e a busca
+         * recursiva começa por ele: sem o desvio, a escrita caía no documento e se perdia.
+         */
+        it('escreve no modelo mesmo quando o documento responde pelo mesmo ID', () => {
+            const design = ModeloCarregado();
+            (bridge as any).Controller.Document.ID = GUID_VAZIO;
+
+            const r = bridge.UpdateProperty(GUID_VAZIO, 'ImportModels', 'Novo.dsorm');
+
+            expect(r.Success).toBe(true);
+            expect(design.ImportModels).toBe('Novo.dsorm');
+        });
+
+        /** A grade mostra "Import Models"; a chave é o mesmo rótulo sem espaços. */
+        it('aceita o rótulo da grade no lugar da chave', () => {
+            const design = ModeloCarregado();
+
+            const r = bridge.UpdateProperty('model', 'Import Models', 'Rotulo.dsorm');
+
+            expect(r.Success).toBe(true);
+            expect(design.ImportModels).toBe('Rotulo.dsorm');
+        });
+
+        it('lê a grade do modelo pelo alias', () => {
+            ModeloCarregado();
+            bridge.UpdateProperty('model', 'ImportModels', 'X.dsorm');
+
+            const prop = bridge.GetProperties('model').find(p => p.Key === 'ImportModels');
+
+            expect(prop).toBeDefined();
+            expect(prop!.Value).toBe('X.dsorm');
+        });
+
+        it('diz quais chaves o modelo aceita quando erra a chave', () => {
+            ModeloCarregado();
+
+            const r = bridge.UpdateProperty('model', 'Importar', 'X.dsorm');
+
+            expect(r.Success).toBe(false);
+            expect(r.Message).toContain('ImportModels');
+        });
+    });
+
     describe('Stereotype', () => {
 
         function TabelaSimples() {

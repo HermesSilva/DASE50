@@ -235,6 +235,7 @@ emprestou às filhas.
 | `DataFields` | lista | todos menos a chave |
 | `ForeignKeys` | lista | só os campos que são chave estrangeira |
 | `Inheritance` | string | nome da tabela-base declarada, ou vazio |
+| `BaseModule` | string | namespace do módulo da base, quando ela vem de OUTRO módulo; vazio quando é daqui |
 | `InheritedFields` | lista | os campos que vieram da base, na ordem em que entram em `Fields` |
 | `Indexes` | lista | índices |
 | `Seed` | lista | linhas de carga inicial |
@@ -290,6 +291,11 @@ tipo, só posiciona o texto.
 
 `Values` resolve chave estrangeira para lookup automaticamente: a coluna guarda o código
 `1`, e o valor entregue é `SYSxEstadoInquilino.Ativo`.
+
+Quando o literal de um tipo **não compila** no alvo, o conserto é o `Literal` do tipo em
+`.DASE/ORM.Types.json` — nunca o template, que interpola mas não transforma. Foi assim que
+data deixou de sair como `new(2026-01-01T00:00:00Z)`, que C# não aceita, e passou a sair
+como `DateTime.Parse(…)`.
 
 `Member` importa porque o identificador de um membro **não se deriva do texto** — `BRL` de
 "Real brasileiro", `Trial` de "Período de teste". Quando está vazio, derive do valor:

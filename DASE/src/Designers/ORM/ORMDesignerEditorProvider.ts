@@ -942,6 +942,30 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         return null;
     }
 
+    /**
+     * Estado + URI do designer ativo (ou do último que esteve ativo), resolvidos JUNTOS a partir
+     * da mesma chave. Existe porque {@link GetActiveUri} só devolve a URI do painel com FOCO,
+     * enquanto {@link GetActiveState} cai no último ativo — a combinação deixava um chamador com
+     * estado mas sem URI (ou vice-versa). Um comando que precisa dos dois usa este método.
+     */
+    GetActiveStateWithUri(): { State: XORMDesignerState; Uri: vscode.Uri } | null {
+        for (const [key, panel] of this._Webviews) {
+            if (panel.active) {
+                this._LastActiveKey = key;
+                const state = this._States.get(key);
+                return state ? { State: state, Uri: vscode.Uri.parse(key) } : null;
+            }
+        }
+
+        if (this._LastActiveKey) {
+            const state = this._States.get(this._LastActiveKey);
+            if (state)
+                return { State: state, Uri: vscode.Uri.parse(this._LastActiveKey) };
+        }
+
+        return null;
+    }
+
     GetActivePanel(): vscode.WebviewPanel | null {
         for (const [key, panel] of this._Webviews) {
             if (panel.active) {
@@ -1008,6 +1032,29 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 return key;
         }
         return null;
+    }
+
+    /**
+     * Resolve o URI de um `.dsorm` por nome de arquivo, caminho relativo ou URI — SEM abrir o
+     * designer. Primeiro entre os documentos já abertos, depois buscando no workspace. É o que
+     * permite gerar código a partir do arquivo em disco sem precisar carregar o webview do
+     * designer (ver {@link OpenDocument}, que abre porque a edição precisa do modelo vivo).
+     *
+     * Devolve a chave-URI (string) ou null quando nenhum `.dsorm` corresponde.
+     */
+    async ResolveDocumentUri(pDocument: string): Promise<string | null> {
+        const key = this.MatchOpenDocument(pDocument);
+        if (key)
+            return key;
+
+        const needle = pDocument.replace(/\\/g, "/").toLowerCase();
+        const candidates = await vscode.workspace.findFiles("**/*.dsorm", "**/node_modules/**", 500);
+        const hit = candidates.find(u => {
+            const p = u.path.toLowerCase();
+            const base = p.split("/").pop() ?? p;
+            return p === needle || base === needle || p.endsWith("/" + needle) || u.toString().toLowerCase() === needle;
+        });
+        return hit ? hit.toString() : null;
     }
 
     /**

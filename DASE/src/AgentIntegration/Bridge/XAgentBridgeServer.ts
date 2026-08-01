@@ -192,8 +192,22 @@ export class XAgentBridgeServer {
 
         try {
             if (method === "ExecuteCommand") {
-                await this.ExecuteCommand(args);
-                this.WriteJson(res, 200, { ok: true, result: `Command "${String(args[0])}" triggered.` });
+                const result = await this.ExecuteCommand(args);
+                // Convenção: um comando disparado pode devolver { ok:false, error } para sinalizar
+                // falha SEM lançar — o comando já a mostrou na UI, mas o agente precisa saber. Sem
+                // isto, uma geração que falha voltava como "triggered" e o MCP reportava sucesso.
+                if (result !== null && typeof result === "object"
+                    && (result as { ok?: unknown }).ok === false
+                    && typeof (result as { error?: unknown }).error === "string") {
+                    this.WriteJson(res, 200, { ok: false, error: (result as { error: string }).error });
+                    return;
+                }
+                this.WriteJson(res, 200, {
+                    ok: true,
+                    result: result === undefined || result === null
+                        ? `Command "${String(args[0])}" triggered.`
+                        : result
+                });
                 return;
             }
 
@@ -216,11 +230,14 @@ export class XAgentBridgeServer {
         }
     }
 
-    private async ExecuteCommand(pArgs: unknown[]): Promise<void> {
+    private async ExecuteCommand(pArgs: unknown[]): Promise<unknown> {
         const command = pArgs[0];
         if (typeof command !== "string" || !ALLOWED_COMMANDS.has(command))
             throw new Error(`Command not allowed: ${String(command)}`);
-        await vscode.commands.executeCommand(command);
+        // Sem argumento posicional: comandos como Dase.OpenORMDesigner leem o primeiro parâmetro
+        // como URI, e injetar um marcador aqui os quebraria. O sinal de falha vem pelo VALOR de
+        // retorno do comando (ver o tratamento de { ok:false, error } no chamador).
+        return await vscode.commands.executeCommand(command);
     }
 
     // ─── Security helpers ───────────────────────────────────────────────────

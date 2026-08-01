@@ -47,6 +47,15 @@ export interface XIExternalTable
     Fields: XIInheritedField[];
     /** Base que ELA declara, para a cadeia continuar através dos modelos. */
     Inheritance: string;
+    /**
+     * Namespace do módulo em que a tabela vive — `Tootega.SYS`.
+     *
+     * Quem herda de fora precisa nomear a classe base pelo caminho INTEIRO: o modelo que
+     * herda não tem `using` para o módulo alheio, e o nome curto resolveria para uma classe
+     * do próprio módulo — ou para nenhuma. Quem lê o arquivo é que sabe de onde ele veio,
+     * então o namespace viaja com a tabela.
+     */
+    Module: string;
 }
 
 export interface XIInheritanceResult
@@ -55,6 +64,12 @@ export interface XIInheritanceResult
     Fields: XIInheritedField[];
     /** Bases percorridas, da mais próxima para a mais distante. */
     Chain: string[];
+    /**
+     * Namespace do módulo onde a base IMEDIATA foi encontrada, ou vazio quando ela mora no
+     * próprio modelo. É a base imediata que vira classe-mãe no código gerado — os ancestrais
+     * mais distantes chegam achatados em campos, e nenhum deles aparece na declaração.
+     */
+    BaseModule: string;
     /** Base declarada que não existe nem no modelo nem entre as externas, ou vazio. */
     Missing: string;
     /** Nome onde a cadeia se fechou sobre si mesma, ou vazio. */
@@ -130,11 +145,13 @@ export function ResolveInheritance(
 
     let missing = "";
     let cycle = "";
+    let baseModule = "";
     let nome = pTable.Inheritance.trim();
 
     while (nome.length > 0)
     {
         const chave = nome.toLowerCase();
+        const ehImediata = cadeia.length === 0;
 
         if (visitados.has(chave))
         {
@@ -157,6 +174,7 @@ export function ResolveInheritance(
         {
             cadeia.push(externa.Name);
             camadas.push(externa.Fields);
+            if (ehImediata) baseModule = externa.Module ?? "";
             nome = externa.Inheritance.trim();
             continue;
         }
@@ -182,5 +200,5 @@ export function ResolveInheritance(
         }
     }
 
-    return { Fields: campos, Chain: cadeia, Missing: missing, Cycle: cycle };
+    return { Fields: campos, Chain: cadeia, BaseModule: baseModule, Missing: missing, Cycle: cycle };
 }

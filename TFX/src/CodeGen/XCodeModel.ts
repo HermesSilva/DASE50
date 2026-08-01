@@ -94,6 +94,13 @@ export interface XICodeTable
 
     /** Campos próprios e herdados, nesta ordem. */
     Fields: XICodeField[];
+    /**
+     * Só os campos PRÓPRIOS — o complemento de `InheritedFields`. Existe porque o campo herdado
+     * já é declarado pela classe base: o template que emite propriedade ou coluna itera aqui, e
+     * não em `Fields`, para não redeclarar o membro da mãe (CS0108) nem reconfigurar a coluna
+     * que a configuração-base já trata.
+     */
+    OwnFields: XICodeField[];
     /** Campos exceto a PK. */
     DataFields: XICodeField[];
     /** Campos que são chave estrangeira. */
@@ -101,6 +108,15 @@ export interface XICodeTable
 
     /** Nome da tabela-base declarada em `Inheritance`, ou vazio. */
     Inheritance: string;
+    /**
+     * Namespace do módulo onde a base vive, quando ela vem de OUTRO módulo — `Tootega.SYS`.
+     * Vazio quando a base é do próprio modelo, e aí o nome curto basta.
+     *
+     * O template usa isto para escrever a classe-mãe pelo caminho inteiro: sem `using` para o
+     * módulo alheio, `SYSxEntidadeAuditavel` no código do VND não resolveria para nada — ou,
+     * pior, resolveria para um homônimo local.
+     */
+    BaseModule: string;
     /** Campos que vieram da herança, na ordem em que entram em `Fields`. */
     InheritedFields: XICodeField[];
 
@@ -444,6 +460,9 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
             .filter(f => !nomesProprios.has(f.Name.toLowerCase()))
             .map(ProjetarHerdado);
 
+        // Captura os próprios ANTES de anexar os herdados: `OwnFields` é o que sai daqui, e
+        // `Fields` é este mais os herdados. A ordem importa — os herdados vão para o fim.
+        const proprios = [...projetados];
         projetados.push(...herdados);
 
         const pk = projetados.find(f => f.IsPrimaryKey) ?? null;
@@ -521,10 +540,14 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
             PKValueGeneratedNever: pkNuncaGerada,
 
             Fields: projetados,
+            OwnFields: proprios,
             DataFields: projetados.filter(f => !f.IsPrimaryKey),
             ForeignKeys: projetados.filter(f => f.IsForeignKey),
 
             Inheritance: (t.Inheritance ?? "").trim(),
+            // Módulo alheio só quando é mesmo alheio: um modelo importado do PRÓPRIO módulo
+            // devolve o namespace daqui, e qualificar nesse caso só encompridaria a linha.
+            BaseModule: heranca.BaseModule === namespaceModelo ? "" : heranca.BaseModule,
             InheritedFields: herdados,
 
             Indexes: indices,

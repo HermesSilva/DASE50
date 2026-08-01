@@ -243,6 +243,12 @@ while (fila.length > 0) {
 
     try {
         const outro = LerDocumento(caminho);
+
+        // Módulo da origem: o `Namespace` declarado vence; sem ele, a pasta que guarda o
+        // arquivo responde — é dela que sai o namespace da classe base quando a herança
+        // cruza módulos, e o gerado tem de nomeá-la por inteiro.
+        const moduloDaOrigem = (outro.Design?.Namespace ?? "").trim() || basename(dirname(caminho));
+
         for (const t of outro.Design?.GetTables?.() ?? []) {
             const chave = (t.Name ?? "").toLowerCase();
             if (t.IsShadow || !chave || tabelasVistas.has(chave)) continue;
@@ -250,7 +256,8 @@ while (fila.length > 0) {
             externas.push({
                 Name: t.Name,
                 Fields: DescribeInheritableFields(t, outro.Design),
-                Inheritance: (t.Inheritance ?? "").trim()
+                Inheritance: (t.Inheritance ?? "").trim(),
+                Module: moduloDaOrigem
             });
         }
         fila.push(...ModelosDeclarados(outro, dirname(caminho)));
@@ -278,21 +285,31 @@ console.log(`   namespace ${modelo.Namespace || "(vazio!)"} | módulo ${modelo.M
 console.log(`   ${modelo.Entities.length} entidades, ${modelo.Lookups.length} lookups, ${modelo.Mirrors.length} espelhos, ${modelo.Owned.length} com posse`);
 console.log(`   ${arquivos.length} arquivos\n`);
 
+// --listar nomeia cada arquivo com o que aconteceria a ele. A contagem sozinha esconde o que
+// mais importa antes de gravar: QUAL arquivo o gerador está prestes a criar ou sobrescrever.
+const LISTAR = process.argv.includes("--listar");
+
 let iguais = 0, novos = 0, mudados = 0;
+const linhas = [];
 
 for (const arq of arquivos) {
     const destino = join(raiz, arq.Path);
     const anterior = existsSync(destino) ? readFileSync(destino, "utf-8") : null;
 
-    if (anterior === null) novos++;
-    else if (anterior === arq.Content) iguais++;
-    else mudados++;
+    let estado;
+    if (anterior === null) { novos++; estado = "novo     "; }
+    else if (anterior === arq.Content) { iguais++; estado = "igual    "; }
+    else { mudados++; estado = "alterado "; }
+
+    if (LISTAR && anterior !== arq.Content) linhas.push(`   ${estado} ${arq.Path}`);
 
     if (GRAVAR) {
         mkdirSync(dirname(destino), { recursive: true });
         writeFileSync(destino, arq.Content, "utf-8");
     }
 }
+
+if (linhas.length > 0) console.log(linhas.sort().join("\n") + "\n");
 
 console.log(`   ${novos} novos, ${mudados} alterados, ${iguais} sem mudança${GRAVAR ? " — GRAVADO" : "  (simulação)"}`);
 

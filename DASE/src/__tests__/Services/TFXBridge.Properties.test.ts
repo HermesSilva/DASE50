@@ -405,7 +405,12 @@ describe('XTFXBridge', () => {
             expect(result.Success).toBe(true); // Basic property update should work
         });
 
-        it('should return success for unknown element type with non-Name property (line 467 false branch)', async () => {
+        /**
+         * Um elemento que não é modelo, tabela, campo nem referência não tem propriedade
+         * alguma para receber o valor. Responder "feito" ali é o pior desfecho possível:
+         * quem chamou registra a alteração e o valor não foi para lugar nenhum.
+         */
+        it('refuses the write when the element type has no editable properties', async () => {
             const json = JSON.stringify({
                 Name: "TestModel"
             });
@@ -418,8 +423,8 @@ describe('XTFXBridge', () => {
             // Use a property key that's NOT "Name" to go through all instanceof checks
             const result = bridge.UpdateProperty('unknown-1', 'SomeOtherProp', 'NewValue');
 
-            // Should return success but property not actually set (falls through)
-            expect(result.Success).toBe(true);
+            expect(result.Success).toBe(false);
+            expect(result.Message).toContain('does not accept property edits');
         });
     });
 

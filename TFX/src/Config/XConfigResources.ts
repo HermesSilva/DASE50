@@ -76,7 +76,7 @@ export class XConfigResources
                             "TypeNullable": "DateTime?",
                             "Column": "Date()",
                             "ColumnMax": "Date()",
-                            "Literal": "new({Value})"
+                            "Literal": "DateTime.Parse(\"{Value}\", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal)"
                         }
                     }
                 },
@@ -95,7 +95,7 @@ export class XConfigResources
                             "TypeNullable": "DateTime?",
                             "Column": "DateTime()",
                             "ColumnMax": "DateTime()",
-                            "Literal": "new({Value})"
+                            "Literal": "DateTime.Parse(\"{Value}\", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal)"
                         }
                     }
                 },

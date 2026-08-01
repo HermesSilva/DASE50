@@ -59,6 +59,8 @@ interface IExternalTableEntry {
     PKType: string;
     Fields: XIInheritedField[];
     Inheritance: string;
+    /** Namespace do módulo de origem — a classe base sai por ele quando a herança cruza módulos. */
+    Module: string;
 }
 
 // Data interfaces for webview communication (JSON-serializable)
@@ -567,15 +569,29 @@ export class XTFXBridge {
      * objeto vivo prenderia dois designs na memória e faria uma edição lá refletir aqui
      * sem passar por validação nenhuma.
      */
-    private DescreverTabelaExterna(pTable: XORMTable, pDesign: XORMDesign | null): IExternalTableEntry {
+    private DescreverTabelaExterna(pTable: XORMTable, pDesign: XORMDesign | null, pCaminho: string): IExternalTableEntry {
         return {
             Name: pTable.Name,
             /* istanbul ignore next — Fill is always set (default XColor.Transparent) */
             Fill: pTable.Fill?.ToString() ?? "",
             PKType: this.PKTypeDaOrigem(pTable),
             Fields: DescribeInheritableFields(pTable, pDesign),
-            Inheritance: (pTable.Inheritance ?? "").trim()
+            Inheritance: (pTable.Inheritance ?? "").trim(),
+            Module: XTFXBridge.ModuloDoModelo(pDesign, pCaminho)
         };
+    }
+
+    /**
+     * Namespace do módulo a que um modelo externo pertence.
+     *
+     * O `Namespace` declarado no `.dsorm` vence. Sem ele, responde a pasta que guarda o
+     * arquivo — convenção do repositório, em que cada módulo mantém o próprio MER ao lado
+     * do código (`Tootega.SYS/MER-SYS.dsorm`). É dado do disco, não palpite, e é a mesma
+     * regra que resolve o namespace do dono de uma tabela espelho.
+     */
+    private static ModuloDoModelo(pDesign: XORMDesign | null, pCaminho: string): string {
+        const declarado = (pDesign?.Namespace ?? "").trim();
+        return declarado || path.basename(path.dirname(pCaminho));
     }
 
     /**
@@ -693,7 +709,7 @@ export class XTFXBridge {
                     if (table.IsShadow || !table.Name || porNome.has(table.Name.toLowerCase()))
                         continue;
                     porNome.add(table.Name.toLowerCase());
-                    this._InheritanceTableClosure.push(this.DescreverTabelaExterna(table, externo.Design));
+                    this._InheritanceTableClosure.push(this.DescreverTabelaExterna(table, externo.Design, caminho));
                 }
 
                 fila.push(...declaradosPor(externo, caminho));
@@ -720,7 +736,7 @@ export class XTFXBridge {
                 if (vistos.has(chave))
                     continue;
                 vistos.add(chave);
-                saida.push({ Name: entry.Name, Fields: entry.Fields, Inheritance: entry.Inheritance });
+                saida.push({ Name: entry.Name, Fields: entry.Fields, Inheritance: entry.Inheritance, Module: entry.Module });
             }
         };
 
@@ -774,14 +790,15 @@ export class XTFXBridge {
             if (!modelName)
                 continue;
             try {
-                const doc = await this.ReadModelDocument(path.join(dirPath, modelName));
+                const caminho = path.join(dirPath, modelName);
+                const doc = await this.ReadModelDocument(caminho);
                 if (doc) {
                     /* istanbul ignore next — Design always has GetTables after successful deserialization */
                     const tables = doc.Design?.GetTables?.() ?? [];
                     const tableEntries: IExternalTableEntry[] = [];
                     for (const table of tables) {
                         if (table.Name)
-                            tableEntries.push(this.DescreverTabelaExterna(table, doc.Design));
+                            tableEntries.push(this.DescreverTabelaExterna(table, doc.Design, caminho));
                     }
                     if (tableEntries.length > 0)
                         this._ParentModelTableGroups.push({ ModelName: modelName, Tables: tableEntries });
@@ -1532,7 +1549,8 @@ export class XTFXBridge {
                 continue;
 
             try {
-                const doc = await this.ReadModelDocument(path.join(raiz, relativo));
+                const caminho = path.join(raiz, relativo);
+                const doc = await this.ReadModelDocument(caminho);
                 if (!doc)
                     continue;
 
@@ -1543,7 +1561,7 @@ export class XTFXBridge {
                 const tables = (design?.GetTables?.() ?? []).filter((t: XORMTable) => !t.IsShadow);
                 const entries = tables
                     .filter((t: XORMTable) => t.Name)
-                    .map((t: XORMTable) => this.DescreverTabelaExterna(t, design));
+                    .map((t: XORMTable) => this.DescreverTabelaExterna(t, design, caminho));
 
                 if (entries.length === 0)
                     continue;
@@ -1728,16 +1746,57 @@ export class XTFXBridge {
         return this._Controller?.ReorderField(reorderData) || { Success: false };
     }
 
+    /**
+     * Acha o elemento de uma leitura ou escrita de propriedade.
+     *
+     * O MODELO é um elemento como os outros, só que sem identidade própria: `XORMDesign`
+     * nunca grava o seu ID, então ele vale o GUID vazio em toda carga. Num documento
+     * recém-criado o `XORMDocument` também está com o ID vazio, e a busca recursiva
+     * começa por ele — o modelo ficava inalcançável, e a escrita caía num elemento que
+     * não aceita propriedade nenhuma.
+     *
+     * Daí as duas correções aqui: o documento sempre redireciona para o design, e
+     * `"model"` (ou `"design"`) vale como identificador, que é o que um agente tem em
+     * mãos — o modelo não aparece em nenhuma listagem de IDs.
+     */
+    private ResolvePropertyTarget(pElementID: string): XElement | null {
+        const design = this._Controller?.Design ?? null;
+        const chave = (pElementID ?? "").trim().toLowerCase();
+
+        if (chave === "model" || chave === "design" || chave === XGuid.EmptyValue.toLowerCase())
+            return design;
+
+        const element = this._Controller?.GetElementByID(pElementID) ?? null;
+        if (element instanceof XORMDocument)
+            return design;
+        return element;
+    }
+
+    /**
+     * Chaves aceitas por `UpdateProperty`, por tipo de elemento — o que a mensagem de erro
+     * mostra quando a chave não existe, para o autor da chamada se corrigir sem adivinhar.
+     */
+    private static readonly _PropertyKeys = {
+        Model: "Name, Schema, ParentModel, ImportModels, StateControlTable, TenantControlTable, GenerateCode, CodeTemplate, Namespace, OutputRoot",
+        Table: "Name, PKType, Description, Fill, X, Y, Width, Height, UseStateControl, GenerateCode, Stereotype, IsModel, Inheritance",
+        Field: "Name, DataType, Length, Scale, IsRequired, IsAutoIncrement, DefaultValue, AllowedValues, ValueGeneratedNever, Description",
+        Reference: "Name, Description"
+    };
+
     UpdateProperty(pElementID: string, pPropertyKey: string, pValue: unknown): XIOperationResult {
         this.Initialize();
 
-        const element = this._Controller?.GetElementByID(pElementID);
+        const element = this.ResolvePropertyTarget(pElementID);
         if (!element)
             return { Success: false, Message: "Element not found." };
 
+        // A chave é o rótulo sem espaços — "Import Models" é a propriedade "ImportModels".
+        // Quem lê a grade de propriedades vê o rótulo, e era com ele que a escrita falhava.
+        const chave = pPropertyKey.replace(/\s+/g, "");
+
         // Directly set known properties instead of using SetValueByKey
         // This avoids key mismatch issues with the property registry
-        if (pPropertyKey === "Name") {
+        if (chave === "Name") {
             // Shadow tables cannot be renamed
             if (element instanceof XORMTable && element.IsShadow)
                 return { Success: false, Message: "Shadow tables are read-only." };
@@ -1748,7 +1807,7 @@ export class XTFXBridge {
             if (element.IsShadow)
                 return { Success: false, Message: "Shadow tables are read-only." };
 
-            switch (pPropertyKey) {
+            switch (chave) {
                 case "PKType":
                     element.PKType = pValue as string;
                     break;
@@ -1790,10 +1849,10 @@ export class XTFXBridge {
                 case "Height":
                     const bounds = element.Bounds;
                     const newBounds = new XRect(
-                        pPropertyKey === "X" ? (pValue as number) : bounds.Left,
-                        pPropertyKey === "Y" ? (pValue as number) : bounds.Top,
-                        pPropertyKey === "Width" ? (pValue as number) : bounds.Width,
-                        pPropertyKey === "Height" ? (pValue as number) : bounds.Height
+                        chave === "X" ? (pValue as number) : bounds.Left,
+                        chave === "Y" ? (pValue as number) : bounds.Top,
+                        chave === "Width" ? (pValue as number) : bounds.Width,
+                        chave === "Height" ? (pValue as number) : bounds.Height
                     );
                     element.Bounds = newBounds;
                     break;
@@ -1852,20 +1911,20 @@ export class XTFXBridge {
                         break;
                     }
                 default:
-                    return { Success: false, Message: `Unknown property: ${pPropertyKey}` };
+                    return { Success: false, Message: `Unknown property "${pPropertyKey}". A table accepts: ${XTFXBridge._PropertyKeys.Table}.` };
             }
         }
         else if (element instanceof XORMReference) {
-            switch (pPropertyKey) {
+            switch (chave) {
                 case "Description":
                     element.Description = pValue as string;
                     break;
                 default:
-                    return { Success: false, Message: `Unknown property: ${pPropertyKey}` };
+                    return { Success: false, Message: `Unknown property "${pPropertyKey}". A reference accepts: ${XTFXBridge._PropertyKeys.Reference}.` };
             }
         }
         else if (element instanceof XORMField) {
-            switch (pPropertyKey) {
+            switch (chave) {
                 case "DataType":
                     // Block DataType changes on FK fields
                     if (element.IsForeignKey)
@@ -1894,15 +1953,21 @@ export class XTFXBridge {
                         return { Success: false, Message: "AllowedValues cannot be set on an auto-increment field." };
                     element.AllowedValues = pValue as string;
                     break;
+                // Fora da grade de propriedades porque o desenho não a revela: quem sabe que
+                // a chave chega pronta da aplicação é o código existente, e é de lá que ela
+                // entra no modelo. Escrevível assim mesmo — a alternativa era editar o XML.
+                case "ValueGeneratedNever":
+                    element.ValueGeneratedNever = pValue as boolean;
+                    break;
                 case "Description":
                     element.Description = pValue as string;
                     break;
                 default:
-                    return { Success: false, Message: `Unknown property: ${pPropertyKey}` };
+                    return { Success: false, Message: `Unknown property "${pPropertyKey}". A field accepts: ${XTFXBridge._PropertyKeys.Field}.` };
             }
         }
         else if (element instanceof XORMDesign) {
-            switch (pPropertyKey) {
+            switch (chave) {
                 case "Schema":
                     element.Schema = pValue as string;
                     break;
@@ -1950,9 +2015,13 @@ export class XTFXBridge {
                     element.OutputRoot = pValue as string;
                     break;
                 default:
-                    return { Success: false, Message: `Unknown property: ${pPropertyKey}` };
+                    return { Success: false, Message: `Unknown property "${pPropertyKey}". The model accepts: ${XTFXBridge._PropertyKeys.Model}.` };
             }
         }
+        // Nenhum ramo reconheceu o elemento: dizer que deu certo aqui é pior do que falhar,
+        // porque quem chamou grava a resposta como feito e o valor nunca foi para lugar nenhum.
+        else
+            return { Success: false, Message: `Element "${element.Name || pElementID}" does not accept property edits.` };
 
         return { Success: true, ElementID: pElementID };
     }
@@ -2020,7 +2089,7 @@ export class XTFXBridge {
     GetProperties(pElementID: string): XPropertyItem[] {
         this.Initialize();
 
-        const element = this._Controller?.GetElementByID(pElementID);
+        const element = this.ResolvePropertyTarget(pElementID);
         if (!element)
             return [];
 
@@ -2546,7 +2615,7 @@ export class XTFXBridge {
     GetElementInfo(pElementID: string): { ID: string; Name: string; Type: string } | null {
         this.Initialize();
 
-        const element = this._Controller?.GetElementByID(pElementID);
+        const element = this.ResolvePropertyTarget(pElementID);
         if (!element)
             return null;
 

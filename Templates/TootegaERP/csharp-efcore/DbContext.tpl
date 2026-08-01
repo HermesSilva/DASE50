@@ -10,8 +10,6 @@ using {{ Model.Projects.Infra }}.Persistencia.Entidades;
 using {{ Model.Projects.Infra }}.Persistencia.Entidades.Espelho;
 {{~ end ~}}
 
-using Lk = {{ Model.Projects.Infra }}.Persistencia.Lookups;
-
 namespace {{ Model.Projects.Infra }}.Persistencia;
 
 public sealed partial class {{ Model.Prefix }}DBContext
@@ -30,7 +28,8 @@ public sealed partial class {{ Model.Prefix }}DBContext
 
     // ── Tabelas-lookup: DbSets de primeira classe, utilizáveis em selects/joins ──
 {{~ for T in Model.Lookups ~}}
-    public DbSet<Lk.{{ T.Name }}> {{ T.Name }} => Set<Lk.{{ T.Name }}>();
+{{# A classe da lookup tem o mesmo nome do enum dela. Sem apelido de namespace: o caminho
+    inteiro na linha diz qual dos dois está sendo mapeado. #}}    public DbSet<{{ Model.Projects.Infra }}.Persistencia.Lookups.{{ T.Name }}> {{ T.Name }} => Set<{{ Model.Projects.Infra }}.Persistencia.Lookups.{{ T.Name }}>();
 {{~ end ~}}
 
     /// <summary>

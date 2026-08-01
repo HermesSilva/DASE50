@@ -54,6 +54,15 @@ describe("literais de seed", () => {
     it("emite verbatim o valor prefixado por = (expressão de código)", () => {
         expect(R().FormatLiteral("Guid", "=SYSxCidade.NaoInformadoID")).toBe("SYSxCidade.NaoInformadoID");
     });
+
+    // O seed guarda a data em ISO, e `new(2026-01-01T00:00:00Z)` não compila: DateTime não tem
+    // construtor de texto. Quem resolve é o molde do tipo — não o template, que só interpola.
+    it("formata data como DateTime.Parse, e não como new()", () => {
+        const esperado = 'DateTime.Parse("2026-01-01T00:00:00Z", System.Globalization.CultureInfo'
+            + ".InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal)";
+        expect(R().FormatLiteral("DateTime", "2026-01-01T00:00:00Z")).toBe(esperado);
+        expect(R().FormatLiteral("Date", "2026-01-01")).toContain("DateTime.Parse(\"2026-01-01\"");
+    });
 });
 
 describe("falhas", () => {

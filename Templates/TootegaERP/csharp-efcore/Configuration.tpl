@@ -7,8 +7,6 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using {{ Model.Projects.Common }}.Lookups;
 using {{ Model.Projects.Infra }}.Persistencia.Entidades;
 
-using Lk = {{ Model.Projects.Infra }}.Persistencia.Lookups;
-
 namespace {{ Model.Projects.Infra }}.Persistencia.Configurations;
 
 public sealed class {{ Table.Name }}Configuration : {{ Model.Prefix }}BaseConfiguration<{{ Table.Name }}>
@@ -20,14 +18,18 @@ public sealed class {{ Table.Name }}Configuration : {{ Model.Prefix }}BaseConfig
         pBuilder.HasKey(e => e.{{ Table.PK.Name }});
 {{~ end ~}}
 
-{{~ for F in Table.Fields ~}}
+{{# Só os campos PRÓPRIOS: a coluna do herdado é configurada pela configuração-base do módulo
+    (ConfigurarAuditoria), chamada ao fim deste Configure. #}}
+{{~ for F in Table.OwnFields ~}}
         pBuilder.Property(e => e.{{ F.Name }}).HasColumnType({{ F.ColumnType }}){{ if F.IsPrimaryKey && Table.PKValueGeneratedNever }}.ValueGeneratedNever(){{ end }}{{ if F.IsRequired && !F.IsPrimaryKey && F.BaseType == "string" }}.IsRequired(){{ end }}{{ if F.DefaultValue }}.HasDefaultValue({{ F.DefaultValue | strip_prefix "=" }}){{ end }};
 {{~ end ~}}
 {{~ if Table.ForeignKeys | count ~}}
 
 {{~ for F in Table.ForeignKeys ~}}
 {{~ if F.LookupEnum ~}}
-        pBuilder.HasOne<Lk.{{ F.TargetTable }}>().WithMany().HasForeignKey(e => e.{{ F.Name }});
+{{# A tabela-lookup tem o nome do enum que o `using` acima já trouxe. Sem apelido de namespace:
+    o caminho inteiro diz qual dos dois é na própria linha, e não obriga a subir o arquivo para
+    descobrir o que `Lk` significava. #}}        pBuilder.HasOne<{{ Model.Projects.Infra }}.Persistencia.Lookups.{{ F.TargetTable }}>().WithMany().HasForeignKey(e => e.{{ F.Name }});
 {{~ else if F.IsOneToOne ~}}
         pBuilder.HasOne<{{ F.TargetTable }}>().WithOne().HasForeignKey<{{ Table.Name }}>(e => e.{{ F.Name }});
 {{~ else ~}}

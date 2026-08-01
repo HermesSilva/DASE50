@@ -2,9 +2,12 @@ import * as vscode from "vscode";
 import * as path from "path";
 import {
     XTypeResolver, BuildCodeModel, XCodeGenerator,
-    type XIProfileSpec, type XIGeneratedFile, type XORMDataTypeInfo
+    type XIProfileSpec, type XIGeneratedFile, type XORMDataTypeInfo, type XIExternalTable
 } from "@tootega/tfx";
 import type { XORMDesignerEditorProvider } from "../ORMDesignerEditorProvider";
+import type { XORMDesignerState } from "../ORMDesignerState";
+import { XAgentBridge } from "../../../AgentIntegration/AgentBridge";
+import { XTFXBridge } from "../../../Services/TFXBridge";
 import { GetLogService } from "../../../Services/LogService";
 
 /**
@@ -21,8 +24,12 @@ export class XGenerateORMCodeCommand {
 
     static Register(pContext: vscode.ExtensionContext, pProvider: XORMDesignerEditorProvider): void {
         pContext.subscriptions.push(
+            // Devolve o resultado de Execute: um resumo (string) no sucesso ou { ok:false, error }
+            // na falha. Quem dispara pela paleta ignora o retorno e só vê o toast; quem dispara
+            // pelo agent bridge (MCP) recebe o resultado e, assim, ENXERGA a falha — antes ela
+            // morria num toast que só a UI do VS Code via, e o MCP reportava sucesso falso.
             vscode.commands.registerCommand("Dase.GenerateORMCode", async () => {
-                await XGenerateORMCodeCommand.Execute(pProvider);
+                return await XGenerateORMCodeCommand.Execute(pProvider);
             })
         );
     }
@@ -215,33 +222,92 @@ export class XGenerateORMCodeCommand {
 
     // ── execução ──────────────────────────────────────────────────────────────
 
-    private static async Execute(pProvider: XORMDesignerEditorProvider): Promise<void> {
+    /**
+     * Gera o código e devolve o desfecho ao chamador. O retorno existe para o agent bridge (MCP):
+     * uma STRING é o resumo do sucesso (ou de um estado sem-o-que-fazer), e `{ ok:false, error }`
+     * é uma falha — que o servidor do bridge traduz em `ok:false` para o agente. A UI continua
+     * recebendo o mesmo toast; ela apenas ignora o retorno. Falhas NÃO são relançadas: relançar
+     * dispararia, além do nosso toast, o aviso genérico do VS Code na invocação pela paleta.
+     */
+    private static async Execute(
+        pProvider: XORMDesignerEditorProvider
+    ): Promise<string | { ok: false; error: string }> {
         const log = GetLogService();
 
-        const state = pProvider.GetActiveState();
-        if (!state) {
-            vscode.window.showWarningMessage("No ORM Designer is open. Open a .dsorm file first.");
-            return;
+        const fail = (pMsg: string): { ok: false; error: string } => ({ ok: false, error: pMsg });
+
+        // Qual documento gerar. O agent bridge (MCP) fixa um ALVO — que pode NEM estar aberto num
+        // designer, porque gerar não exige o designer. Sem alvo (paleta), vale o editor ativo.
+        const targetUri = XAgentBridge.GetInstance().GetTargetUri();
+        let docUri: vscode.Uri | null = null;
+        let openState: XORMDesignerState | null = null;
+
+        if (targetUri) {
+            docUri = vscode.Uri.parse(targetUri);
+            openState = pProvider.GetStateByUri(targetUri);
+        }
+        else {
+            const active = pProvider.GetActiveStateWithUri();
+            if (active) {
+                docUri = active.Uri;
+                openState = active.State;
+            }
         }
 
-        const docUri = pProvider.GetActiveUri();
-        if (!docUri || docUri.scheme === "untitled") {
-            vscode.window.showWarningMessage("Save the model to a file before generating code.");
-            return;
+        if (!docUri) {
+            const msg = "No ORM model to generate. Open a .dsorm designer, or pass 'document' to target a model on disk.";
+            vscode.window.showWarningMessage(msg);
+            return fail(msg);
         }
 
-        const ormDoc = state.Bridge?.Document;
+        if (docUri.scheme === "untitled") {
+            const msg = "Save the model to a file before generating code.";
+            vscode.window.showWarningMessage(msg);
+            return fail(msg);
+        }
+
+        // O modelo NÃO precisa do designer aberto. Se ele está aberto, usa-se o documento em
+        // memória (respeita edições ainda não salvas); senão, carrega-se do DISCO por um bridge
+        // headless — o mesmo caminho de desserialização e de resolução de herança, sem webview.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- o getter Document é `any`, como no fluxo original.
+        let ormDoc: any;
+        let external: XIExternalTable[];
+        try {
+            if (openState?.Bridge?.Document) {
+                ormDoc = openState.Bridge.Document;
+                await openState.Bridge.LoadInheritanceSources?.();
+                external = openState.Bridge.GetExternalInheritanceTables?.() ?? [];
+            }
+            else {
+                const headless = new XTFXBridge();
+                headless.Initialize();
+                headless.SetContextPath(docUri.fsPath);
+                const text = Buffer.from(await vscode.workspace.fs.readFile(docUri)).toString("utf-8");
+                headless.LoadOrmModelFromText(text);
+                ormDoc = headless.Document;
+                await headless.LoadInheritanceSources();
+                external = headless.GetExternalInheritanceTables();
+            }
+        }
+        catch (err: any) {
+            const message = err?.message ?? String(err);
+            log.Error("GenerateORMCode: failed to load model", err);
+            const msg = `The model could not be read: ${message}`;
+            vscode.window.showErrorMessage(msg);
+            return fail(msg);
+        }
+
         const design = ormDoc?.Design;
         if (!design) {
-            vscode.window.showWarningMessage("The model could not be read.");
-            return;
+            const msg = "The model could not be read.";
+            vscode.window.showWarningMessage(msg);
+            return fail(msg);
         }
 
         if (design.GenerateCode === false) {
-            vscode.window.showInformationMessage(
-                "This model has Generate Code turned off. Enable it in the model properties to generate."
-            );
-            return;
+            const msg = "This model has Generate Code turned off. Enable it in the model properties to generate.";
+            vscode.window.showInformationMessage(msg);
+            return msg;
         }
 
         const modelDir = path.dirname(docUri.fsPath);
@@ -250,35 +316,43 @@ export class XGenerateORMCodeCommand {
             // ── perfil ────────────────────────────────────────────────────────
             const templatesDir = await XGenerateORMCodeCommand.FindInDase(modelDir, "Templates");
             if (!templatesDir) {
-                vscode.window.showErrorMessage(
-                    "No .DASE/Templates folder found above this model. Add a template profile to generate code."
-                );
-                return;
+                const msg = "No .DASE/Templates folder found above this model. Add a template profile to generate code.";
+                vscode.window.showErrorMessage(msg);
+                return fail(msg);
             }
 
             const profiles = await XGenerateORMCodeCommand.ListProfiles(templatesDir);
             if (profiles.length === 0) {
-                vscode.window.showErrorMessage(`No template profile found in ${templatesDir} (a profile needs a profile.json).`);
-                return;
+                const msg = `No template profile found in ${templatesDir} (a profile needs a profile.json).`;
+                vscode.window.showErrorMessage(msg);
+                return fail(msg);
             }
 
             const declared = (design.CodeTemplate ?? "").trim();
             let chosen = declared || profiles[0];
 
             if (declared && !profiles.includes(declared)) {
-                vscode.window.showErrorMessage(
-                    `Template profile "${declared}" not found. Available: ${profiles.join(", ")}`
-                );
-                return;
+                const msg = `Template profile "${declared}" not found. Available: ${profiles.join(", ")}`;
+                vscode.window.showErrorMessage(msg);
+                return fail(msg);
             }
 
             // Vários perfis e nenhum declarado: quem escolhe é o usuário, não a ordem alfabética.
+            // Mas headless (disparo via agent bridge, com alvo fixado) não há usuário para o
+            // seletor — abri-lo penduraria a chamada. Nesse caso, erra pedindo CodeTemplate no
+            // modelo, em vez de escolher um perfil no escuro.
             if (!declared && profiles.length > 1) {
+                if (targetUri) {
+                    const msg = `Model has no CodeTemplate set and ${profiles.length} profiles exist (${profiles.join(", ")}). `
+                        + "Set the model's CodeTemplate property to generate headlessly.";
+                    vscode.window.showErrorMessage(msg);
+                    return fail(msg);
+                }
                 const picked = await vscode.window.showQuickPick(profiles, {
                     title: "Generate ORM Code",
                     placeHolder: "Select the template profile to use"
                 });
-                if (!picked) return;
+                if (!picked) return "Generation cancelled: no template profile selected.";
                 chosen = picked;
             }
 
@@ -293,15 +367,17 @@ export class XGenerateORMCodeCommand {
                     templates.set(name, await XGenerateORMCodeCommand.ReadText(path.join(profileDir, name)));
 
             if (templates.size === 0) {
-                vscode.window.showErrorMessage(`Profile "${chosen}" has no .tpl templates.`);
-                return;
+                const msg = `Profile "${chosen}" has no .tpl templates.`;
+                vscode.window.showErrorMessage(msg);
+                return fail(msg);
             }
 
             // ── tipos ─────────────────────────────────────────────────────────
             const typesPath = await XGenerateORMCodeCommand.FindInDase(modelDir, "ORM.Types.json");
             if (!typesPath) {
-                vscode.window.showErrorMessage("No .DASE/ORM.Types.json found above this model.");
-                return;
+                const msg = "No .DASE/ORM.Types.json found above this model.";
+                vscode.window.showErrorMessage(msg);
+                return fail(msg);
             }
 
             const types = JSON.parse(await XGenerateORMCodeCommand.ReadText(typesPath)).Types as XORMDataTypeInfo[];
@@ -310,10 +386,9 @@ export class XGenerateORMCodeCommand {
             // Tipo sem mapeamento produziria código silenciosamente errado — melhor parar aqui.
             const unmapped = resolver.GetUnmappedTypes();
             if (unmapped.length > 0) {
-                vscode.window.showErrorMessage(
-                    `ORM.Types.json has no Mappings["${profile.Id}"] for: ${unmapped.join(", ")}`
-                );
-                return;
+                const msg = `ORM.Types.json has no Mappings["${profile.Id}"] for: ${unmapped.join(", ")}`;
+                vscode.window.showErrorMessage(msg);
+                return fail(msg);
             }
 
             // ── geração ───────────────────────────────────────────────────────
@@ -335,13 +410,8 @@ export class XGenerateORMCodeCommand {
             if (naoAchados.length > 0)
                 log.Info(`GenerateORMCode: sem projeto para ${naoAchados.join(", ")} — usando "${namespace}.<sufixo>"`);
 
-            // Tabelas da árvore inteira de modelos alcançáveis: sem elas, uma tabela que herda
-            // de fora sairia com menos colunas do que o modelo declara. Recarregadas aqui, e
-            // não só na abertura, porque gerar contra um modelo-origem editado nesta sessão —
-            // noutra janela ou por outro agente — tem de sair com o que está no disco AGORA.
-            await state.Bridge?.LoadInheritanceSources?.();
-            const external = state.Bridge?.GetExternalInheritanceTables?.() ?? [];
-
+            // `external` (bases de herança da árvore inteira de modelos) já foi resolvido acima,
+            // junto com o carregamento do modelo — do bridge aberto ou do headless, do disco.
             const model = BuildCodeModel(ormDoc, {
                 Resolver: resolver,
                 OwnerNamespaces: owners,
@@ -355,8 +425,9 @@ export class XGenerateORMCodeCommand {
                 log.Info(`GenerateORMCode: namespace derivado da estrutura: "${namespace}"`);
 
             if (model.Tables.length === 0) {
-                vscode.window.showInformationMessage("The model has no tables to generate.");
-                return;
+                const msg = "The model has no tables to generate.";
+                vscode.window.showInformationMessage(msg);
+                return msg;
             }
 
             const files = new XCodeGenerator(profile, templates).Generate(model);
@@ -370,17 +441,24 @@ export class XGenerateORMCodeCommand {
 
             log.Info(`GenerateORMCode: ${files.length} files with profile "${chosen}" — ${summary}`);
 
-            const action = await vscode.window.showInformationMessage(
-                `ORM code generated — ${chosen} / ${model.Namespace}${declaredNs ? "" : " (derived)"}: ${summary}`,
-                "Show Folder"
-            );
-            if (action === "Show Folder")
-                await vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputRoot));
+            const result = `ORM code generated — ${chosen} / ${model.Namespace}${declaredNs ? "" : " (derived)"}: ${summary}`;
+
+            // NÃO aguarda o toast: um aviso com botão só resolve quando o usuário interage, e uma
+            // invocação headless (via agent bridge / MCP) ficaria pendurada aqui PARA SEMPRE — os
+            // arquivos já foram gravados, mas a chamada nunca retornaria. Dispara e trata a ação à
+            // parte; a resposta ao chamador é o `result` devolvido logo abaixo.
+            void Promise.resolve(vscode.window.showInformationMessage(result, "Show Folder")).then(action => {
+                if (action === "Show Folder")
+                    void vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(outputRoot));
+            });
+
+            return result;
         }
         catch (err: any) {
             const message = err?.message ?? String(err);
             log.Error("GenerateORMCode failed", err);
             vscode.window.showErrorMessage(`ORM code generation failed: ${message}`);
+            return fail(`ORM code generation failed: ${message}`);
         }
     }
 

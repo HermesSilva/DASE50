@@ -14,6 +14,7 @@ import { XReloadDataTypesCommand } from "./Commands/ReloadDataTypesCommand";
 import { XIssuesViewProvider } from "./Views/IssuesViewProvider";
 import { XPropertiesViewProvider } from "./Views/PropertiesViewProvider";
 import { InitializeLogService, GetLogService } from "./Services/LogService";
+import { XGeneratedFileGuard } from "./Services/GeneratedFileGuard";
 import { RegisterAgentIntegration } from "./AgentIntegration";
 import { RegisterClaudeCliProvider } from "./AgentIntegration/ClaudeCli";
 import { XOrganizeTablesCommand } from "./Designers/ORM/Commands/OrganizeTablesCommand";
@@ -47,6 +48,9 @@ export function activate(pContext: vscode.ExtensionContext): void {
 
         XIssuesViewProvider.Register(pContext);
         XPropertiesViewProvider.Register(pContext, designerProvider);
+
+        // Protege os arquivos gerados: abertos no editor, ficam somente-leitura (na sessão).
+        XGeneratedFileGuard.Register(pContext);
 
         // Register AI Agent Integration (Chat Participant + Language Model Tools)
         RegisterAgentIntegration(pContext, designerProvider);

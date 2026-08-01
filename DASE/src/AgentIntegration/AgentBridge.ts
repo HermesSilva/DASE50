@@ -99,12 +99,23 @@ export class XAgentBridge {
      * Returns `{ name }` of the resolved document, or `{ error }` when no matching
      * `.dsorm` file exists.
      */
-    async SetTargetDocument(pDocument?: string): Promise<{ name?: string; error?: string }> {
+    async SetTargetDocument(pDocument?: string, pOpen: boolean = true): Promise<{ name?: string; error?: string }> {
         this._TargetUri = null;
         if (!pDocument)
             return {};
         if (!this._Provider)
             return { error: "No ORM designer provider available." };
+
+        // pOpen=false: só RESOLVE o caminho no disco e fixa o alvo, sem abrir o webview. É o que
+        // a geração de código usa — ela não precisa do designer aberto, lê o modelo do disco. As
+        // operações de edição continuam com pOpen=true, por precisarem do modelo vivo no designer.
+        if (!pOpen) {
+            const uri = await this._Provider.ResolveDocumentUri(pDocument);
+            if (!uri)
+                return { error: `No .dsorm document matching "${pDocument}" was found in the workspace.` };
+            this._TargetUri = uri;
+            return { name: uri.split("/").pop() ?? pDocument };
+        }
 
         const resolved = await this._Provider.OpenDocument(pDocument);
         if (!resolved)
@@ -117,6 +128,16 @@ export class XAgentBridge {
     /** Clear the per-call document target. */
     ClearTarget(): void {
         this._TargetUri = null;
+    }
+
+    /**
+     * URI do documento-alvo fixado por {@link SetTargetDocument}, ou null quando não há alvo e a
+     * operação deve cair no editor ativo. Exposto para comandos disparados via bridge — a geração
+     * de código por MCP — resolverem o MESMO documento que as demais operações do agente, em vez
+     * do foco do VS Code, que num fluxo de agente costuma não estar no webview do designer.
+     */
+    GetTargetUri(): string | null {
+        return this._TargetUri;
     }
 
     /**
@@ -146,7 +167,15 @@ export class XAgentBridge {
             const docName = doc?.Name ?? "Unnamed";
 
             let result = `## ORM Model: ${docName}\n`;
+            // O modelo é o único elemento que não aparece em listagem nenhuma, e é ele que
+            // carrega Import Models, Namespace, Output Root... Sem o elementId aqui, não há
+            // por onde um agente começar uma escrita de propriedade do modelo.
+            result += `- **elementId:** \`model\` — use it in dase_get_properties / dase_update_property to read or edit the properties below\n`;
             result += `- **Schema:** ${schema}\n`;
+            result += `- **Namespace:** ${design?.Namespace || "_(empty)_"}\n`;
+            result += `- **Output Root:** ${design?.OutputRoot || "_(empty)_"}\n`;
+            result += `- **Import Models:** ${design?.ImportModels || "_(none)_"}\n`;
+            result += `- **Parent Model:** ${design?.ParentModel || "_(none)_"}\n`;
             result += `- **Tables:** ${tableCount}\n`;
             result += `- **References (FK):** ${refCount}\n`;
 
@@ -453,6 +482,10 @@ export class XAgentBridge {
 
     /**
      * Get properties of a specific element by ID.
+     *
+     * A coluna que importa é a Key: é ela que `UpdateProperty` aceita. Mostrar só o rótulo
+     * levava a chamada seguinte a tentar "Import Models" e receber "Unknown property" —
+     * a grade dizia uma coisa e a escrita exigia outra.
      */
     GetProperties(pElementId: string): string {
         const bridge = this.GetActiveBridge();
@@ -465,10 +498,11 @@ export class XAgentBridge {
                 return `No properties found for element "${pElementId}".`;
 
             let result = `### Properties\n`;
-            result += `| Property | Value | Type | Read-Only |\n`;
-            result += `|----------|-------|------|-----------|\n`;
+            result += `_Use the **Key** column as \`propertyKey\` in dase_update_property._\n\n`;
+            result += `| Key | Label | Value | Type | Read-Only |\n`;
+            result += `|-----|-------|-------|------|-----------|\n`;
             for (const prop of props)
-                result += `| ${prop.Name} | ${prop.Value ?? ""} | ${prop.Type} | ${prop.IsReadOnly ? "✓" : ""} |\n`;
+                result += `| ${prop.Key} | ${prop.Name} | ${prop.Value ?? ""} | ${prop.Type} | ${prop.IsReadOnly ? "✓" : ""} |\n`;
 
             return result;
         }
@@ -1220,7 +1254,10 @@ export class XAgentBridge {
         const info = bridge.GetElementInfo(pElementId);
         if (!info)
             return `Element "${pElementId}" not found.`;
-        return `### Element\n- **ID:** ${info.ID}\n- **Name:** ${info.Name}\n- **Type:** ${info.Type}\n`;
+        // O modelo não tem ID próprio — XORMDesign nunca serializa o seu —, então quem o
+        // endereça usa o alias, e é o alias que precisa aparecer aqui.
+        const id = info.Type === "XORMDesign" ? "model" : info.ID;
+        return `### Element\n- **ID:** ${id}\n- **Name:** ${info.Name}\n- **Type:** ${info.Type}\n`;
     }
 
     // ─── Layout ─────────────────────────────────────────────────────────────
