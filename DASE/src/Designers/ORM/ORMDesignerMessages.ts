@@ -29,6 +29,11 @@ export const XDesignerMessageType = {
     SeedDataLoaded: "SeedDataLoaded",
     SaveSeedData: "SaveSeedData",
     SeedDataSaved: "SeedDataSaved",
+    // Table options — Indexes tab
+    RequestIndexes: "RequestIndexes",
+    IndexesLoaded: "IndexesLoaded",
+    SaveIndexes: "SaveIndexes",
+    IndexesSaved: "IndexesSaved",
     // Shadow table picker
     RequestShadowTablePicker: "RequestShadowTablePicker",
     ShadowTablePickerData: "ShadowTablePickerData",

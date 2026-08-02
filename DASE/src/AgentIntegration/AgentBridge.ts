@@ -2,7 +2,7 @@
 import * as vscode from "vscode";
 import { GetLogService } from "../Services/LogService";
 import type { XORMDesignerEditorProvider } from "../Designers/ORM/ORMDesignerEditorProvider";
-import type { XTFXBridge, ITableData, IAddShadowTablePayload } from "../Services/TFXBridge";
+import type { XTFXBridge, ITableData, IAddShadowTablePayload, IIndexSave } from "../Services/TFXBridge";
 
 /**
  * AgentBridge — Adapter layer between AI agent tools/participants and the DASE extension.
@@ -1377,6 +1377,109 @@ export class XAgentBridge {
         catch (err) {
             GetLogService().Error("AgentBridge.SaveSeed failed", err);
             return `Error saving seed data for "${pTableName}".`;
+        }
+    }
+
+    // ─── Indexes ────────────────────────────────────────────────────────────
+
+    GetIndexes(pTableName?: string, pTableId?: string, pIsShadow?: boolean): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        try {
+            const rt = this.ResolveTable(bridge, pTableName, pTableId, pIsShadow);
+            if (rt.error)
+                return rt.error;
+            const table = rt.table!;
+            const payload = bridge.GetTableIndexes(table.ID);
+            if (!payload)
+                return `Table "${table.Name}" has no index support.`;
+
+            if (payload.Indexes.length === 0)
+                return `## Indexes: ${payload.TableName}\n_(no indexes)_\n`;
+
+            const idToName = new Map(payload.Columns.map(c => [c.FieldID, c.Name] as const));
+
+            let result = `## Indexes: ${payload.TableName}\n\n`;
+            for (const ix of payload.Indexes) {
+                const keyFields = ix.Fields.filter(f => !f.IsIncluded);
+                const includeFields = ix.Fields.filter(f => f.IsIncluded);
+
+                result += `### ${ix.Name}${ix.IsUnique ? " (UNIQUE)" : ""}\n`;
+                result += `- Columns: ${keyFields.length > 0
+                    ? keyFields.map(f => `${idToName.get(f.FieldID) ?? "?"}${f.IsDescending ? " DESC" : ""}`).join(", ")
+                    : "_(none)_"}\n`;
+                if (includeFields.length > 0)
+                    result += `- Include: ${includeFields.map(f => idToName.get(f.FieldID) ?? "?").join(", ")}\n`;
+                if (ix.Filter)
+                    result += `- Filter: \`${ix.Filter}\`\n`;
+                result += "\n";
+            }
+            return result;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.GetIndexes failed", err);
+            return `Error reading indexes for "${pTableName}".`;
+        }
+    }
+
+    /**
+     * Replace all indexes of a table. Each index's `fields`/`includeFields` carry
+     * COLUMN NAMES (the LLM does not know field IDs); resolved to field IDs here,
+     * same as SaveSeed. `fields` are the index key (ordering/uniqueness);
+     * `includeFields` ride along as covering (non-key) columns.
+     */
+    SaveIndexes(pTableName: string | undefined, pIndexes: Array<{
+        name: string;
+        isUnique?: boolean;
+        filter?: string;
+        fields: Array<{ column: string; descending?: boolean; allowDuplicate?: boolean }>;
+        includeFields?: string[];
+    }>, pTableId?: string, pIsShadow?: boolean): string {
+        const bridge = this.GetActiveBridge();
+        if (!bridge)
+            return "No ORM designer is currently open. Please open a .dsorm file first.";
+        try {
+            const rt = this.ResolveTable(bridge, pTableName, pTableId, pIsShadow);
+            if (rt.error)
+                return rt.error;
+            const table = rt.table!;
+            const payload = bridge.GetTableIndexes(table.ID);
+            if (!payload)
+                return `Table "${table.Name}" has no index support.`;
+
+            const nameToId = new Map(payload.Columns.map(c => [c.Name.toLowerCase(), c.FieldID] as const));
+            const unknownColumns: string[] = [];
+
+            const saveIndexes: IIndexSave[] = pIndexes.map(ix => {
+                const fields: IIndexSave["Fields"] = [];
+
+                for (const f of ix.fields) {
+                    const fid = nameToId.get(f.column.toLowerCase());
+                    if (!fid) { unknownColumns.push(f.column); continue; }
+                    fields.push({ FieldID: fid, IsDescending: f.descending, AllowDuplicate: f.allowDuplicate, IsIncluded: false });
+                }
+                for (const colName of ix.includeFields ?? []) {
+                    const fid = nameToId.get(colName.toLowerCase());
+                    if (!fid) { unknownColumns.push(colName); continue; }
+                    fields.push({ FieldID: fid, IsIncluded: true });
+                }
+
+                return { IndexID: "NEW", Name: ix.name, IsUnique: ix.isUnique, Filter: ix.filter, Fields: fields };
+            });
+
+            if (unknownColumns.length > 0)
+                return `Unknown column(s): ${unknownColumns.join(", ")}.`;
+
+            const result = bridge.SaveTableIndexes(table.ID, saveIndexes);
+            if (!result.Success)
+                return `Failed to save indexes: ${result.Message ?? "Unknown error"}.`;
+            this.RefreshActive();
+            return `Saved ${saveIndexes.length} index(es) on "${table.Name}".`;
+        }
+        catch (err) {
+            GetLogService().Error("AgentBridge.SaveIndexes failed", err);
+            return `Error saving indexes for "${pTableName}".`;
         }
     }
 

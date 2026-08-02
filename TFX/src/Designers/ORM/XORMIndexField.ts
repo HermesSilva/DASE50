@@ -41,6 +41,18 @@ export class XORMIndexField extends XPersistableElement
         false
     );
 
+    /**
+     * Whether this is a covering (INCLUDE) column — carried by the index for
+     * read performance, but not part of the key used for ordering/uniqueness.
+     */
+    public static readonly IsIncludedProp = XProperty.Register<XORMIndexField, boolean>(
+        (p: XORMIndexField) => p.IsIncluded,
+        "6E2D6A2E-6C0B-4F97-9C1D-6A4E7B2F0B34",
+        "IsIncluded",
+        "Included Column",
+        false
+    );
+
     public get IsDescending(): boolean
     {
         return this.GetValue(XORMIndexField.IsDescendingProp) as boolean;
@@ -59,5 +71,15 @@ export class XORMIndexField extends XPersistableElement
     public set AllowDuplicate(pValue: boolean)
     {
         this.SetValue(XORMIndexField.AllowDuplicateProp, pValue);
+    }
+
+    public get IsIncluded(): boolean
+    {
+        return this.GetValue(XORMIndexField.IsIncludedProp) as boolean;
+    }
+
+    public set IsIncluded(pValue: boolean)
+    {
+        this.SetValue(XORMIndexField.IsIncludedProp, pValue);
     }
 }

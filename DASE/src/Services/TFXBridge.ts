@@ -39,6 +39,8 @@ import {
     XORMDataSet,
     XORMDataTuple,
     XFieldValue,
+    XORMIndex,
+    XORMIndexField,
     DescribeInheritableFields,
     ResolveInheritance,
     type XIExternalTable,
@@ -186,6 +188,52 @@ export interface ISeedRowSave {
 export interface IShadowTableEntry {
     ID: string;
     Name: string;
+}
+
+// ─── Index editor interfaces ────────────────────────────────────────────────
+
+export interface IIndexColumn {
+    FieldID: string;
+    Name: string;
+    DataType: string;
+    IsPrimaryKey: boolean;
+}
+
+export interface IIndexFieldData {
+    FieldID: string;
+    IsDescending: boolean;
+    AllowDuplicate: boolean;
+    IsIncluded: boolean;
+}
+
+export interface IIndexData {
+    IndexID: string;
+    Name: string;
+    IsUnique: boolean;
+    Filter: string;
+    Fields: IIndexFieldData[];
+}
+
+export interface IIndexEditorPayload {
+    TableID: string;
+    TableName: string;
+    Columns: IIndexColumn[];
+    Indexes: IIndexData[];
+}
+
+export interface IIndexFieldSave {
+    FieldID: string;
+    IsDescending?: boolean;
+    AllowDuplicate?: boolean;
+    IsIncluded?: boolean;
+}
+
+export interface IIndexSave {
+    IndexID: string;
+    Name: string;
+    IsUnique?: boolean;
+    Filter?: string;
+    Fields: IIndexFieldSave[];
 }
 
 export interface IShadowModelEntry {
@@ -2610,6 +2658,97 @@ export class XTFXBridge {
         }
 
         return { Success: true, ElementID: dataSet.ID };
+    }
+
+    /**
+     * Builds the index editor payload for the given table: its fields (to pick from)
+     * and every XORMIndex already defined on it.
+     */
+    GetTableIndexes(pTableID: string): IIndexEditorPayload | null {
+        this.Initialize();
+
+        const table = this._Controller?.GetElementByID(pTableID) as XORMTable | null;
+        if (!(table instanceof XORMTable))
+            return null;
+
+        const columns: IIndexColumn[] = table.GetFields().map(field => ({
+            FieldID: field.ID,
+            Name: field.Name,
+            DataType: field.DataType,
+            IsPrimaryKey: field.IsPrimaryKey
+        }));
+
+        const indexes: IIndexData[] = table.GetChildrenOfType(XORMIndex).map(ix => ({
+            IndexID: ix.ID,
+            Name: ix.Name,
+            IsUnique: ix.IsUnique,
+            Filter: ix.Filter ?? "",
+            Fields: ix.GetIndexFields().map(f => ({
+                FieldID: f.ParentID,
+                IsDescending: f.IsDescending,
+                AllowDuplicate: f.AllowDuplicate,
+                IsIncluded: f.IsIncluded
+            }))
+        }));
+
+        return {
+            TableID: pTableID,
+            TableName: table.Name,
+            Columns: columns,
+            Indexes: indexes
+        };
+    }
+
+    /**
+     * Persists the table's indexes. Replaces every existing XORMIndex child with the
+     * supplied list — same "clear and rebuild" approach used for seed rows.
+     */
+    SaveTableIndexes(pTableID: string, pIndexes: IIndexSave[]): XIOperationResult {
+        this.Initialize();
+
+        const table = this._Controller?.GetElementByID(pTableID) as XORMTable | null;
+        if (!(table instanceof XORMTable))
+            return { Success: false, Message: "Table not found." };
+
+        for (const name of pIndexes.map(ix => ix.Name.trim().toLowerCase())) {
+            if (!name)
+                return { Success: false, Message: "Every index needs a name." };
+        }
+        const dupeName = pIndexes
+            .map(ix => ix.Name.trim().toLowerCase())
+            .find((name, i, arr) => arr.indexOf(name) !== i);
+        if (dupeName)
+            return { Success: false, Message: `Duplicate index name: "${dupeName}".` };
+
+        for (const ix of pIndexes) {
+            if (ix.Fields.filter(f => !f.IsIncluded).length === 0)
+                return { Success: false, Message: `Index "${ix.Name}" needs at least one key column.` };
+        }
+
+        for (const existing of table.GetChildrenOfType(XORMIndex))
+            table.RemoveChild(existing);
+
+        for (const ixData of pIndexes) {
+            const index = new XORMIndex();
+            index.ID = ixData.IndexID === "NEW" ? XGuid.NewValue() : ixData.IndexID;
+            index.Name = ixData.Name.trim();
+            index.IsUnique = !!ixData.IsUnique;
+            index.Filter = ixData.Filter ?? "";
+
+            for (const fieldData of ixData.Fields) {
+                const indexField = new XORMIndexField();
+                indexField.ID = XGuid.NewValue();
+                indexField.ParentID = fieldData.FieldID;
+                indexField.IsDescending = !!fieldData.IsDescending;
+                indexField.AllowDuplicate = !!fieldData.AllowDuplicate;
+                indexField.IsIncluded = !!fieldData.IsIncluded;
+                index.AppendChild(indexField);
+            }
+
+            table.AppendChild(index);
+        }
+
+        return { Success: true, ElementID: table.ID };
     }
 
     GetElementInfo(pElementID: string): { ID: string; Name: string; Type: string } | null {

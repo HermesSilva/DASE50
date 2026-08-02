@@ -32,6 +32,11 @@
         SeedDataLoaded: "SeedDataLoaded",
         SaveSeedData: "SaveSeedData",
         SeedDataSaved: "SeedDataSaved",
+        // Table Options — Indexes tab
+        RequestIndexes: "RequestIndexes",
+        IndexesLoaded: "IndexesLoaded",
+        SaveIndexes: "SaveIndexes",
+        IndexesSaved: "IndexesSaved",
         // Shadow table picker
         RequestShadowTablePicker: "RequestShadowTablePicker",
         ShadowTablePickerData: "ShadowTablePickerData",
@@ -84,6 +89,9 @@
     let _SeedEditor = null; // { TableID, Columns, Rows, OriginalRows, SelectedRows: Set<number> }
     let _SeedNextNewId = 0;
     let _GuidSeq = 0;
+    let _IndexEditor = null; // { TableID, Columns, Indexes: [{IndexID, Name, IsUnique, Filter, Fields:[{FieldID,IsDescending,AllowDuplicate,IsIncluded}]}], SelectedIndexID }
+    let _IndexNextNewId = 0;
+    let _TableOptionsActiveTab = "seed";
     let _ShadowPickerData = null;
 
     // Data type icons mapping - returns SVG path or emoji
@@ -193,6 +201,14 @@
                 OnSeedDataSaved(pMsg.Payload);
                 break;
 
+            case XMessageType.IndexesLoaded:
+                OnIndexesLoaded(pMsg.Payload);
+                break;
+
+            case XMessageType.IndexesSaved:
+                OnIndexesSaved(pMsg.Payload);
+                break;
+
             case XMessageType.ShadowTablePickerData:
                 OpenShadowPickerModal(pMsg.Payload);
                 break;
@@ -297,7 +313,7 @@
                     if (tableID)
                         SendMessage(XMessageType.AddField, { TableID: tableID, Name: "NewField", DataType: "String" });
                     break;
-                case "edit-seed-data":
+                case "table-options":
                     if (tableID)
                         SendMessage(XMessageType.RequestSeedData, { TableID: tableID });
                     break;
@@ -447,7 +463,7 @@
 
         const table = _Model.Tables.find(function (t) { return t.ID === pTableID; });
         const isShadow = table && table.IsShadow;
-        const shadowRestricted = ["add-field", "edit-seed-data", "rename-table"];
+        const shadowRestricted = ["add-field", "table-options", "rename-table"];
         const items = _TableContextMenu.querySelectorAll(".context-menu-item");
         for (const item of items) {
             const action = item.getAttribute("data-action");
@@ -2486,11 +2502,12 @@
             SelectedRows: new Set()
         };
         _SeedNextNewId = 0;
+        _IndexEditor = null;
 
         const overlay = document.getElementById("seed-editor-overlay");
         const title = document.getElementById("seed-modal-title");
 
-        title.textContent = "Seed Data — " + _SeedEditor.TableName;
+        title.textContent = "Table Options — " + _SeedEditor.TableName;
 
         BuildSeedGrid();
         UpdateSeedRowCount();
@@ -2510,7 +2527,16 @@
 
         document.getElementById("seed-add-row").onclick = AddSeedRow;
         document.getElementById("seed-delete-rows").onclick = DeleteSelectedSeedRows;
-        document.getElementById("seed-btn-save").onclick = SaveSeedEditorData;
+        document.getElementById("index-add-btn").onclick = AddIndex;
+
+        // Tabs
+        document.getElementById("tab-btn-seed").onclick = function () { SwitchTableOptionsTab("seed"); };
+        document.getElementById("tab-btn-indexes").onclick = function () { SwitchTableOptionsTab("indexes"); };
+        SwitchTableOptionsTab("seed");
+
+        // Kick off the Indexes tab load in the background so it's ready by the time
+        // the user switches — the badge/list render as soon as the payload lands.
+        SendMessage(XMessageType.RequestIndexes, { TableID: pPayload.TableID });
 
         // Keyboard shortcuts — attach to document, guarded by modal open state
         document.addEventListener("keydown", HandleSeedKeydown);
@@ -2518,11 +2544,37 @@
         overlay.focus();
     }
 
+    // ── Table Options tabs ──────────────────────────────────────────────────
+
+    function SwitchTableOptionsTab(pTab) {
+        _TableOptionsActiveTab = pTab;
+
+        const seedPanel = document.getElementById("tab-panel-seed");
+        const indexPanel = document.getElementById("tab-panel-indexes");
+        const seedBtn = document.getElementById("tab-btn-seed");
+        const indexBtn = document.getElementById("tab-btn-indexes");
+        const rowCountBadge = document.getElementById("seed-row-count");
+
+        const isSeed = pTab === "seed";
+        seedPanel.style.display = isSeed ? "" : "none";
+        indexPanel.style.display = isSeed ? "none" : "";
+        seedBtn.classList.toggle("active", isSeed);
+        indexBtn.classList.toggle("active", !isSeed);
+        seedBtn.setAttribute("aria-selected", String(isSeed));
+        indexBtn.setAttribute("aria-selected", String(!isSeed));
+        rowCountBadge.style.display = isSeed ? "" : "none";
+
+        document.getElementById("seed-btn-save").onclick = isSeed ? SaveSeedEditorData : SaveIndexEditorData;
+        SetSeedStatusMessage("");
+        SetSeedValidationBadge(null);
+    }
+
     function CloseSeedEditorModal() {
         const overlay = document.getElementById("seed-editor-overlay");
         overlay.style.display = "none";
         document.removeEventListener("keydown", HandleSeedKeydown);
         _SeedEditor = null;
+        _IndexEditor = null;
     }
 
     function HandleSeedKeydown(pEvent) {
@@ -2532,9 +2584,12 @@
         }
         else if (pEvent.key === "Enter" && (pEvent.ctrlKey || pEvent.metaKey)) {
             pEvent.preventDefault();
-            SaveSeedEditorData();
+            if (_TableOptionsActiveTab === "seed")
+                SaveSeedEditorData();
+            else
+                SaveIndexEditorData();
         }
-        else if (pEvent.key === "Delete" && !IsEditableTarget(pEvent.target)) {
+        else if (pEvent.key === "Delete" && _TableOptionsActiveTab === "seed" && !IsEditableTarget(pEvent.target)) {
             DeleteSelectedSeedRows();
         }
     }
@@ -2880,7 +2935,11 @@
         const p4 = varNibble + randA;
 
         // p5: 48 random bits
-        const p5 = (Math.random() * 0xFFFFFFFF | 0).toString(16).padStart(8, "0") +
+        // `0xFFFFFFFF` overflows the 32-bit SIGNED range that `| 0` truncates to, so roughly
+        // half the time that produced a negative number — and toString(16) prints a leading
+        // "-" for negatives, corrupting the GUID with a stray dash. `>>> 0` truncates to
+        // UNSIGNED 32-bit instead, which is what an 8-hex-digit segment actually needs.
+        const p5 = (Math.random() * 0x100000000 >>> 0).toString(16).padStart(8, "0") +
             (Math.random() * 0xFFFF | 0).toString(16).padStart(4, "0");
 
         return p1 + "-" + p2 + "-" + p3 + "-" + p4 + "-" + p5;
@@ -3236,6 +3295,907 @@
             return;
         el.textContent = pMsg;
         el.className = "seed-status-msg" + (pType ? " status-" + pType : "");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // INDEX EDITOR (Table Options → Indexes tab)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    function OnIndexesLoaded(pPayload) {
+        if (!pPayload || !pPayload.TableID)
+            return;
+
+        // Preserve the current selection across a reload triggered while the modal is open.
+        const previousSelectedID = _IndexEditor ? _IndexEditor.SelectedIndexID : null;
+
+        _IndexEditor = {
+            TableID: pPayload.TableID,
+            TableName: pPayload.TableName || "Table",
+            Columns: pPayload.Columns || [],
+            Indexes: (pPayload.Indexes || []).map(function (ix) {
+                const filter = ix.Filter || "";
+                const parsedConditions = ParseFilterExpression(filter, pPayload.Columns || []);
+                return {
+                    IndexID: ix.IndexID,
+                    Name: ix.Name || "",
+                    IsUnique: !!ix.IsUnique,
+                    Filter: filter,
+                    FilterConditions: parsedConditions || [],
+                    FilterMode: parsedConditions !== null ? "guided" : "advanced",
+                    Fields: (ix.Fields || []).map(function (f) {
+                        return {
+                            FieldID: f.FieldID,
+                            IsDescending: !!f.IsDescending,
+                            AllowDuplicate: !!f.AllowDuplicate,
+                            IsIncluded: !!f.IsIncluded
+                        };
+                    })
+                };
+            }),
+            SelectedIndexID: null
+        };
+        _IndexNextNewId = 0;
+
+        const stillExists = previousSelectedID && _IndexEditor.Indexes.some(function (ix) { return ix.IndexID === previousSelectedID; });
+        _IndexEditor.SelectedIndexID = stillExists ? previousSelectedID : (_IndexEditor.Indexes[0] ? _IndexEditor.Indexes[0].IndexID : null);
+
+        RenderIndexList();
+        RenderIndexDetail();
+    }
+
+    function GetSelectedIndex() {
+        if (!_IndexEditor || !_IndexEditor.SelectedIndexID)
+            return null;
+        return _IndexEditor.Indexes.find(function (ix) { return ix.IndexID === _IndexEditor.SelectedIndexID; }) || null;
+    }
+
+    function SuggestIndexName(pIndex) {
+        const fieldNames = pIndex.Fields
+            .filter(function (f) { return !f.IsIncluded; })
+            .map(function (f) {
+                const col = _IndexEditor.Columns.find(function (c) { return c.FieldID === f.FieldID; });
+                return col ? col.Name : "";
+            })
+            .filter(function (n) { return n; });
+        const prefix = pIndex.IsUnique ? "UX_" : "IX_";
+        return prefix + _IndexEditor.TableName + (fieldNames.length ? "_" + fieldNames.join("_") : "");
+    }
+
+    // ── List pane ────────────────────────────────────────────────────────────
+
+    function RenderIndexList() {
+        const list = document.getElementById("index-list");
+        if (!list || !_IndexEditor)
+            return;
+
+        list.innerHTML = "";
+
+        if (_IndexEditor.Indexes.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "index-list-empty";
+            empty.textContent = "No indexes yet.";
+            list.appendChild(empty);
+            return;
+        }
+
+        for (const ix of _IndexEditor.Indexes) {
+            const item = document.createElement("div");
+            item.className = "index-list-item" + (ix.IndexID === _IndexEditor.SelectedIndexID ? " active" : "");
+            item.setAttribute("data-index-id", ix.IndexID);
+
+            const info = document.createElement("div");
+            info.className = "index-list-item-info";
+
+            const nameRow = document.createElement("div");
+            nameRow.className = "index-list-item-name";
+            nameRow.textContent = ix.Name || "(unnamed)";
+            if (ix.IsUnique) {
+                const badge = document.createElement("span");
+                badge.className = "seed-col-badge seed-col-pk";
+                badge.textContent = "UNIQUE";
+                nameRow.appendChild(badge);
+            }
+            info.appendChild(nameRow);
+
+            const fieldsRow = document.createElement("div");
+            fieldsRow.className = "index-list-item-fields";
+            const keyCount = ix.Fields.filter(function (f) { return !f.IsIncluded; }).length;
+            const incCount = ix.Fields.length - keyCount;
+            fieldsRow.textContent = keyCount + (keyCount === 1 ? " column" : " columns") + (incCount ? " + " + incCount + " included" : "");
+            info.appendChild(fieldsRow);
+
+            item.appendChild(info);
+
+            const removeBtn = document.createElement("button");
+            removeBtn.className = "index-list-item-remove";
+            removeBtn.title = "Delete index";
+            removeBtn.textContent = "🗑️";
+            removeBtn.addEventListener("click", function (e) {
+                e.stopPropagation();
+                RemoveIndex(ix.IndexID);
+            });
+            item.appendChild(removeBtn);
+
+            item.addEventListener("click", function () {
+                _IndexEditor.SelectedIndexID = ix.IndexID;
+                RenderIndexList();
+                RenderIndexDetail();
+            });
+
+            list.appendChild(item);
+        }
+    }
+
+    function AddIndex() {
+        if (!_IndexEditor)
+            return;
+
+        const newIndex = {
+            IndexID: "NEW_" + (_IndexNextNewId++),
+            Name: "",
+            IsUnique: false,
+            Filter: "",
+            FilterConditions: [],
+            FilterMode: "guided",
+            Fields: []
+        };
+        newIndex.Name = SuggestIndexName(newIndex);
+
+        _IndexEditor.Indexes.push(newIndex);
+        _IndexEditor.SelectedIndexID = newIndex.IndexID;
+
+        RenderIndexList();
+        RenderIndexDetail();
+
+        const nameInput = document.querySelector("#index-detail-pane .index-name-input");
+        if (nameInput) {
+            nameInput.focus();
+            nameInput.select();
+        }
+    }
+
+    function RemoveIndex(pIndexID) {
+        if (!_IndexEditor)
+            return;
+
+        _IndexEditor.Indexes = _IndexEditor.Indexes.filter(function (ix) { return ix.IndexID !== pIndexID; });
+
+        if (_IndexEditor.SelectedIndexID === pIndexID)
+            _IndexEditor.SelectedIndexID = _IndexEditor.Indexes[0] ? _IndexEditor.Indexes[0].IndexID : null;
+
+        RenderIndexList();
+        RenderIndexDetail();
+    }
+
+    // ── Detail pane ──────────────────────────────────────────────────────────
+
+    function RenderIndexDetail() {
+        const pane = document.getElementById("index-detail-pane");
+        if (!pane)
+            return;
+
+        const index = GetSelectedIndex();
+        pane.innerHTML = "";
+
+        if (!index) {
+            const empty = document.createElement("div");
+            empty.className = "index-empty-state";
+            empty.id = "index-empty-state";
+            empty.innerHTML = "<span class='seed-empty-icon'>🔑</span>No index selected. Click <b>Add</b> to create one.";
+            pane.appendChild(empty);
+            return;
+        }
+
+        // Header row: name + unique
+        const headerRow = document.createElement("div");
+        headerRow.className = "index-detail-row";
+
+        const nameLabel = document.createElement("label");
+        nameLabel.className = "index-field-label";
+        nameLabel.textContent = "Name";
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.className = "seed-cell-input index-name-input";
+        nameInput.value = index.Name;
+        nameInput.placeholder = SuggestIndexName(index);
+        nameInput.addEventListener("input", function () {
+            index.Name = this.value;
+            RenderIndexList();
+        });
+        nameLabel.appendChild(nameInput);
+        headerRow.appendChild(nameLabel);
+
+        const uniqueLabel = document.createElement("label");
+        uniqueLabel.className = "index-checkbox-label";
+        const uniqueChk = document.createElement("input");
+        uniqueChk.type = "checkbox";
+        uniqueChk.checked = index.IsUnique;
+        uniqueChk.addEventListener("change", function () {
+            index.IsUnique = this.checked;
+            RenderIndexDetail();
+            RenderIndexList();
+        });
+        uniqueLabel.appendChild(uniqueChk);
+        uniqueLabel.appendChild(document.createTextNode(" Unique"));
+        uniqueLabel.title = "Enforces a UNIQUE constraint across the key columns below.";
+        headerRow.appendChild(uniqueLabel);
+
+        pane.appendChild(headerRow);
+
+        pane.appendChild(BuildFilterSection(index));
+
+        pane.appendChild(BuildIndexFieldsGrid(index, {
+            IsIncluded: false,
+            Title: "Index Columns",
+            EmptyMessage: "No key columns yet — add at least one below.",
+            AddPlaceholder: "+ Add key column…"
+        }));
+
+        pane.appendChild(BuildIndexFieldsGrid(index, {
+            IsIncluded: true,
+            Title: "Included Columns",
+            EmptyMessage: "No included (covering) columns — this index will only carry its key.",
+            AddPlaceholder: "+ Add included column…"
+        }));
+    }
+
+    /**
+     * Key columns and INCLUDE (covering) columns mean very different things — one defines
+     * uniqueness/ordering, the other just rides along for read performance — so they get
+     * their own grids instead of one table with a checkbox toggling what a row even means.
+     */
+    function BuildIndexFieldsGrid(pIndex, pConfig) {
+        const groupFields = pIndex.Fields.filter(function (f) { return f.IsIncluded === pConfig.IsIncluded; });
+
+        const section = document.createElement("div");
+        section.className = "index-fields-section";
+
+        const header = document.createElement("div");
+        header.className = "index-fields-header";
+        header.innerHTML = "<span>" + pConfig.Title + "</span>";
+
+        const addFieldSelect = document.createElement("select");
+        addFieldSelect.className = "seed-cell-select index-add-field-select";
+        const placeholderOpt = document.createElement("option");
+        placeholderOpt.value = "";
+        placeholderOpt.textContent = pConfig.AddPlaceholder;
+        addFieldSelect.appendChild(placeholderOpt);
+
+        const usedFieldIDs = new Set(pIndex.Fields.map(function (f) { return f.FieldID; }));
+        for (const col of _IndexEditor.Columns) {
+            if (usedFieldIDs.has(col.FieldID))
+                continue;
+            const opt = document.createElement("option");
+            opt.value = col.FieldID;
+            opt.textContent = col.Name;
+            addFieldSelect.appendChild(opt);
+        }
+        addFieldSelect.addEventListener("change", function () {
+            if (!this.value)
+                return;
+            pIndex.Fields.push({ FieldID: this.value, IsDescending: false, AllowDuplicate: false, IsIncluded: pConfig.IsIncluded });
+            if (!pIndex.Name)
+                pIndex.Name = SuggestIndexName(pIndex);
+            RenderIndexDetail();
+            RenderIndexList();
+        });
+        header.appendChild(addFieldSelect);
+        section.appendChild(header);
+
+        if (groupFields.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "index-fields-empty";
+            empty.textContent = pConfig.EmptyMessage;
+            section.appendChild(empty);
+            return section;
+        }
+
+        const table = document.createElement("table");
+        table.className = "index-fields-table";
+        const thead = document.createElement("thead");
+        thead.innerHTML = pConfig.IsIncluded
+            ? "<tr><th>Column</th><th></th><th></th></tr>"
+            : "<tr><th>Column</th><th title='Sort direction'>Order</th>" +
+              "<th title='Allow duplicate NULLs (only relevant for unique indexes)'>Dup. NULL</th><th></th><th></th></tr>";
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+        for (let i = 0; i < groupFields.length; i++)
+            tbody.appendChild(BuildIndexFieldRow(pIndex, groupFields[i], i, pConfig.IsIncluded));
+        table.appendChild(tbody);
+
+        section.appendChild(table);
+        return section;
+    }
+
+    // ── Filter (WHERE) builder ──────────────────────────────────────────────
+    //
+    // Free-text SQL is a trap here: the same string has to mean something on every
+    // provider a template might target, and a typo'd column name only surfaces at
+    // migration time. So the default is a guided picker — real columns, operators
+    // gated by data type, values typed through the right widget — that always emits
+    // a well-formed neutral expression. "Advanced" is an escape hatch for the rare
+    // expression the picker can't represent, not the default path.
+
+    const FILTER_OP_SQL = { eq: "=", neq: "<>", gt: ">", gte: ">=", lt: "<", lte: "<=" };
+
+    function GetFilterOperators(pDataType) {
+        const ops = [{ value: "eq", label: "=" }, { value: "neq", label: "≠" }];
+        if (IsNumericType(pDataType) || pDataType === "Date" || pDataType === "DateTime") {
+            ops.push(
+                { value: "gt", label: ">" },
+                { value: "gte", label: "≥" },
+                { value: "lt", label: "<" },
+                { value: "lte", label: "≤" }
+            );
+        }
+        ops.push({ value: "isnull", label: "is null" }, { value: "isnotnull", label: "is not null" });
+        return ops;
+    }
+
+    function FindColumnByName(pColumns, pName) {
+        return pColumns.find(function (c) { return c.Name === pName; })
+            || pColumns.find(function (c) { return c.Name.toLowerCase() === pName.toLowerCase(); })
+            || null;
+    }
+
+    function FormatFilterLiteral(pCol, pValue) {
+        const dataType = pCol.DataType;
+        if (dataType === "Boolean")
+            return pValue === "false" ? "false" : "true";
+        if (IsNumericType(dataType))
+            return pValue === "" || pValue === undefined ? "0" : pValue;
+        if (dataType === "Date" || dataType === "DateTime")
+            return "'" + (pValue || "") + "'";
+        return "'" + String(pValue || "").replace(/'/g, "''") + "'";
+    }
+
+    function ParseFilterLiteral(pCol, pRaw) {
+        const dataType = pCol.DataType;
+
+        if (dataType === "Boolean") {
+            if (/^true$/i.test(pRaw)) return "true";
+            if (/^false$/i.test(pRaw)) return "false";
+            return null;
+        }
+
+        if (IsNumericType(dataType))
+            return /^-?\d+(\.\d+)?$/.test(pRaw) ? pRaw : null;
+
+        // Date/DateTime/String/Text/Guid — all carried as quoted literals.
+        const m = pRaw.match(/^'(.*)'$/s);
+        return m ? m[1].replace(/''/g, "'") : null;
+    }
+
+    /**
+     * Splits a stored Filter expression back into structured conditions.
+     * Returns null when the text doesn't match the shape this builder produces —
+     * the caller falls back to the raw-text "advanced" editor rather than showing
+     * a builder state that doesn't actually represent the saved expression.
+     */
+    function ParseFilterExpression(pExpr, pColumns) {
+        const text = (pExpr || "").trim();
+        if (!text)
+            return [];
+
+        const parts = text.split(/\s+AND\s+/i);
+        const conditions = [];
+
+        for (const rawPart of parts) {
+            const part = rawPart.trim();
+
+            let m = part.match(/^([A-Za-z_][A-Za-z0-9_]*)\s+IS\s+NOT\s+NULL$/i);
+            if (m) {
+                const col = FindColumnByName(pColumns, m[1]);
+                if (!col) return null;
+                conditions.push({ FieldID: col.FieldID, Op: "isnotnull", Value: "" });
+                continue;
+            }
+
+            m = part.match(/^([A-Za-z_][A-Za-z0-9_]*)\s+IS\s+NULL$/i);
+            if (m) {
+                const col = FindColumnByName(pColumns, m[1]);
+                if (!col) return null;
+                conditions.push({ FieldID: col.FieldID, Op: "isnull", Value: "" });
+                continue;
+            }
+
+            m = part.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*(=|<>|>=|<=|>|<)\s*(.+)$/);
+            if (!m)
+                return null;
+
+            const col = FindColumnByName(pColumns, m[1]);
+            if (!col)
+                return null;
+
+            const opMap = { "=": "eq", "<>": "neq", ">": "gt", ">=": "gte", "<": "lt", "<=": "lte" };
+            const op = opMap[m[2]];
+            const allowedOps = GetFilterOperators(col.DataType);
+            if (!allowedOps.some(function (o) { return o.value === op; }))
+                return null;
+
+            const value = ParseFilterLiteral(col, m[3].trim());
+            if (value === null)
+                return null;
+
+            conditions.push({ FieldID: col.FieldID, Op: op, Value: value });
+        }
+
+        return conditions;
+    }
+
+    function SerializeFilterConditions(pConditions) {
+        const parts = [];
+        for (const cond of pConditions) {
+            const col = _IndexEditor.Columns.find(function (c) { return c.FieldID === cond.FieldID; });
+            if (!col)
+                continue;
+            if (cond.Op === "isnull") { parts.push(col.Name + " IS NULL"); continue; }
+            if (cond.Op === "isnotnull") { parts.push(col.Name + " IS NOT NULL"); continue; }
+            parts.push(col.Name + " " + (FILTER_OP_SQL[cond.Op] || "=") + " " + FormatFilterLiteral(col, cond.Value));
+        }
+        return parts.join(" AND ");
+    }
+
+    function SyncFilterFromConditions(pIndex) {
+        pIndex.Filter = SerializeFilterConditions(pIndex.FilterConditions);
+    }
+
+    function AddFilterCondition(pIndex) {
+        const firstCol = _IndexEditor.Columns[0];
+        if (!firstCol)
+            return;
+        const ops = GetFilterOperators(firstCol.DataType);
+        pIndex.FilterConditions.push({ FieldID: firstCol.FieldID, Op: ops[0].value, Value: "" });
+        SyncFilterFromConditions(pIndex);
+        RenderIndexDetail();
+    }
+
+    function ToggleFilterMode(pIndex) {
+        if (pIndex.FilterMode === "advanced") {
+            // VS Code webviews block window.confirm/alert, so this can't ask before switching —
+            // it only switches when the text actually round-trips into equivalent conditions,
+            // and leaves the raw expression untouched otherwise.
+            const parsed = ParseFilterExpression(pIndex.Filter, _IndexEditor.Columns);
+            if (parsed === null) {
+                SetSeedStatusMessage("This expression can't be converted to the guided editor automatically — simplify it first.", "err");
+                return;
+            }
+            pIndex.FilterConditions = parsed;
+            pIndex.FilterMode = "guided";
+            SyncFilterFromConditions(pIndex);
+        }
+        else {
+            pIndex.FilterMode = "advanced";
+        }
+        RenderIndexDetail();
+    }
+
+    function BuildFilterValueWidget(pCol, pValue, pOnChange) {
+        const dataType = pCol ? pCol.DataType : "String";
+
+        if (dataType === "Boolean") {
+            const sel = document.createElement("select");
+            sel.className = "seed-cell-select";
+            [["true", "True"], ["false", "False"]].forEach(function (pair) {
+                const opt = document.createElement("option");
+                opt.value = pair[0];
+                opt.textContent = pair[1];
+                if (pair[0] === pValue) opt.selected = true;
+                sel.appendChild(opt);
+            });
+            if (!pValue)
+                pOnChange("true");
+            sel.addEventListener("change", function () { pOnChange(this.value); });
+            return sel;
+        }
+
+        if (dataType === "Date" || dataType === "DateTime") {
+            const inp = document.createElement("input");
+            inp.type = dataType === "Date" ? "date" : "datetime-local";
+            inp.className = "seed-cell-input";
+            inp.value = pValue || "";
+            inp.addEventListener("input", function () { pOnChange(this.value); });
+            return inp;
+        }
+
+        if (IsNumericType(dataType)) {
+            const inp = document.createElement("input");
+            inp.type = "text";
+            inp.inputMode = "numeric";
+            inp.className = "seed-cell-input";
+            inp.placeholder = "0";
+            inp.value = pValue || "";
+            inp.addEventListener("input", function () {
+                pOnChange(this.value);
+                inp.classList.toggle("cell-error", this.value !== "" && isNaN(Number(this.value)));
+            });
+            return inp;
+        }
+
+        const inp = document.createElement("input");
+        inp.type = "text";
+        inp.className = "seed-cell-input";
+        inp.placeholder = "value";
+        inp.value = pValue || "";
+        inp.addEventListener("input", function () { pOnChange(this.value); });
+        return inp;
+    }
+
+    function BuildFilterConditionRow(pIndex, pCond, pCondIndex) {
+        const row = document.createElement("div");
+        row.className = "index-filter-row";
+
+        if (pCondIndex > 0) {
+            const andLabel = document.createElement("span");
+            andLabel.className = "index-filter-and";
+            andLabel.textContent = "AND";
+            row.appendChild(andLabel);
+        }
+
+        const col = _IndexEditor.Columns.find(function (c) { return c.FieldID === pCond.FieldID; });
+
+        const fieldSelect = document.createElement("select");
+        fieldSelect.className = "seed-cell-select";
+        for (const c of _IndexEditor.Columns) {
+            const opt = document.createElement("option");
+            opt.value = c.FieldID;
+            opt.textContent = c.Name;
+            if (c.FieldID === pCond.FieldID) opt.selected = true;
+            fieldSelect.appendChild(opt);
+        }
+        fieldSelect.addEventListener("change", function () {
+            pCond.FieldID = this.value;
+            const newCol = _IndexEditor.Columns.find(function (c) { return c.FieldID === pCond.FieldID; });
+            const ops = GetFilterOperators(newCol ? newCol.DataType : "String");
+            if (!ops.some(function (o) { return o.value === pCond.Op; }))
+                pCond.Op = ops[0].value;
+            pCond.Value = "";
+            SyncFilterFromConditions(pIndex);
+            RenderIndexDetail();
+        });
+        row.appendChild(fieldSelect);
+
+        const opSelect = document.createElement("select");
+        opSelect.className = "seed-cell-select";
+        const ops = GetFilterOperators(col ? col.DataType : "String");
+        for (const op of ops) {
+            const opt = document.createElement("option");
+            opt.value = op.value;
+            opt.textContent = op.label;
+            if (op.value === pCond.Op) opt.selected = true;
+            opSelect.appendChild(opt);
+        }
+        opSelect.addEventListener("change", function () {
+            pCond.Op = this.value;
+            pCond.Value = "";
+            SyncFilterFromConditions(pIndex);
+            RenderIndexDetail();
+        });
+        row.appendChild(opSelect);
+
+        if (pCond.Op !== "isnull" && pCond.Op !== "isnotnull") {
+            const widget = BuildFilterValueWidget(col, pCond.Value, function (pNewValue) {
+                pCond.Value = pNewValue;
+                SyncFilterFromConditions(pIndex);
+            });
+            row.appendChild(widget);
+        }
+
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "index-list-item-remove";
+        removeBtn.title = "Remove condition";
+        removeBtn.textContent = "✕";
+        removeBtn.addEventListener("click", function () {
+            pIndex.FilterConditions.splice(pCondIndex, 1);
+            SyncFilterFromConditions(pIndex);
+            RenderIndexDetail();
+        });
+        row.appendChild(removeBtn);
+
+        return row;
+    }
+
+    function BuildFilterSection(pIndex) {
+        const section = document.createElement("div");
+        section.className = "index-fields-section";
+
+        const header = document.createElement("div");
+        header.className = "index-fields-header";
+        header.innerHTML = "<span>Filter (WHERE) — optional, all conditions must match (AND)</span>";
+
+        const modeToggle = document.createElement("button");
+        modeToggle.className = "index-filter-mode-toggle";
+        modeToggle.textContent = pIndex.FilterMode === "advanced" ? "Use guided editor" : "Use raw expression";
+        modeToggle.title = pIndex.FilterMode === "advanced"
+            ? "Switch back to the validated, multi-database picker."
+            : "Escape hatch for expressions the guided picker can't represent — not validated, not portable across providers.";
+        modeToggle.addEventListener("click", function () { ToggleFilterMode(pIndex); });
+        header.appendChild(modeToggle);
+
+        section.appendChild(header);
+
+        if (pIndex.FilterMode === "advanced") {
+            const textarea = document.createElement("textarea");
+            textarea.className = "seed-cell-input index-filter-raw";
+            textarea.rows = 2;
+            textarea.placeholder = "e.g. IsDeleted = false AND Country = 'BR'";
+            textarea.value = pIndex.Filter;
+            textarea.title = "Free-form condition, written as the model understands it — the template translates it per database provider. Not validated.";
+            textarea.addEventListener("input", function () { pIndex.Filter = this.value; });
+            section.appendChild(textarea);
+            return section;
+        }
+
+        if (pIndex.FilterConditions.length === 0) {
+            const emptyFilter = document.createElement("div");
+            emptyFilter.className = "index-fields-empty";
+            emptyFilter.textContent = "No filter — this will be a full index.";
+            section.appendChild(emptyFilter);
+        }
+        else {
+            for (let i = 0; i < pIndex.FilterConditions.length; i++)
+                section.appendChild(BuildFilterConditionRow(pIndex, pIndex.FilterConditions[i], i));
+        }
+
+        const addCondBtn = document.createElement("button");
+        addCondBtn.className = "seed-btn seed-btn-secondary index-add-condition-btn";
+        addCondBtn.textContent = "+ Add condition";
+        addCondBtn.disabled = _IndexEditor.Columns.length === 0;
+        addCondBtn.addEventListener("click", function () { AddFilterCondition(pIndex); });
+        section.appendChild(addCondBtn);
+
+        return section;
+    }
+
+    const INDEX_FIELD_GROUP_DRAG_TYPE = "application/x-dase-index-field-group";
+
+    /**
+     * @param pGroupIndex position within the filtered (key-only or include-only) list this
+     *        row belongs to — reordering operates on that local list and gets flattened back
+     *        into pIndex.Fields by ReorderFieldsGroup.
+     */
+    function BuildIndexFieldRow(pIndex, pField, pGroupIndex, pIsIncludedGroup) {
+        const tr = document.createElement("tr");
+        tr.className = "index-field-row";
+        tr.draggable = true;
+        const groupKey = pIsIncludedGroup ? "include" : "key";
+        const col = _IndexEditor.Columns.find(function (c) { return c.FieldID === pField.FieldID; });
+
+        tr.addEventListener("dragstart", function (e) {
+            tr.classList.add("dragging");
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData(INDEX_FIELD_GROUP_DRAG_TYPE, groupKey);
+            e.dataTransfer.setData("text/plain", String(pGroupIndex));
+        });
+        tr.addEventListener("dragend", function () {
+            tr.classList.remove("dragging");
+            tr.parentElement.querySelectorAll(".drag-over").forEach(function (el) { el.classList.remove("drag-over"); });
+        });
+        tr.addEventListener("dragover", function (e) {
+            if (!e.dataTransfer.types.includes(INDEX_FIELD_GROUP_DRAG_TYPE))
+                return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            tr.classList.add("drag-over");
+        });
+        tr.addEventListener("dragleave", function () {
+            tr.classList.remove("drag-over");
+        });
+        tr.addEventListener("drop", function (e) {
+            e.preventDefault();
+            tr.classList.remove("drag-over");
+            if (e.dataTransfer.getData(INDEX_FIELD_GROUP_DRAG_TYPE) !== groupKey)
+                return; // dragged from the other grid — reordering only makes sense within a grid
+            const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10);
+            ReorderFieldsGroup(pIndex, pIsIncludedGroup, fromIndex, pGroupIndex);
+        });
+        tr.title = "Drag row to reorder";
+
+        // Column name
+        const tdName = document.createElement("td");
+        tdName.className = "index-field-name";
+        tdName.textContent = col ? col.Name : "(missing field)";
+        if (col && col.IsPrimaryKey) {
+            const badge = document.createElement("span");
+            badge.className = "seed-col-badge seed-col-pk";
+            badge.textContent = "PK";
+            tdName.appendChild(badge);
+        }
+        tr.appendChild(tdName);
+
+        if (!pIsIncludedGroup) {
+            // Ascending / Descending — meaningless for an INCLUDE column, so this grid skips it.
+            const tdSort = document.createElement("td");
+            const sortSelect = document.createElement("select");
+            sortSelect.className = "seed-cell-select";
+            const ascOpt = document.createElement("option");
+            ascOpt.value = "asc";
+            ascOpt.textContent = "▲ ASC";
+            const descOpt = document.createElement("option");
+            descOpt.value = "desc";
+            descOpt.textContent = "▼ DESC";
+            sortSelect.appendChild(ascOpt);
+            sortSelect.appendChild(descOpt);
+            sortSelect.value = pField.IsDescending ? "desc" : "asc";
+            sortSelect.addEventListener("change", function () {
+                pField.IsDescending = this.value === "desc";
+            });
+            tdSort.appendChild(sortSelect);
+            tr.appendChild(tdSort);
+
+            // Allow duplicate NULL — only meaningful for a unique key column.
+            const tdDup = document.createElement("td");
+            tdDup.className = "index-field-checkbox-cell";
+            if (pIndex.IsUnique) {
+                const dupChk = document.createElement("input");
+                dupChk.type = "checkbox";
+                dupChk.checked = pField.AllowDuplicate;
+                dupChk.title = "Allow multiple NULLs in this column despite the UNIQUE constraint.";
+                dupChk.addEventListener("change", function () {
+                    pField.AllowDuplicate = this.checked;
+                });
+                tdDup.appendChild(dupChk);
+            }
+            else {
+                tdDup.textContent = "—";
+                tdDup.className += " index-field-disabled";
+            }
+            tr.appendChild(tdDup);
+        }
+
+        // Move to the other grid
+        const tdMove = document.createElement("td");
+        const moveBtn = document.createElement("button");
+        moveBtn.className = "index-field-move-btn";
+        moveBtn.title = pIsIncludedGroup ? "Move to Index Columns" : "Move to Included Columns";
+        moveBtn.textContent = pIsIncludedGroup ? "⇤ Key" : "Include ⇥";
+        moveBtn.addEventListener("click", function () {
+            pField.IsIncluded = !pIsIncludedGroup;
+            if (pField.IsIncluded) {
+                pField.IsDescending = false;
+                pField.AllowDuplicate = false;
+            }
+            RenderIndexDetail();
+            RenderIndexList();
+        });
+        tdMove.appendChild(moveBtn);
+        tr.appendChild(tdMove);
+
+        // Remove
+        const tdRemove = document.createElement("td");
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "index-list-item-remove";
+        removeBtn.title = "Remove column from index";
+        removeBtn.textContent = "✕";
+        removeBtn.addEventListener("click", function () {
+            pIndex.Fields.splice(pIndex.Fields.indexOf(pField), 1);
+            RenderIndexDetail();
+            RenderIndexList();
+        });
+        tdRemove.appendChild(removeBtn);
+        tr.appendChild(tdRemove);
+
+        return tr;
+    }
+
+    function ReorderFieldsGroup(pIndex, pIsIncludedGroup, pFromIndex, pToIndex) {
+        const group = pIndex.Fields.filter(function (f) { return f.IsIncluded === pIsIncludedGroup; });
+        const otherGroup = pIndex.Fields.filter(function (f) { return f.IsIncluded !== pIsIncludedGroup; });
+
+        if (isNaN(pFromIndex) || pFromIndex === pToIndex
+            || pFromIndex < 0 || pFromIndex >= group.length
+            || pToIndex < 0 || pToIndex >= group.length)
+            return;
+
+        const [moved] = group.splice(pFromIndex, 1);
+        group.splice(pToIndex, 0, moved);
+
+        // Key columns first, included columns after — codegen filters each group by
+        // IsIncluded independently, so the relative order between the two groups is moot.
+        pIndex.Fields = pIsIncludedGroup ? otherGroup.concat(group) : group.concat(otherGroup);
+        RenderIndexDetail();
+    }
+
+    // ── Validation / Save ────────────────────────────────────────────────────
+
+    function ValidateAllIndexes() {
+        if (!_IndexEditor)
+            return [];
+
+        const errors = [];
+        const namesSeen = new Set();
+
+        for (const ix of _IndexEditor.Indexes) {
+            const name = (ix.Name || "").trim();
+            if (!name)
+                errors.push("Every index needs a name.");
+            else {
+                const key = name.toLowerCase();
+                if (namesSeen.has(key))
+                    errors.push("Duplicate index name: \"" + name + "\".");
+                namesSeen.add(key);
+            }
+
+            const keyFields = ix.Fields.filter(function (f) { return !f.IsIncluded; });
+            if (keyFields.length === 0)
+                errors.push("Index \"" + (name || "(unnamed)") + "\" needs at least one key column.");
+
+            if (ix.FilterMode === "guided") {
+                for (const cond of ix.FilterConditions) {
+                    if (cond.Op === "isnull" || cond.Op === "isnotnull")
+                        continue;
+                    const col = _IndexEditor.Columns.find(function (c) { return c.FieldID === cond.FieldID; });
+                    if (col && IsNumericType(col.DataType) && (cond.Value === "" || isNaN(Number(cond.Value))))
+                        errors.push("Filter on \"" + col.Name + "\" (index \"" + (name || "(unnamed)") + "\") needs a valid number.");
+                }
+            }
+        }
+
+        return errors;
+    }
+
+    function CollectIndexData() {
+        if (!_IndexEditor)
+            return [];
+
+        return _IndexEditor.Indexes.map(function (ix) {
+            return {
+                IndexID: ix.IndexID.indexOf("NEW_") === 0 ? "NEW" : ix.IndexID,
+                Name: (ix.Name || "").trim(),
+                IsUnique: ix.IsUnique,
+                Filter: ix.Filter || "",
+                Fields: ix.Fields.map(function (f) {
+                    return {
+                        FieldID: f.FieldID,
+                        IsDescending: f.IsDescending,
+                        AllowDuplicate: f.AllowDuplicate,
+                        IsIncluded: f.IsIncluded
+                    };
+                })
+            };
+        });
+    }
+
+    function SaveIndexEditorData() {
+        if (!_IndexEditor)
+            return;
+
+        const errors = ValidateAllIndexes();
+        if (errors.length > 0) {
+            SetSeedValidationBadge(errors.map(function (m) { return { Message: m }; }));
+            SetSeedStatusMessage(errors[0], "err");
+            return;
+        }
+
+        SetSeedValidationBadge(null);
+        document.getElementById("seed-btn-save").disabled = true;
+        SetSeedStatusMessage("Saving...", "");
+
+        SendMessage(XMessageType.SaveIndexes, {
+            TableID: _IndexEditor.TableID,
+            Indexes: CollectIndexData()
+        });
+    }
+
+    function OnIndexesSaved(pPayload) {
+        if (!_IndexEditor)
+            return;
+
+        const btnSave = document.getElementById("seed-btn-save");
+        if (!btnSave)
+            return;
+
+        if (pPayload && pPayload.Success) {
+            SetSeedStatusMessage("✓ Saved successfully.", "ok");
+            btnSave.disabled = false;
+            setTimeout(CloseSeedEditorModal, 900);
+        }
+        else {
+            const msg = (pPayload && pPayload.Message) ? pPayload.Message : "Failed to save.";
+            SetSeedStatusMessage("✕ " + msg, "err");
+            btnSave.disabled = false;
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

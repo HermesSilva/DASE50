@@ -6,6 +6,7 @@ import { GetSelectionService } from "../../Services/SelectionService";
 import { GetLogService } from "../../Services/LogService";
 import { XDesignerSelection } from "../../Models/DesignerSelection";
 import { XIssueItem } from "../../Models/IssueItem";
+import { GetActiveDesignerTracker } from "../../Services/ActiveDesignerTracker";
 
 interface ISelectPayload {
     Clear?: boolean;
@@ -73,6 +74,26 @@ interface ISaveSeedDataPayload {
     Rows: Array<{
         TupleID: string;
         Values: Record<string, string>;
+    }>;
+}
+
+interface IRequestIndexesPayload {
+    TableID: string;
+}
+
+interface ISaveIndexesPayload {
+    TableID: string;
+    Indexes: Array<{
+        IndexID: string;
+        Name: string;
+        IsUnique?: boolean;
+        Filter?: string;
+        Fields: Array<{
+            FieldID: string;
+            IsDescending?: boolean;
+            AllowDuplicate?: boolean;
+            IsIncluded?: boolean;
+        }>;
     }>;
 }
 
@@ -175,11 +196,13 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
         // Set as last active immediately so Properties panel can find it
         this._LastActiveKey = key;
+        GetActiveDesignerTracker().NotifyActive("ORM");
 
         // Track view state changes to update last active key
         pWebviewPanel.onDidChangeViewState((e) => {
             if (e.webviewPanel.active) {
                 this._LastActiveKey = key;
+                GetActiveDesignerTracker().NotifyActive("ORM");
                 // Update global IssueService with this document's issues
                 state.RefreshIssues();
             }
@@ -371,6 +394,16 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 break;
 
             // ----------------------------------------------------
+            // Index Messages (Table Options — Indexes tab)
+            // ----------------------------------------------------
+            case XDesignerMessageType.RequestIndexes:
+                this.OnRequestIndexes(pPanel, pState, payload as IRequestIndexesPayload);
+                break;
+            case XDesignerMessageType.SaveIndexes:
+                await this.OnSaveIndexes(pPanel, pState, payload as ISaveIndexesPayload);
+                break;
+
+            // ----------------------------------------------------
             // DBML Messages
             // ----------------------------------------------------
             case "ExportToDBML":
@@ -463,6 +496,39 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
 
         pPanel.webview.postMessage({
             Type: XDesignerMessageType.SeedDataSaved,
+            Payload: { TableID: pPayload.TableID, Success: result.Success, Message: result.Message }
+        });
+
+        if (result.Success) {
+            this.NotifyDocumentChanged(pState);
+            await this.SendIssuesUpdate(pPanel, pState);
+        }
+    }
+
+    OnRequestIndexes(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: IRequestIndexesPayload): void {
+        if (!pPayload?.TableID)
+            return;
+
+        const indexData = pState.Bridge.GetTableIndexes(pPayload.TableID);
+        if (!indexData) {
+            GetLogService().Warn(`GetTableIndexes: table not found: ${pPayload.TableID}`);
+            return;
+        }
+
+        pPanel.webview.postMessage({
+            Type: XDesignerMessageType.IndexesLoaded,
+            Payload: indexData
+        });
+    }
+
+    async OnSaveIndexes(pPanel: vscode.WebviewPanel, pState: XORMDesignerState, pPayload: ISaveIndexesPayload): Promise<void> {
+        if (!pPayload?.TableID || !Array.isArray(pPayload.Indexes))
+            return;
+
+        const result = pState.Bridge.SaveTableIndexes(pPayload.TableID, pPayload.Indexes);
+
+        pPanel.webview.postMessage({
+            Type: XDesignerMessageType.IndexesSaved,
             Payload: { TableID: pPayload.TableID, Success: result.Success, Message: result.Message }
         });
 
@@ -1280,7 +1346,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
     <div id="table-context-menu" class="context-menu">
         <div class="context-menu-item" data-action="add-field"><span class="icon">➕</span>Add Field</div>
         <div class="context-menu-separator"></div>
-        <div class="context-menu-item" data-action="edit-seed-data"><span class="icon">🗂️</span>Edit Seed Data</div>
+        <div class="context-menu-item" data-action="table-options"><span class="icon">🗂️</span>Table Options</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="delete-table"><span class="icon">🗑️</span>Delete Table</div>
         <div class="context-menu-item" data-action="rename-table"><span class="icon">✏️</span>Rename Table</div>
@@ -1312,27 +1378,56 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
             <div class="seed-modal-header">
                 <div class="seed-modal-title-block">
                     <span class="seed-modal-icon">🗂️</span>
-                    <h2 id="seed-modal-title" class="seed-modal-title"></h2>
+                    <h2 id="seed-modal-title" class="seed-modal-title">Table Options</h2>
                     <span class="seed-modal-badge" id="seed-row-count"></span>
                 </div>
                 <button id="seed-modal-close" class="seed-modal-close" aria-label="Close" title="Close (Esc)">✕</button>
             </div>
-            <div class="seed-modal-toolbar">
-                <button id="seed-add-row" class="seed-btn seed-btn-primary" title="Add a new row (Ctrl+Enter)">
-                    <span>➕</span> Add Row
+            <div class="table-options-tabs" id="table-options-tabs" role="tablist">
+                <button class="table-options-tab active" id="tab-btn-seed" data-tab="seed" role="tab" aria-selected="true">
+                    <span>🌱</span> Seed Data
                 </button>
-                <button id="seed-delete-rows" class="seed-btn seed-btn-danger" title="Delete selected rows (Del)">
-                    <span>🗑️</span> Delete
+                <button class="table-options-tab" id="tab-btn-indexes" data-tab="indexes" role="tab" aria-selected="false">
+                    <span>🔑</span> Indexes
                 </button>
-                <span class="seed-toolbar-sep"></span>
-                <span id="seed-validation-badge" class="seed-validation-badge" style="display:none"></span>
             </div>
-            <div class="seed-grid-wrapper" id="seed-grid-wrapper">
-                <div class="seed-grid-container" id="seed-grid-container">
-                    <table class="seed-grid" id="seed-grid" cellspacing="0" cellpadding="0">
-                        <thead id="seed-grid-head"></thead>
-                        <tbody id="seed-grid-body"></tbody>
-                    </table>
+            <div class="table-options-tab-panel" id="tab-panel-seed" role="tabpanel">
+                <div class="seed-modal-toolbar">
+                    <button id="seed-add-row" class="seed-btn seed-btn-primary" title="Add a new row (Ctrl+Enter)">
+                        <span>➕</span> Add Row
+                    </button>
+                    <button id="seed-delete-rows" class="seed-btn seed-btn-danger" title="Delete selected rows (Del)">
+                        <span>🗑️</span> Delete
+                    </button>
+                    <span class="seed-toolbar-sep"></span>
+                    <span id="seed-validation-badge" class="seed-validation-badge" style="display:none"></span>
+                </div>
+                <div class="seed-grid-wrapper" id="seed-grid-wrapper">
+                    <div class="seed-grid-container" id="seed-grid-container">
+                        <table class="seed-grid" id="seed-grid" cellspacing="0" cellpadding="0">
+                            <thead id="seed-grid-head"></thead>
+                            <tbody id="seed-grid-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="table-options-tab-panel" id="tab-panel-indexes" style="display:none" role="tabpanel">
+                <div class="index-editor-layout">
+                    <div class="index-list-pane">
+                        <div class="index-list-header">
+                            <span>Indexes</span>
+                            <button id="index-add-btn" class="seed-btn seed-btn-primary index-add-btn" title="Add a new index">
+                                <span>➕</span> Add
+                            </button>
+                        </div>
+                        <div id="index-list" class="index-list"></div>
+                    </div>
+                    <div class="index-detail-pane" id="index-detail-pane">
+                        <div class="index-empty-state" id="index-empty-state">
+                            <span class="seed-empty-icon">🔑</span>
+                            No index selected. Click <b>Add</b> to create one.
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="seed-modal-footer">

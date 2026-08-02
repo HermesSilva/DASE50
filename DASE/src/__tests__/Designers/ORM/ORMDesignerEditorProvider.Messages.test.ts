@@ -1012,6 +1012,133 @@ describe('XORMDesignerEditorProvider', () => {
         });
     });
 
+    describe('HandleMessage RequestIndexes', () => {
+        let mockPanel: any;
+        let mockState: any;
+
+        beforeEach(() => {
+            mockPanel = createMockWebviewPanel();
+            mockState = {
+                Bridge: {
+                    GetTableIndexes: jest.fn().mockReturnValue({ TableID: 't1', TableName: 'T', Columns: [], Indexes: [] }),
+                    SaveTableIndexes: jest.fn().mockReturnValue({ Success: true }),
+                    LastSyncMutated: false,
+                    GetAllDataTypes: jest.fn().mockReturnValue([]),
+                    GetPKDataTypes: jest.fn().mockReturnValue([])
+                },
+                Validate: jest.fn().mockReturnValue([]),
+                GetProperties: jest.fn().mockReturnValue([]),
+                IsDirty: false,
+                Document: { uri: Uri.file('/test/model.dsorm') },
+                IssueService: { SetIssues: jest.fn() },
+                SelectionService: { HasSelection: false, PrimaryID: null }
+            };
+        });
+
+        it('should send index data when table exists', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'RequestIndexes',
+                Payload: { TableID: 't1' }
+            });
+
+            expect(mockState.Bridge.GetTableIndexes).toHaveBeenCalledWith('t1');
+            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+                expect.objectContaining({ Type: 'IndexesLoaded' })
+            );
+        });
+
+        it('should do nothing when TableID is missing', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'RequestIndexes',
+                Payload: {}
+            });
+
+            expect(mockState.Bridge.GetTableIndexes).not.toHaveBeenCalled();
+        });
+
+        it('should log warning when index data is null', async () => {
+            mockState.Bridge.GetTableIndexes.mockReturnValue(null);
+
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'RequestIndexes',
+                Payload: { TableID: 'not-found' }
+            });
+
+            expect(mockPanel.webview.postMessage).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('HandleMessage SaveIndexes', () => {
+        let mockPanel: any;
+        let mockState: any;
+
+        beforeEach(() => {
+            mockPanel = createMockWebviewPanel();
+            mockState = {
+                Bridge: {
+                    SaveTableIndexes: jest.fn().mockReturnValue({ Success: true }),
+                    LastSyncMutated: false,
+                    GetAllDataTypes: jest.fn().mockReturnValue([]),
+                    GetPKDataTypes: jest.fn().mockReturnValue([])
+                },
+                Validate: jest.fn().mockReturnValue([]),
+                GetProperties: jest.fn().mockReturnValue([]),
+                IsDirty: false,
+                Document: { uri: Uri.file('/test/model.dsorm') },
+                IssueService: { SetIssues: jest.fn() },
+                SelectionService: { HasSelection: false, PrimaryID: null }
+            };
+        });
+
+        it('should save indexes and notify changes on success', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'SaveIndexes',
+                Payload: { TableID: 't1', Indexes: [{ IndexID: 'NEW', Name: 'IX_1', Fields: [{ FieldID: 'f1' }] }] }
+            });
+
+            expect(mockState.Bridge.SaveTableIndexes).toHaveBeenCalledWith(
+                't1', [{ IndexID: 'NEW', Name: 'IX_1', Fields: [{ FieldID: 'f1' }] }]
+            );
+            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+                expect.objectContaining({ Type: 'IndexesSaved' })
+            );
+        });
+
+        it('should do nothing when TableID is missing', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'SaveIndexes',
+                Payload: { Indexes: [] }
+            });
+
+            expect(mockState.Bridge.SaveTableIndexes).not.toHaveBeenCalled();
+        });
+
+        it('should do nothing when Indexes is not an array', async () => {
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'SaveIndexes',
+                Payload: { TableID: 't1', Indexes: 'invalid' }
+            });
+
+            expect(mockState.Bridge.SaveTableIndexes).not.toHaveBeenCalled();
+        });
+
+        it('should not notify document changed when save fails', async () => {
+            mockState.Bridge.SaveTableIndexes.mockReturnValue({ Success: false, Message: 'Error' });
+
+            await provider.HandleMessage(mockPanel, mockState, {
+                Type: 'SaveIndexes',
+                Payload: { TableID: 't1', Indexes: [] }
+            });
+
+            expect(mockPanel.webview.postMessage).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    Type: 'IndexesSaved',
+                    Payload: expect.objectContaining({ Success: false })
+                })
+            );
+        });
+    });
+
     describe('HandleMessage RequestShadowTablePicker', () => {
         let mockPanel: any;
         let mockState: any;

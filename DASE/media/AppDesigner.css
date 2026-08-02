@@ -1,0 +1,499 @@
+/* AppDesigner.css — Fase 4 (WYSIWYG, paleta fiel ao produto real).
+   Tema copiado do TootegaERP rodando de verdade (print do dono, tema "amber" — o escolhido
+   pelo assinante nas telas de referência): fundo marrom bem escuro, acento laranja. Cores de
+   ação são FIXAS em qualquer tema no front real (Front/Core/src/components/templates/
+   XButtonBar.tsx `ACTION_STYLES` + `Front/Core/src/lib/closeButtonStyle.ts`) — Criar=verde,
+   Editar=azul, Visualizar=azul pastel, Exportar=violeta, Fechar=vermelho abafado — copiadas
+   aqui tal e qual. O restante (`BUTTON_TYPE_STYLES`) segue a paleta do tema.
+
+   O webview passa a ter cor PRÓPRIA (não `var(--vscode-*)`) porque o objetivo agora é parecer
+   com o produto, não com o chrome do VS Code — o usuário quer ver a App como ela vai ficar,
+   não como o editor está pintado. */
+
+* { box-sizing: border-box; }
+
+:root {
+    /* Front/Core/src/styles/index.css — tema "amber" */
+    --tt-bg: hsl(20 30% 8%);
+    --tt-surface: hsl(22 25% 14%);
+    --tt-surface-alt: hsl(20 18% 17%);
+    --tt-text-primary: hsl(35 40% 90%);
+    --tt-text-secondary: hsl(30 20% 65%);
+    --tt-text-muted: hsl(25 15% 48%);
+    --tt-border: hsl(22 20% 22%);
+    --tt-border-light: hsl(20 18% 17%);
+
+    --tt-brand-primary: hsl(30 85% 55%);
+    --tt-brand-primary-light: hsl(32 80% 65%);
+    --tt-brand-primary-dark: hsl(25 90% 45%);
+    --tt-danger: hsl(0 70% 58%);
+    --tt-success: hsl(142 55% 48%);
+    --tt-warning: hsl(38 75% 52%);
+    --tt-info: hsl(30 80% 60%);
+
+    /* Cores de AÇÃO — fixas, não mudam com o tema (XButtonBar.tsx ACTION_STYLES) */
+    --tt-act-create: #16a34a;      /* green-600 */
+    --tt-act-create-hover: #15803d;
+    --tt-act-edit: #2563eb;        /* blue-600 */
+    --tt-act-edit-hover: #1d4ed8;
+    --tt-act-view-bg: rgb(125 211 252 / 0.7);  /* sky-300/70 */
+    --tt-act-view-bg-hover: #7dd3fc;
+    --tt-act-view-fg: #082f49;     /* sky-950 */
+    --tt-act-export: #7c3aed;      /* violet-600 */
+    --tt-act-export-hover: #6d28d9;
+    --tt-act-close-bg: rgb(127 29 29 / 0.6);   /* red-900/60 */
+    --tt-act-close-bg-hover: #991b1b;          /* red-800 */
+    --tt-act-close-fg: rgb(254 226 226 / 0.8); /* red-100/80 */
+
+    --tt-radius-sm: 6px;
+    --tt-radius-md: 8px;
+    --tt-radius-lg: 16px;
+    --tt-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--vscode-font-family, system-ui, sans-serif);
+    font-size: var(--vscode-font-size, 13px);
+    color: var(--tt-text-primary);
+    background: var(--tt-bg);
+}
+
+#app-designer-root { padding: 16px 24px 40px; }
+
+.app-empty {
+    opacity: 0.85;
+    padding: 40px;
+    text-align: center;
+}
+
+.app-create-btn { margin: 14px auto 0; }
+
+.app-empty-inline {
+    padding: 20px;
+    text-align: center;
+    opacity: 0.85;
+    border: 1px dashed var(--tt-border);
+    border-radius: var(--tt-radius-sm);
+}
+
+.app-empty-inline-actions {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+/* ---- Cabeçalho da App / shell ---------------------------------------------------------- */
+
+.app-shell { }
+
+.app-shell-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 4px 14px;
+    margin-bottom: 4px;
+    cursor: pointer;
+}
+
+.app-shell-title-block { display: flex; align-items: center; gap: 10px; }
+.app-shell-title { font-size: 1.15em; font-weight: 700; }
+.app-shell-subtitle { opacity: 0.65; font-size: 0.82em; color: var(--tt-text-secondary); }
+.app-shell-header-actions { display: flex; gap: 8px; }
+
+/* ---- Botões reais — forma de Button.tsx (rounded-lg, px-4 py-2.5, font-medium); cor por
+   AÇÃO quando a ação é uma das cinco fixas (Criar/Editar/Visualizar/Exportar/Fechar), senão
+   por ButtonType (XButtonBar.tsx BUTTON_TYPE_STYLES) ------------------------------------- */
+
+.app-real-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--tt-radius-md);
+    border: 1px solid transparent;
+    font-size: 0.85em;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.15s;
+}
+
+.app-btn-primary { background: var(--tt-brand-primary); color: #fff; }
+.app-btn-primary:hover { background: var(--tt-brand-primary-dark); }
+.app-btn-secondary { background: var(--tt-bg); color: var(--tt-text-primary); border-color: var(--tt-border); }
+.app-btn-secondary:hover { background: var(--tt-surface-alt); }
+.app-btn-danger { background: var(--tt-danger); color: #fff; }
+.app-btn-danger:hover { filter: brightness(0.9); }
+.app-btn-success { background: var(--tt-success); color: #fff; }
+.app-btn-success:hover { filter: brightness(0.9); }
+.app-btn-warning { background: var(--tt-warning); color: #fff; }
+.app-btn-warning:hover { filter: brightness(0.9); }
+.app-btn-info { background: var(--tt-info); color: #fff; }
+.app-btn-info:hover { filter: brightness(0.9); }
+
+/* Ação fixa — prevalece sobre ButtonType, igual ao front real */
+.app-act-create { background: var(--tt-act-create); color: #fff; }
+.app-act-create:hover { background: var(--tt-act-create-hover); }
+.app-act-edit { background: var(--tt-act-edit); color: #fff; }
+.app-act-edit:hover { background: var(--tt-act-edit-hover); }
+.app-act-view { background: var(--tt-act-view-bg); color: var(--tt-act-view-fg); }
+.app-act-view:hover { background: var(--tt-act-view-bg-hover); }
+.app-act-export { background: var(--tt-act-export); color: #fff; }
+.app-act-export:hover { background: var(--tt-act-export-hover); }
+.app-act-close { background: var(--tt-act-close-bg); color: var(--tt-act-close-fg); }
+.app-act-close:hover { background: var(--tt-act-close-bg-hover); color: #fff; }
+
+.app-icon { flex-shrink: 0; }
+.app-icon-mono {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    font-size: 9px;
+    font-weight: 700;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.25);
+    flex-shrink: 0;
+}
+
+/* ---- Barra única: filtros + botões — mirror do cabeçalho de XApplicationView.tsx
+   (`flex flex-wrap items-end ... border-b border-border-light`, um flex-1 entre os dois
+   grupos). NÃO é uma caixa própria: senta direto no fundo da página, só uma borda embaixo. */
+
+.app-toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px;
+    padding: 8px 4px 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--tt-border-light);
+}
+
+.app-toolbar-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.app-toolbar-spacer { flex: 1 1 8px; min-width: 8px; }
+.app-toolbar-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+.app-filter-field { display: flex; flex-direction: column; gap: 4px; min-width: 140px; max-width: 240px; cursor: pointer; }
+.app-filter-label { font-size: 0.85em; font-weight: 500; color: var(--tt-text-primary); }
+
+.app-filter-field input, .app-filter-field select {
+    background: var(--tt-bg);
+    color: var(--tt-text-primary);
+    border: 1px solid var(--tt-border);
+    padding: 6px 10px;
+    border-radius: var(--tt-radius-md);
+    font-size: 0.85em;
+    color-scheme: dark;
+}
+
+.app-filter-field input::placeholder { color: var(--tt-text-muted); }
+
+.app-ghost-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border: 1px dashed var(--tt-border);
+    border-radius: var(--tt-radius-sm);
+    background: transparent;
+    color: var(--tt-text-secondary);
+    font-size: 0.78em;
+    cursor: pointer;
+}
+
+.app-ghost-add:hover { border-color: var(--tt-brand-primary); color: var(--tt-brand-primary); }
+
+/* ---- Grade de dados — <table> de verdade, mirror de XDataView.tsx/XDataViewHeader.tsx:
+   sem linha vertical entre colunas, cabeçalho com borda dupla, linhas com borda simples. ---- */
+
+.app-grid-wrap { margin-bottom: 16px; overflow-x: auto; }
+
+.app-real-table { width: 100%; border-collapse: collapse; }
+
+.app-real-table th {
+    padding: 0 12px;
+    height: 40px;
+    text-align: left;
+    font-size: 0.85em;
+    font-weight: 500;
+    color: var(--tt-text-primary);
+    border-bottom: 2px solid var(--tt-border);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.app-real-table th:hover { background: var(--tt-surface-alt); }
+.app-grid-add-cell { width: 1%; cursor: default !important; }
+.app-grid-add-cell:hover { background: transparent !important; }
+
+.app-real-table td {
+    padding: 0 12px;
+    height: 40px;
+    border-bottom: 1px solid var(--tt-border-light);
+}
+
+.app-grid-skeleton-row-selected { background: hsl(30 85% 55% / 0.16); }
+.app-grid-skeleton-row:hover { background: var(--tt-surface); }
+
+.app-grid-skeleton-bar {
+    display: inline-block;
+    height: 8px;
+    width: 70%;
+    border-radius: 2px;
+    background: hsl(35 20% 55% / 0.3);
+}
+
+.app-grid-empty { padding: 14px 4px; opacity: 0.6; font-size: 0.85em; }
+
+/* ---- Chips (ações de linha / visualizadores) — discretos, não caixas próprias ------------- */
+
+.app-chip-strip { margin-bottom: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.app-chip-strip-title { font-size: 0.7em; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--tt-text-muted); }
+.app-chip-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.app-chip {
+    padding: 3px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--tt-border);
+    font-size: 0.78em;
+    cursor: pointer;
+    color: var(--tt-text-secondary);
+}
+.app-chip:hover { border-color: var(--tt-brand-primary); color: var(--tt-text-primary); }
+
+/* ---- Formulário: cartão real (.card do front: rounded-xl shadow-sm border-border-light),
+   largura calculada pela mesma fórmula da FE-8 (970px de referência × ModalWidth%) --------- */
+
+.app-form-area { margin-top: 18px; }
+
+.app-form-card {
+    border: 1px solid var(--tt-border);
+    border-radius: var(--tt-radius-lg);
+    box-shadow: var(--tt-shadow-sm), 0 8px 24px rgb(0 0 0 / 0.45);
+    background: var(--tt-surface);
+    max-width: 100%;
+    min-width: 280px;
+}
+
+.app-form-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--tt-border);
+    font-weight: 700;
+    font-size: 1.05em;
+    cursor: pointer;
+    border-radius: var(--tt-radius-lg) var(--tt-radius-lg) 0 0;
+}
+
+.app-form-card-width { font-weight: 400; font-size: 0.72em; opacity: 0.55; }
+
+.app-tab-strip {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 10px 0;
+    border-bottom: 1px solid var(--tt-border);
+    overflow-x: auto;
+}
+
+.app-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border: none;
+    background: transparent;
+    color: var(--tt-text-secondary);
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+.app-tab-btn:hover { color: var(--tt-text-primary); }
+.app-tab-active { color: var(--tt-brand-primary); border-bottom-color: var(--tt-brand-primary); font-weight: 600; }
+
+.app-form-card-body { padding: 14px 16px; }
+
+.app-section-panel { margin-bottom: 4px; }
+
+/* Divisor de seção — Front/Core/.../XFormView.tsx FormSection: linha à esquerda, título à
+   direita, cor do acento em 40% de opacidade, título pequeno/médio, mesma cor do acento. */
+.app-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 4px 8px;
+    cursor: pointer;
+}
+
+.app-section-header::before {
+    content: "";
+    flex: 1;
+    height: 2px;
+    background: hsl(30 85% 55% / 0.4);
+}
+
+.app-section-header-title {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: var(--tt-brand-primary);
+    white-space: nowrap;
+}
+
+.app-section-header .app-ghost-add { margin-left: 4px; }
+
+.app-section-ghost-row {
+    display: flex;
+    justify-content: flex-end;
+    padding: 4px 8px;
+    cursor: pointer;
+}
+
+.app-detail-grid-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1px dashed var(--tt-border);
+    border-radius: var(--tt-radius-md);
+    cursor: pointer;
+    font-size: 0.85em;
+    opacity: 0.85;
+}
+
+/* ---- Grid de 32 colunas (FE-2) ------------------------------------------------------------ */
+
+.app-fields-grid { padding: 6px 4px 12px; display: flex; flex-direction: column; gap: 6px; }
+
+.app-grid-row-lane {
+    display: flex;
+    gap: 12px;
+    min-height: 20px;
+    border-radius: var(--tt-radius-sm);
+    transition: background-color 0.1s;
+}
+
+.app-grid-newrow {
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border: 1px dashed var(--tt-border);
+    font-size: 0.72em;
+    opacity: 0.5;
+}
+
+.app-drop-target { background: hsl(30 85% 55% / 0.15); outline: 1px dashed var(--tt-brand-primary); }
+
+.app-field {
+    position: relative;
+    min-width: 0;
+    padding: 2px 10px 8px 2px;
+    border: 1px solid transparent;
+    border-radius: var(--tt-radius-sm);
+    cursor: grab;
+}
+
+.app-field:hover { background: hsl(35 20% 50% / 0.08); }
+.app-field.app-selected { border-color: var(--tt-brand-primary); background: hsl(30 85% 55% / 0.1); }
+.app-field-dragging { opacity: 0.5; }
+
+.app-field-label {
+    display: block;
+    font-size: 0.8em;
+    font-weight: 600;
+    color: var(--tt-text-primary);
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-field-label-missing { color: var(--tt-warning); }
+.app-field-required { color: var(--tt-danger); }
+
+.app-field-widget,
+.app-field-body input,
+.app-field-body select,
+.app-field-body textarea {
+    width: 100%;
+    background: var(--tt-bg);
+    color: var(--tt-text-primary);
+    border: 1px solid var(--tt-border);
+    border-radius: var(--tt-radius-sm);
+    padding: 5px 8px;
+    font-size: 0.85em;
+    font-family: inherit;
+    color-scheme: dark;
+}
+
+.app-field-widget::placeholder { color: var(--tt-text-muted); }
+
+.app-field-bool { display: flex; align-items: center; height: 28px; }
+.app-field-upload {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border: 1px dashed var(--tt-border);
+    border-radius: var(--tt-radius-sm);
+    font-size: 0.8em;
+    color: var(--tt-text-secondary);
+}
+.app-field-color { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--tt-border); border-radius: var(--tt-radius-sm); }
+.app-color-swatch { width: 16px; height: 16px; border-radius: 2px; background: #ffffff; border: 1px solid var(--tt-border); }
+.app-field-rating { opacity: 0.4; letter-spacing: 1px; }
+.app-field-affix { display: flex; align-items: center; gap: 4px; }
+.app-field-affix input { flex: 1; }
+.app-affix { font-size: 0.78em; color: var(--tt-text-secondary); }
+
+.app-field-hidden-chip {
+    padding: 3px 8px;
+    border-radius: 10px;
+    border: 1px dashed var(--tt-border);
+    font-size: 0.72em;
+    opacity: 0.6;
+    cursor: pointer;
+    align-self: flex-start;
+}
+
+.app-resize-handle {
+    position: absolute;
+    top: 0;
+    right: -4px;
+    bottom: 0;
+    width: 8px;
+    cursor: ew-resize;
+}
+
+.app-resize-handle::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 3px;
+    width: 2px;
+    height: 60%;
+    transform: translateY(-50%);
+    background: var(--tt-border);
+    border-radius: 1px;
+}
+
+.app-field:hover .app-resize-handle::after,
+.app-field.app-selected .app-resize-handle::after { background: var(--tt-brand-primary); }
+
+/* ---- Problemas ----------------------------------------------------------------------------- */
+
+.app-issues { margin-top: 16px; }
+.app-issues-title { font-weight: 700; margin-bottom: 6px; }
+.app-issue { padding: 3px 6px; font-size: 0.85em; cursor: pointer; border-radius: var(--tt-radius-sm); }
+.app-issue:hover { background: hsl(35 20% 50% / 0.1); }
+.app-issue-error { color: var(--tt-danger); }
+.app-issue-warning { color: var(--tt-warning); }
+
+body.app-drag-active { cursor: grabbing; }

@@ -899,6 +899,358 @@ body {
     text-overflow: ellipsis;
 }
 
+/* ── Table Options tabs ─────────────────────────────────────────── */
+.table-options-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+    flex-shrink: 0;
+}
+
+.table-options-tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
+    font-size: 12px;
+    font-family: var(--vscode-font-family);
+    padding: 8px 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: color 0.12s, border-color 0.12s;
+}
+
+.table-options-tab:hover {
+    color: var(--vscode-foreground);
+}
+
+.table-options-tab.active {
+    color: var(--vscode-foreground);
+    border-bottom-color: var(--vscode-focusBorder, #007acc);
+    font-weight: 600;
+}
+
+.table-options-tab-panel {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ── Index editor ───────────────────────────────────────────────── */
+.index-editor-layout {
+    flex: 1 1 0;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.index-list-pane {
+    width: 220px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.index-list-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
+    border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.15));
+    flex-shrink: 0;
+}
+
+.index-add-btn {
+    padding: 2px 8px;
+    font-size: 11px;
+}
+
+.index-list {
+    flex: 1 1 0;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.index-list-empty {
+    padding: 20px 14px;
+    font-size: 12px;
+    text-align: center;
+    color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.5));
+}
+
+.index-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.08));
+    transition: background 0.1s;
+}
+
+.index-list-item:hover {
+    background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.1));
+}
+
+.index-list-item.active {
+    background: var(--vscode-list-activeSelectionBackground, rgba(14, 99, 156, 0.35));
+}
+
+.index-list-item-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.index-list-item-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--vscode-foreground);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.index-list-item-fields {
+    font-size: 10px;
+    color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.6));
+    margin-top: 2px;
+}
+
+.index-list-item-remove {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--vscode-errorForeground, #f14c4c);
+    opacity: 0.75;
+    font-size: 12px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    transition: opacity 0.1s, background 0.1s;
+}
+
+.index-list-item-remove:hover {
+    opacity: 1;
+    background: rgba(241, 76, 76, 0.15);
+}
+
+.index-detail-pane {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: auto;
+    padding: 16px 18px;
+}
+
+.index-empty-state {
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.5));
+    font-size: 13px;
+}
+
+.index-detail-row {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+}
+
+.index-field-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
+}
+
+.index-field-label .seed-cell-input {
+    width: 260px;
+}
+
+.index-field-label-wide .seed-cell-input {
+    width: 100%;
+    min-width: 320px;
+}
+
+.index-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    user-select: none;
+}
+
+.index-fields-section {
+    margin-top: 20px;
+}
+
+.index-fields-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.7));
+}
+
+.index-add-field-select {
+    width: 160px;
+}
+
+.index-fields-empty {
+    padding: 16px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.5));
+    border: 1px dashed var(--vscode-panel-border, rgba(128, 128, 128, 0.25));
+    border-radius: 4px;
+}
+
+.index-fields-table {
+    width: 100%;
+    min-width: 460px;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.index-fields-table th {
+    text-align: left;
+    padding: 6px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.6));
+    border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.2));
+}
+
+.index-fields-table td {
+    height: 40px;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.08));
+    vertical-align: middle;
+}
+
+.index-field-row {
+    cursor: grab;
+    transition: opacity 0.1s, background 0.1s;
+}
+
+.index-field-row.dragging {
+    opacity: 0.4;
+}
+
+.index-field-row.drag-over {
+    background: var(--vscode-list-dropBackground, rgba(14, 99, 156, 0.25));
+    box-shadow: inset 0 2px 0 var(--vscode-focusBorder, #007acc);
+}
+
+.index-field-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.index-field-disabled {
+    color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.35));
+    text-align: center;
+}
+
+.index-field-checkbox-cell {
+    text-align: center;
+}
+
+.index-field-move-btn {
+    background: none;
+    border: 1px solid var(--vscode-button-border, rgba(128, 128, 128, 0.4));
+    color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.8));
+    border-radius: 3px;
+    font-size: 10px;
+    padding: 2px 6px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.1s, border-color 0.1s;
+}
+
+.index-field-move-btn:hover {
+    color: var(--vscode-foreground);
+    border-color: var(--vscode-focusBorder, #007acc);
+}
+
+/* ── Filter (WHERE) builder ─────────────────────────────────────── */
+.index-filter-mode-toggle {
+    background: none;
+    border: none;
+    color: var(--vscode-textLink-foreground, #3794ff);
+    font-size: 11px;
+    cursor: pointer;
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 500;
+    padding: 0;
+}
+
+.index-filter-mode-toggle:hover {
+    text-decoration: underline;
+}
+
+.index-filter-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+}
+
+.index-filter-row select,
+.index-filter-row input {
+    width: auto;
+    min-width: 110px;
+}
+
+.index-filter-and {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--vscode-descriptionForeground, rgba(204, 204, 204, 0.6));
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+
+.index-add-condition-btn {
+    margin-top: 2px;
+}
+
+.index-filter-raw {
+    width: 100%;
+    resize: vertical;
+    font-family: var(--vscode-editor-font-family, monospace);
+}
+
 /* Empty state */
 .seed-empty-state {
     padding: 40px 20px;

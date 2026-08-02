@@ -62,7 +62,14 @@ export interface XICodeIndex
     IsUnique: boolean;
     /** Condição de índice parcial, ou vazio. */
     Filter: string;
+    /** Colunas-chave, na ordem do índice. */
     Fields: string[];
+    /** Um bool por entrada de `Fields`, na mesma posição — true quando aquela coluna ordena DESC. */
+    Descending: boolean[];
+    /** true quando ao menos uma coluna de `Fields` ordena DESC — o template só emite `.IsDescending(...)` neste caso. */
+    HasDescending: boolean;
+    /** Colunas de cobertura (INCLUDE) — carregadas pelo índice, fora da chave. */
+    IncludeFields: string[];
 }
 
 export interface XICodeSeedRow
@@ -480,14 +487,26 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
         // Índice que perdeu TODAS as colunas não sai: viraria `HasIndex(e => e.)`, C# inválido.
         // Quem acusa e conserta o vínculo morto é o XORMValidator, no Validate Model — aqui o
         // gerador só se recusa a escrever código quebrado com o que sobrou.
-        const indices: XICodeIndex[] = t.GetChildrenOfType(XORMIndex).map(ix => ({
-            Name: ix.Name,
-            IsUnique: ix.IsUnique,
-            Filter: ix.Filter ?? "",
-            Fields: ix.GetIndexFields()
+        const indices: XICodeIndex[] = t.GetChildrenOfType(XORMIndex).map(ix => {
+            const chaves = ix.GetIndexFields()
+                .filter(f => !f.IsIncluded)
+                .map(f => ({ Name: campos.find(c => c.ID === f.ParentID)?.Name ?? "", Desc: f.IsDescending }))
+                .filter(f => f.Name.length > 0);
+            const incluidas = ix.GetIndexFields()
+                .filter(f => f.IsIncluded)
                 .map(f => campos.find(c => c.ID === f.ParentID)?.Name ?? "")
-                .filter(n => n.length > 0)
-        })).filter(ix => ix.Fields.length > 0);
+                .filter(n => n.length > 0);
+
+            return {
+                Name: ix.Name,
+                IsUnique: ix.IsUnique,
+                Filter: ix.Filter ?? "",
+                Fields: chaves.map(f => f.Name),
+                Descending: chaves.map(f => f.Desc),
+                HasDescending: chaves.some(f => f.Desc),
+                IncludeFields: incluidas
+            };
+        }).filter(ix => ix.Fields.length > 0);
 
         // Seed: as colunas vêm por FieldID; o Name da tupla é o identificador do membro
         // do enum, que não se deriva do texto (BRL, Trial, Z0Confiavel).

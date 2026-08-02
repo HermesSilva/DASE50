@@ -21,6 +21,11 @@ import { XOrganizeTablesCommand } from "./Designers/ORM/Commands/OrganizeTablesC
 import { XCreateSQLScriptCommand } from "./Designers/ORM/Commands/CreateSQLScriptCommand";
 import { XGenerateORMCodeCommand } from "./Designers/ORM/Commands/GenerateORMCodeCommand";
 import { XDetachDesignerCommand } from "./Designers/ORM/Commands/DetachDesignerCommand";
+import { XAppDesignerEditorProvider } from "./Designers/App/AppDesignerEditorProvider";
+import { XNewAppDesignerCommand } from "./Designers/App/Commands/NewAppDesignerCommand";
+import { XOpenAppDesignerCommand } from "./Designers/App/Commands/OpenAppDesignerCommand";
+import { XValidateAppModelCommand } from "./Designers/App/Commands/ValidateAppModelCommand";
+import { XCompositeDesignerProvider } from "./Views/CompositeDesignerProvider";
 
 export function activate(pContext: vscode.ExtensionContext): void {
     const log = InitializeLogService(pContext);
@@ -46,8 +51,17 @@ export function activate(pContext: vscode.ExtensionContext): void {
         XGenerateORMCodeCommand.Register(pContext, designerProvider);
         XDetachDesignerCommand.Register(pContext);
 
+        // App Designer (.dsapp) — modelo de Aplicação/Formulário do TootegaERP. Integração de
+        // agente continua ORM-only até a Fase 6 do plano; o painel de Propriedades já é
+        // compartilhado (ver XCompositeDesignerProvider).
+        const appDesignerProvider = XAppDesignerEditorProvider.Register(pContext);
+        XNewAppDesignerCommand.Register(pContext, appDesignerProvider);
+        XOpenAppDesignerCommand.Register(pContext, appDesignerProvider);
+        XValidateAppModelCommand.Register(pContext, appDesignerProvider);
+
         XIssuesViewProvider.Register(pContext);
-        XPropertiesViewProvider.Register(pContext, designerProvider);
+        const propertiesProvider = new XCompositeDesignerProvider(designerProvider, appDesignerProvider);
+        XPropertiesViewProvider.Register(pContext, propertiesProvider);
 
         // Protege os arquivos gerados: abertos no editor, ficam somente-leitura (na sessão).
         XGeneratedFileGuard.Register(pContext);

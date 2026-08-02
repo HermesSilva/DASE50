@@ -2,7 +2,7 @@
     "name": "dase",
     "displayName": "DASE - Design-Aided Software Engineering",
     "description": "Visual design environment for multi-tier, multi-platform web applications",
-    "version": "1.0.41918",
+    "version": "1.0.41920",
     "publisher": "HermesSilva",
     "license": "MIT",
     "icon": "media/icon.png",
@@ -43,7 +43,11 @@
         "workspaceContains:**/*.dsorm",
         "onCommand:Dase.NewORMDesigner",
         "onCommand:Dase.OpenORMDesigner",
-        "onCommand:Dase.ImportFromDBML"
+        "onCommand:Dase.ImportFromDBML",
+        "onCustomEditor:Dase.AppDesigner",
+        "workspaceContains:**/*.dsapp",
+        "onCommand:Dase.NewAppDesigner",
+        "onCommand:Dase.OpenAppDesigner"
     ],
     "main": "./out/ExtensionMain.js",
     "contributes": {
@@ -137,6 +141,24 @@
                 "title": "Detach Designer to New Window",
                 "category": "DASE",
                 "icon": "$(multiple-windows)"
+            },
+            {
+                "command": "Dase.NewAppDesigner",
+                "title": "New App Designer",
+                "category": "DASE",
+                "icon": "$(file-add)"
+            },
+            {
+                "command": "Dase.OpenAppDesigner",
+                "title": "Open App Designer",
+                "category": "DASE",
+                "icon": "$(folder-opened)"
+            },
+            {
+                "command": "Dase.ValidateAppModel",
+                "title": "Validate App Model",
+                "category": "DASE",
+                "icon": "$(check)"
             }
         ],
         "customEditors": [
@@ -146,6 +168,16 @@
                 "selector": [
                     {
                         "filenamePattern": "*.dsorm"
+                    }
+                ],
+                "priority": "default"
+            },
+            {
+                "viewType": "Dase.AppDesigner",
+                "displayName": "App Designer",
+                "selector": [
+                    {
+                        "filenamePattern": "*.dsapp"
                     }
                 ],
                 "priority": "default"
@@ -219,6 +251,17 @@
                     "command": "Dase.ImportFromDBML",
                     "group": "DASE",
                     "icon": "$(import)"
+                },
+                {
+                    "when": "resourceExtname == .dsapp",
+                    "command": "Dase.OpenAppDesigner",
+                    "group": "dase@1"
+                },
+                {
+                    "when": "resourceExtname == .dsapp",
+                    "command": "Dase.ValidateAppModel",
+                    "group": "dase@2",
+                    "icon": "$(check)"
                 }
             ],
             "webview/context": [

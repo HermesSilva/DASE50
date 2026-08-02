@@ -1,19 +1,19 @@
 ﻿import * as vscode from "vscode";
 import { GetSelectionService } from "../Services/SelectionService";
 import { XPropertyItem } from "../Models/PropertyItem";
-import { XORMDesignerEditorProvider } from "../Designers/ORM/ORMDesignerEditorProvider";
+import type { IPropertiesCapableProvider } from "../Models/DesignerContracts";
 import { XDesignerSelection } from "../Models/DesignerSelection";
 import { GetLogService } from "../Services/LogService";
 
 export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
     // Context kept for future features (theming, storage)
     private readonly _Context: vscode.ExtensionContext;
-    private _DesignerProvider: XORMDesignerEditorProvider;
+    private _DesignerProvider: IPropertiesCapableProvider;
     private _View: vscode.WebviewView | null;
     private _Properties: XPropertyItem[];
     private _ElementID: string | null;
 
-    constructor(pContext: vscode.ExtensionContext, pDesignerProvider: XORMDesignerEditorProvider) {
+    constructor(pContext: vscode.ExtensionContext, pDesignerProvider: IPropertiesCapableProvider) {
         this._Context = pContext;
         this._DesignerProvider = pDesignerProvider;
         this._View = null;
@@ -54,7 +54,7 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
         return "Dase.Properties";
     }
 
-    static Register(pContext: vscode.ExtensionContext, pDesignerProvider: XORMDesignerEditorProvider): XPropertiesViewProvider {
+    static Register(pContext: vscode.ExtensionContext, pDesignerProvider: IPropertiesCapableProvider): XPropertiesViewProvider {
         const provider = new XPropertiesViewProvider(pContext, pDesignerProvider);
         const registration = vscode.window.registerWebviewViewProvider(
             XPropertiesViewProvider.ViewType,
@@ -367,8 +367,10 @@ export class XPropertiesViewProvider implements vscode.WebviewViewProvider {
         state.UpdateProperty(this._ElementID, pPropertyKey, pValue);
 
         // When parent model selection changes, wait for the async table load to complete
-        // before refreshing properties — otherwise the dropdowns show the old groups
-        if (pPropertyKey === "ParentModel") {
+        // before refreshing properties — otherwise the dropdowns show the old groups.
+        // "ParentModel" só existe no domínio ORM; `LoadParentModelTables` é opcional na
+        // interface compartilhada por isso mesmo (ver Models/DesignerContracts.ts).
+        if (pPropertyKey === "ParentModel" && state.LoadParentModelTables) {
             const models = ((pValue as string) || "").split("|").filter(f => f.length > 0);
             await state.LoadParentModelTables(models);
         }

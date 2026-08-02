@@ -26,6 +26,7 @@ const BRIDGE_METHODS = [
     "ListDocuments",
     "GetElementInfoText",
     "GetSeed",
+    "GetIndexes",
     "GetShadowTableOptions",
     "GetOrganizationContextText",
     // ── Write ──
@@ -46,6 +47,7 @@ const BRIDGE_METHODS = [
     "RenameElementById",
     "AlignLines",
     "SaveSeed",
+    "SaveIndexes",
     "AddShadowTable",
     "SaveActiveDocument",
     "CreateDocument",

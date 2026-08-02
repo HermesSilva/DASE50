@@ -279,7 +279,10 @@ tipo, só posiciona o texto.
 | `Name` | nome do índice |
 | `IsUnique` | restrição de unicidade |
 | `Filter` | condição de índice parcial, ou vazio |
-| `Fields` | nomes das colunas, na ordem |
+| `Fields` | nomes das colunas-chave, na ordem |
+| `Descending` | um booleano por entrada de `Fields`, na mesma posição — `true` quando aquela coluna ordena DESC |
+| `HasDescending` | `true` quando ao menos uma coluna de `Fields` ordena DESC — condição pronta para só emitir `.IsDescending(...)` quando fizer diferença |
+| `IncludeFields` | colunas de cobertura (INCLUDE) — carregadas pelo índice, fora da chave |
 
 ### `Seed`
 
