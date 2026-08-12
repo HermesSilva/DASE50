@@ -2,7 +2,7 @@
     "name": "dase",
     "displayName": "DASE - Design-Aided Software Engineering",
     "description": "Visual design environment for multi-tier, multi-platform web applications",
-    "version": "1.0.41920",
+    "version": "1.0.41921",
     "publisher": "HermesSilva",
     "license": "MIT",
     "icon": "media/icon.png",
@@ -111,6 +111,12 @@
                 "title": "Export to DBML",
                 "category": "DASE",
                 "icon": "$(export)"
+            },
+            {
+                "command": "Dase.ExportToSVG",
+                "title": "Export to SVG",
+                "category": "DASE",
+                "icon": "$(file-media)"
             },
             {
                 "command": "Dase.ImportFromDBML",
@@ -299,6 +305,11 @@
                     "when": "webviewId == 'Dase.ORMDesigner'",
                     "command": "Dase.ExportToDBML",
                     "group": "dase@6"
+                },
+                {
+                    "when": "webviewId == 'Dase.ORMDesigner'",
+                    "command": "Dase.ExportToSVG",
+                    "group": "dase@6b"
                 },
                 {
                     "when": "webviewId == 'Dase.ORMDesigner'",

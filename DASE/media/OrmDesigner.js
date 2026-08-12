@@ -165,6 +165,67 @@
         vscode.postMessage({ Type: pType, Payload: pPayload });
     }
 
+    // Propriedades de estilo cujo VALOR COMPUTADO é copiado para cada nó antes de serializar.
+    // Necessário porque o desenho depende de classes CSS com var(--vscode-*) — que só existem
+    // dentro do webview. Sem essa cópia, o .svg exportado abriria em preto e branco fora do VS Code.
+    const SVGStyleProps = [
+        "fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap",
+        "stroke-linejoin", "opacity", "fill-opacity", "stroke-opacity",
+        "font-family", "font-size", "font-weight", "letter-spacing",
+        "text-anchor", "dominant-baseline"
+    ];
+
+    function CopyComputedSvgStyles(pSrc, pDst) {
+        const computed = window.getComputedStyle(pSrc);
+        let style = "";
+        for (const prop of SVGStyleProps) {
+            const val = computed.getPropertyValue(prop);
+            if (val) style += prop + ":" + val + ";";
+        }
+        if (style) pDst.setAttribute("style", style);
+
+        for (let i = 0; i < pSrc.children.length; i++)
+            CopyComputedSvgStyles(pSrc.children[i], pDst.children[i]);
+    }
+
+    function ExportCanvasAsSVG() {
+        const svg = document.getElementById("canvas");
+        if (!svg)
+            return;
+
+        let box;
+        try { box = svg.getBBox(); } catch { box = null; }
+        if (!box || box.width <= 0 || box.height <= 0)
+            box = { x: 0, y: 0, width: _CanvasW, height: _CanvasH };
+
+        const pad = 24;
+        const x = box.x - pad;
+        const y = box.y - pad;
+        const w = box.width + pad * 2;
+        const h = box.height + pad * 2;
+
+        const clone = svg.cloneNode(true);
+        CopyComputedSvgStyles(svg, clone);
+
+        clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        clone.setAttribute("viewBox", x + " " + y + " " + w + " " + h);
+        clone.setAttribute("width", String(Math.round(w)));
+        clone.setAttribute("height", String(Math.round(h)));
+        clone.removeAttribute("style");
+
+        const bg = window.getComputedStyle(svg).backgroundColor;
+        const bgRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        bgRect.setAttribute("x", String(x));
+        bgRect.setAttribute("y", String(y));
+        bgRect.setAttribute("width", String(w));
+        bgRect.setAttribute("height", String(h));
+        bgRect.setAttribute("fill", (bg && bg !== "rgba(0, 0, 0, 0)") ? bg : "#1e1e1e");
+        clone.insertBefore(bgRect, clone.firstChild);
+
+        const svgText = new XMLSerializer().serializeToString(clone);
+        SendMessage("ExportSVGData", { Svg: svgText });
+    }
+
     function SetupMessageHandler() {
         window.addEventListener("message", function (pEvent) {
             const msg = pEvent.data;
@@ -286,6 +347,9 @@
                     break;
                 case "export-dbml":
                     SendMessage("ExportToDBML", {});
+                    break;
+                case "export-svg":
+                    ExportCanvasAsSVG();
                     break;
                 case "organize-tables-ai":
                     SendMessage(XMessageType.OrganizeTablesAI, {});

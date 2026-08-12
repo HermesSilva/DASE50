@@ -7,6 +7,7 @@ import { XAddFieldCommand } from "./Designers/ORM/Commands/AddFieldCommand";
 import { XAlignLinesCommand } from "./Designers/ORM/Commands/AlignLinesCommand";
 import { XValidateORMModelCommand } from "./Designers/ORM/Commands/ValidateORMModelCommand";
 import { XExportToDBMLCommand } from "./Designers/ORM/Commands/ExportToDBMLCommand";
+import { XExportToSVGCommand } from "./Designers/ORM/Commands/ExportToSVGCommand";
 import { XImportFromDBMLCommand } from "./Designers/ORM/Commands/ImportFromDBMLCommand";
 import { XDeleteSelectedCommand } from "./Commands/DeleteSelectedCommand";
 import { XRenameSelectedCommand } from "./Commands/RenameSelectedCommand";
@@ -41,6 +42,7 @@ export function activate(pContext: vscode.ExtensionContext): void {
         XAddFieldCommand.Register(pContext, designerProvider);
         XAlignLinesCommand.Register(pContext, designerProvider);
         XExportToDBMLCommand.Register(pContext, designerProvider);
+        XExportToSVGCommand.Register(pContext);
         XImportFromDBMLCommand.Register(pContext);
         XValidateORMModelCommand.Register(pContext, designerProvider);
         XDeleteSelectedCommand.Register(pContext, designerProvider);

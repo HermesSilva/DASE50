@@ -410,6 +410,12 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
                 vscode.commands.executeCommand("Dase.ExportToDBML");
                 break;
 
+            // O SVG é montado inteiramente no webview (só ele tem o DOM do canvas e as cores
+            // resolvidas do tema); aqui só repassa o texto pronto para o comando gravar em disco.
+            case "ExportSVGData":
+                vscode.commands.executeCommand("Dase.ExportToSVG", (payload as { Svg?: string })?.Svg);
+                break;
+
             case XDesignerMessageType.RequestShadowTablePicker:
                 this.OnRequestShadowTablePicker(pPanel, pState, payload as IRequestShadowTablePickerPayload);
                 break;
@@ -1338,6 +1344,7 @@ export class XORMDesignerEditorProvider implements vscode.CustomEditorProvider<I
         <div class="context-menu-item" data-action="align-lines"><span class="icon">📐</span>Align Lines</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="export-dbml"><span class="icon">📤</span>Export to DBML</div>
+        <div class="context-menu-item" data-action="export-svg"><span class="icon">🖼️</span>Export to SVG</div>
         <div class="context-menu-separator"></div>
         <div class="context-menu-item" data-action="organize-tables-ai"><span class="icon">&#x2728;</span>Organize Tables using AI</div>
         <div class="context-menu-item" data-action="create-sql-script"><span class="icon">&#x1f5c4;&#xfe0f;</span>Create SQL Script&#x2026;</div>

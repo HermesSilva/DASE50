@@ -529,6 +529,12 @@ describe('XORMDesignerEditorProvider', () => {
             expect(executeMock).toHaveBeenCalledWith('Dase.ExportToDBML');
         });
 
+        it('should execute ExportToSVG command with the payload SVG on ExportSVGData message', async () => {
+            const executeMock = vscode.commands.executeCommand as jest.MockedFunction<typeof vscode.commands.executeCommand>;
+            await provider.HandleMessage(mockPanel, mockState, { Type: 'ExportSVGData', Payload: { Svg: '<svg></svg>' } });
+            expect(executeMock).toHaveBeenCalledWith('Dase.ExportToSVG', '<svg></svg>');
+        });
+
         it('should warn on unknown message type', async () => {
             const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
 
