@@ -73,6 +73,27 @@
       "Scope": "Model",
       "Template": "DbContext.tpl",
       "Output": "{{ Model.Projects.Infra }}/Persistencia/{{ Model.Prefix }}DBContext.Design.cs"
+    },
+    {
+      "_comment": [
+        "As DUAS bases que as Configurations geradas herdam. Eram escritas à mão em todo módulo —",
+        "o gerado as citava e o build quebrava até alguém criá-las. Passaram a ser geradas para que",
+        "NENHUMA configuration seja escrita à mão (decisão do dono, 2026-08-11).",
+        "",
+        "⚠️ A base de lookup GERADA semeia a coluna Sigla quando a entidade a declara. STQ, NFE e VND",
+        "já faziam isso; SYS e TID não. Regerar SYS exige conferir o SYSxUF, que é a única lookup",
+        "deles com Sigla e hoje a recebe por outro caminho — regerar sem olhar duplicaria o seed."
+      ],
+      "Id": "base-configuration",
+      "Scope": "Model",
+      "Template": "BaseConfiguration.tpl",
+      "Output": "{{ Model.Projects.Infra }}/Persistencia/Configurations/{{ Model.Prefix }}BaseConfiguration.cs"
+    },
+    {
+      "Id": "lookup-configuration-base",
+      "Scope": "Model",
+      "Template": "LookupConfigurationBase.tpl",
+      "Output": "{{ Model.Projects.Infra }}/Persistencia/Configurations/{{ Model.Prefix }}LookupConfiguration.cs"
     }
   ]
 }

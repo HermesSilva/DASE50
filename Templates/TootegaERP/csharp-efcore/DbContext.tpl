@@ -44,7 +44,7 @@ public sealed partial class {{ Model.Prefix }}DBContext
         // dono uma entidade deste modelo, com discriminador de herança (TPH) e uma coluna nova na
         // tabela ALHEIA. Ignorar a base corta isso pela raiz.
 {{~ for T in Model.Mirrors ~}}
-        pBuilder.Ignore<{{ T.OwnerModule }}.Infra.Persistencia.Entidades.{{ T.Name }}>();
+        pBuilder.Ignore<{{ T.OwnerModule }}.Infra.Persistencia.{{ if T.SourceStereotype == "Lookup" }}Lookups{{ else }}Entidades{{ end }}.{{ T.Name }}>();
 {{~ end ~}}
 
 {{~ end ~}}

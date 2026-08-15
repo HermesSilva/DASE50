@@ -29,7 +29,7 @@ public sealed class {{ Table.Name }}EspelhoConfiguration : XBaseEntityConfigurat
 {{~ if Table.Indexes | count ~}}
 
 {{~ for IX in Table.Indexes ~}}
-        pBuilder.HasIndex({{ if IX.Fields | count > 1 }}e => new { {{ for C in IX.Fields }}e.{{ C }}{{ if !for.last }}, {{ end }}{{ end }} }{{ else }}e => e.{{ IX.Fields | first }}{{ end }}){{ if IX.IsUnique }}.IsUnique(){{ end }}{{ if IX.HasDescending }}.IsDescending({{ for D in IX.Descending }}{{ D }}{{ if !for.last }}, {{ end }}{{ end }}){{ end }}{{ if IX.IncludeFields | count ~}}.IncludeProperties(e => new { {{ for C in IX.IncludeFields }}e.{{ C }}{{ if !for.last }}, {{ end }}{{ end }} }){{~ end }}{{ if IX.Filter }}.HasFilter({{ IX.Filter }}){{ end }};
+        pBuilder.HasIndex({{ if IX.Fields | count > 1 }}e => new { {{ for C in IX.Fields }}e.{{ C }}{{ if !for.last }}, {{ end }}{{ end }} }{{ else }}e => e.{{ IX.Fields | first }}{{ end }}){{ if IX.IsUnique }}.IsUnique(){{ end }};
 {{~ end ~}}
 {{~ end ~}}
     }

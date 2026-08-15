@@ -93,6 +93,13 @@ export interface XICodeTable
     OwnerPrefix: string;
     /** Namespace do módulo dono, quando espelho. */
     OwnerModule: string;
+    /**
+     * Papel que a tabela tem NO MÓDULO DONO — `"Lookup"` ou `"Entity"` —, e vazio quando não é
+     * espelho. Existe porque `Stereotype` de um espelho é sempre `"Mirror"`, e só isso não basta
+     * ao template: entidade e lookup são geradas em pastas (e namespaces) diferentes pelo dono,
+     * de modo que herdar a classe alheia exige saber de qual das duas se trata.
+     */
+    SourceStereotype: XCodeStereotype | "";
 
     PKType: string;
     PK: XICodeField | null;
@@ -137,6 +144,13 @@ export interface XICodeTable
 
     /** Nome do enum gerado, quando lookup. */
     EnumName: string;
+
+    /**
+     * A tabela fica em cache local no back (ADR-0005): a entidade gerada implementa
+     * `XIEntidadeEmCache<Self>`. Só tabela PRÓPRIA (não espelho) carrega a marca — o espelho lê a
+     * tabela de outro módulo, e é o módulo dono quem a cacheia.
+     */
+    IsCached: boolean;
 }
 
 export interface XICodeModel
@@ -246,6 +260,25 @@ function EhLookup(pTabela: XORMTable, pCampos: XORMField[], pTemFK: (pID: string
     return demais.every(f => (f.DataType === "String" || f.DataType === "Text") && !pTemFK(f.ID));
 }
 
+/**
+ * Papel de uma tabela ESPELHO no módulo que a possui: `"Lookup"` ou `"Entity"`.
+ *
+ * O espelho chega sem campos — dele só se copiam nome, aparência e tipo de chave —, então a
+ * forma da tabela, que decide o papel de uma tabela própria, não está disponível aqui. O que
+ * sobra, e basta, é o TIPO DA CHAVE: lookup tem chave pequena por convenção (`Int16`, com
+ * `Int8` como caso histórico), e entidade tem chave grande (`Int64`, `Guid`). É a mesma
+ * condição que a dedução de tabela própria já exige, e a única que sobrevive ao espelhamento.
+ *
+ * Limite conhecido e aceito: entidade de chave `Int16` espelhada seria lida como lookup. Não
+ * existe no acervo — e o dia em que existir, o dono declara `Stereotype` na origem, que é o
+ * caminho por onde uma declaração vence a dedução em todo o resto deste gerador.
+ */
+function PapelDeOrigem(pTabela: XORMTable): XCodeStereotype
+{
+    const chave = pTabela.GetPKField()?.DataType ?? pTabela.PKType;
+    return chave === "Int16" || chave === "Int8" ? "Lookup" : "Entity";
+}
+
 /** Prefixo de módulo em `SYSxInquilino` → `SYS`. */
 function PrefixoDe(pNome: string): string
 {
@@ -301,6 +334,29 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
 
         const raiz = namespaceModelo.split(".").slice(0, -1).join(".");
         return donos[pPrefixo] || pRegistrado || (raiz ? `${raiz}.${pPrefixo}` : pPrefixo);
+    };
+
+    /**
+     * Enumerado que uma FK para tabela-lookup carrega, ou vazio quando o alvo não é lookup.
+     *
+     * Lookup do PRÓPRIO módulo sai pelo nome cru: o template já resolve o namespace, porque o
+     * enum nasce ao lado. Lookup de OUTRO módulo — alcançada por espelho — sai qualificada com
+     * o namespace do dono, e por isso não basta perguntar se o alvo é `Lookup`: um espelho é
+     * sempre `Mirror`, e o papel de origem é que responde. Sem isto, a FK entre módulos vinha
+     * como inteiro cru e o Entity Framework recusava a relação — a chave da lookup é o enum,
+     * não o `short`.
+     */
+    const EnumDeLookup = (pAlvo: XORMTable | null): string =>
+    {
+        if (!pAlvo) return "";
+
+        if (!pAlvo.IsShadow)
+            return estereotipos.get(pAlvo.ID) === "Lookup" ? pAlvo.Name : "";
+
+        if (PapelDeOrigem(pAlvo) !== "Lookup") return "";
+
+        const dono = NamespaceDono(PrefixoDe(pAlvo.Name), pAlvo.ShadowModuleName ?? "");
+        return `${dono}.Common.Lookups.${pAlvo.Name}`;
     };
 
     const todasTabelas = design.GetTables();
@@ -380,7 +436,6 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
         const alvoLocal = pCampo.TargetTable
             ? todasTabelas.find(t => t.Name === pCampo.TargetTable) ?? null
             : null;
-        const alvoEhLookup = alvoLocal !== null && estereotipos.get(alvoLocal.ID) === "Lookup";
 
         return {
             Name: pCampo.Name,
@@ -401,7 +456,7 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
 
             TargetTable: pCampo.TargetTable,
             IsOneToOne: pCampo.IsOneToOne,
-            LookupEnum: alvoEhLookup ? pCampo.TargetTable : ""
+            LookupEnum: EnumDeLookup(alvoLocal)
         };
     };
 
@@ -425,8 +480,6 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
         {
             const fk = porCampoFK.get(f.ID);
             const alvo = fk?.Alvo ?? null;
-            const alvoEhLookup = alvo ? estereotipos.get(alvo.ID) === "Lookup" : false;
-
             const tipo = resolver.Resolve({
                 DataType: f.DataType,
                 Length: f.Length,
@@ -453,7 +506,7 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
 
                 TargetTable: alvo?.Name ?? "",
                 IsOneToOne: fk?.UmParaUm ?? false,
-                LookupEnum: alvoEhLookup ? (alvo?.Name ?? "") : ""
+                LookupEnum: EnumDeLookup(alvo)
             };
         });
 
@@ -553,6 +606,7 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
             IsShadow: t.IsShadow,
             OwnerPrefix: t.IsShadow ? PrefixoDe(t.Name) : "",
             OwnerModule: t.IsShadow ? NamespaceDono(PrefixoDe(t.Name), t.ShadowModuleName ?? "") : "",
+            SourceStereotype: t.IsShadow ? PapelDeOrigem(t) : "",
 
             PKType: pkBruto?.DataType ?? t.PKType,
             PK: pk,
@@ -575,7 +629,12 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
             HasTenant: temTenant,
             TenantColumn: temTenant ? `${tenantTable}ID` : "",
 
-            EnumName: estereotipo === "Lookup" ? t.Name : ""
+            EnumName: estereotipo === "Lookup" ? t.Name : "",
+
+            // Só a tabela PRÓPRIA declara cache: o espelho lê a tabela alheia, e quem a cacheia é o
+            // módulo dono. Marcar o espelho geraria a implementação da interface num tipo que este
+            // módulo apenas lê.
+            IsCached: !t.IsShadow && t.IsCached
         });
     }
 

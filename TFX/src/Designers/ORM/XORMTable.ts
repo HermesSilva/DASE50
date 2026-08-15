@@ -168,6 +168,24 @@ export class XORMTable extends XRectangle
         ""
     );
 
+    /**
+     * A tabela fica EM CACHE local no back: sua leitura é servida da memória do processo, não do
+     * banco (ADR-0005 — cache local por nível). Default FALSE.
+     *
+     * Marcada, a entidade gerada passa a implementar `Tootega.Core.Data.XIEntidadeEmCache<T>` — o
+     * contrato que o back usa para descobrir, por tipo, quais tabelas pré-carregar e por onde
+     * invalidar/atualizar o cache na escrita (interceptor de SaveChanges). O NÍVEL do cache
+     * (imutável no boot, TTL, por-inquilino) e a estratégia de refresh vivem na implementação do
+     * contrato no ERP, não no modelo: aqui só se declara QUE a tabela é cacheável.
+     */
+    public static readonly IsCachedProp = XProperty.Register<XORMTable, boolean>(
+        (p: XORMTable) => p.IsCached,
+        "9A3C1F7E-2D64-4B8A-91E5-3F7C6A0D2B48",
+        "IsCached",
+        "Is Cached",
+        false
+    );
+
     public constructor()
     {
         super();
@@ -334,6 +352,17 @@ export class XORMTable extends XRectangle
     public set Inheritance(pValue: string)
     {
         this.SetValue(XORMTable.InheritanceProp, pValue);
+    }
+
+    /** A tabela fica em cache local no back; a entidade implementa XIEntidadeEmCache<T>. Default false. */
+    public get IsCached(): boolean
+    {
+        return this.GetValue(XORMTable.IsCachedProp) as boolean;
+    }
+
+    public set IsCached(pValue: boolean)
+    {
+        this.SetValue(XORMTable.IsCachedProp, pValue);
     }
 
     /** Returns the XORMStateField child of this table, or null if none exists. */

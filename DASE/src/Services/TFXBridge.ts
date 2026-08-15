@@ -102,6 +102,8 @@ export interface ITableData {
     ShadowModuleName?: string;
     /** Tabela-modelo: não gera nada; só cede campos a quem a herda. */
     IsModel?: boolean;
+    /** A tabela fica em cache local no back (ADR-0005): a entidade implementa XIEntidadeEmCache<Self>. */
+    IsCached?: boolean;
     /** Nome da tabela-base cujos campos esta também gera, ou vazio. */
     Inheritance?: string;
     Fields: IFieldData[];
@@ -1826,7 +1828,7 @@ export class XTFXBridge {
      */
     private static readonly _PropertyKeys = {
         Model: "Name, Schema, ParentModel, ImportModels, StateControlTable, TenantControlTable, GenerateCode, CodeTemplate, Namespace, OutputRoot",
-        Table: "Name, PKType, Description, Fill, X, Y, Width, Height, UseStateControl, GenerateCode, Stereotype, IsModel, Inheritance",
+        Table: "Name, PKType, Description, Fill, X, Y, Width, Height, UseStateControl, GenerateCode, Stereotype, IsModel, IsCached, Inheritance",
         Field: "Name, DataType, Length, Scale, IsRequired, IsAutoIncrement, DefaultValue, AllowedValues, ValueGeneratedNever, Description",
         Reference: "Name, Description"
     };
@@ -1872,6 +1874,9 @@ export class XTFXBridge {
                 }
                 case "IsModel":
                     element.IsModel = pValue as boolean;
+                    break;
+                case "IsCached":
+                    element.IsCached = pValue as boolean;
                     break;
                 case "Inheritance": {
                     const base = String(pValue ?? "").trim();
@@ -2271,6 +2276,10 @@ export class XTFXBridge {
                 const isModelProp = new XPropertyItem("IsModel", "Is Model Table", element.IsModel, XPropertyType.Boolean, undefined, "CodeGen");
                 isModelProp.Hint = "A model table generates nothing of its own — it only lends its fields to the tables that inherit it.";
                 props.push(isModelProp);
+
+                const isCachedProp = new XPropertyItem("IsCached", "Is Cached", element.IsCached, XPropertyType.Boolean, undefined, "CodeGen");
+                isCachedProp.Hint = "The table is cached locally in the back-end (ADR-0005): the generated entity implements XIEntidadeEmCache<Self>, read from process memory instead of the database.";
+                props.push(isCachedProp);
 
                 // Seletor de tabela igual ao do espelho: o modelo aberto e cada modelo pai ou
                 // importado, um grupo por arquivo. A base pode morar em outro módulo.
@@ -2865,6 +2874,7 @@ export class XTFXBridge {
                 ShadowModuleID: t.ShadowModuleID || undefined,
                 ShadowModuleName: t.ShadowModuleName || undefined,
                 IsModel: t.IsModel || false,
+                IsCached: t.IsCached || false,
                 Inheritance: t.Inheritance || undefined,
                 Fields: fields.map((f: any) => ({
                     ID: f.ID,
