@@ -14,8 +14,8 @@ RegisterORMElements();
 const engine = XSerializationEngine.Instance;
 const Resolver = () => new XTypeResolver(XConfigResources.GetORMDataType().Types, "csharp-efcore");
 
-// O gerador roda contra o Entity.tpl REAL desta pasta versionada — é o que garante que a mudança
-// do template (implementar a interface + gerar ChaveDeCache) está de fato coberta.
+// O gerador roda contra os templates REAIS desta pasta versionada — é o que garante que as mudanças
+// (Entity.tpl implementando a interface; CacheRegistro.tpl gerando o registro) estão de fato cobertas.
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "Templates", "TootegaERP", "csharp-efcore");
 function GeradorDeEntidade(): XCodeGenerator {
     const templates = new Map<string, string>([
@@ -30,6 +30,24 @@ function GeradorDeEntidade(): XCodeGenerator {
             Where: 'Stereotype == "Entity"',
             Template: "Entity.tpl",
             Output: "Entidades/{{ Table.Name }}.Design.cs",
+        }],
+    };
+    return new XCodeGenerator(perfil as never, templates);
+}
+
+// Gerador do registro de cache (escopo Model): usa o CacheRegistro.tpl real.
+function GeradorDeRegistro(): XCodeGenerator {
+    const templates = new Map<string, string>([
+        ["CacheRegistro.tpl", readFileSync(join(RAIZ, "CacheRegistro.tpl"), "utf-8")],
+        ["_Header.tpl", readFileSync(join(RAIZ, "_Header.tpl"), "utf-8")],
+    ]);
+    const perfil = {
+        Id: "csharp-efcore",
+        Artifacts: [{
+            Id: "cache-registro",
+            Scope: "Model" as const,
+            Template: "CacheRegistro.tpl",
+            Output: "{{ Model.Prefix }}CacheRegistro.Design.cs",
         }],
     };
     return new XCodeGenerator(perfil as never, templates);
@@ -139,5 +157,79 @@ describe("IsCached — projeção no code model", () => {
         const arquivo = saida.find(a => a.Path.includes("VNDxPedido"))!;
 
         expect(arquivo.Content).not.toContain("XIEntidadeEmCache");
+    });
+
+    it("Model.Cached traz só as marcadas", () => {
+        CriarEntidade("VNDxTabelaFiscal").IsCached = true;
+        CriarEntidade("VNDxOutraRef").IsCached = true;
+        CriarEntidade("VNDxPedido");
+
+        const nomes = Montar().Cached.map(t => t.Name).sort();
+        expect(nomes).toEqual(["VNDxOutraRef", "VNDxTabelaFiscal"]);
+    });
+});
+
+describe("CacheRegistro.tpl — registro automático no DI", () => {
+
+    let design: XORMDesign;
+
+    beforeEach(() => {
+        const doc = new XORMDocument();
+        doc.Initialize();
+        design = doc.Design;
+        design.Namespace = "Acme.VND";
+    });
+
+    function Montar() {
+        const doc = design.ParentNode as unknown as XORMDocument;
+        return BuildCodeModel(doc, {
+            Resolver: Resolver(),
+            Namespace: "Acme.VND",
+            Projects: { Infra: "Acme.VND.Infra", Common: "Acme.VND.Common" },
+            ProjectSuffixes: ["Infra", "Common"],
+        });
+    }
+
+    function CriarEntidade(pNome: string): XORMTable {
+        const t = design.CreateTable({ Name: pNome, X: 0, Y: 0 });
+        t.Name = pNome;
+        const pk = t.CreatePKField({ Name: `${pNome}ID`, DataType: "Int64" });
+        pk.Name = `${pNome}ID`;
+        return t;
+    }
+
+    it("referência global entra como RegistrarReferencia, com o carregador AsNoTracking", () => {
+        CriarEntidade("VNDxCFOP").IsCached = true;
+
+        const saida = GeradorDeRegistro().Generate(Montar());
+        const reg = saida[0].Content;
+
+        expect(reg).toContain("public static class VNDxCacheRegistro");
+        expect(reg).toContain("AddCacheVND");
+        expect(reg).toContain("XCacheEntidade.RegistrarReferencia<VNDxCFOP>(pServicos, CarregarVNDxCFOP)");
+        expect(reg).toContain("Set<VNDxCFOP>().AsNoTracking().ToList()");
+    });
+
+    it("entidade com posse por inquilino entra como RegistrarPorInquilino, com o seletor de tenant", () => {
+        design.TenantControlTable = "SYSxInquilino";
+        const t = CriarEntidade("VNDxRegraTributaria");
+        t.IsCached = true;
+        t.CreateField({ Name: "SYSxInquilinoID", DataType: "Guid" });
+
+        const saida = GeradorDeRegistro().Generate(Montar());
+        const reg = saida[0].Content;
+
+        expect(reg).toContain("RegistrarPorInquilino<VNDxRegraTributaria>(pServicos, CarregarVNDxRegraTributaria, e => e.SYSxInquilinoID)");
+    });
+
+    it("sem tabela cacheada, o registro ainda nasce vazio e válido (AddCache no-op)", () => {
+        CriarEntidade("VNDxPedido");
+
+        const saida = GeradorDeRegistro().Generate(Montar());
+        const reg = saida[0].Content;
+
+        expect(reg).toContain("AddCacheVND");
+        expect(reg).not.toContain("RegistrarReferencia");
+        expect(reg).not.toContain("RegistrarPorInquilino");
     });
 });

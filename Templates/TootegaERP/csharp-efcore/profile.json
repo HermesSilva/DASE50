@@ -94,6 +94,12 @@
       "Scope": "Model",
       "Template": "LookupConfigurationBase.tpl",
       "Output": "{{ Model.Projects.Infra }}/Persistencia/Configurations/{{ Model.Prefix }}LookupConfiguration.cs"
+    },
+    {
+      "Id": "cache-registro",
+      "Scope": "Model",
+      "Template": "CacheRegistro.tpl",
+      "Output": "{{ Model.Projects.Infra }}/Persistencia/{{ Model.Prefix }}CacheRegistro.Design.cs"
     }
   ]
 }

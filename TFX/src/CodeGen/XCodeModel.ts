@@ -190,6 +190,8 @@ export interface XICodeModel
     Mirrors: XICodeTable[];
     /** Entidades com posse por inquilino. */
     Owned: XICodeTable[];
+    /** Entidades marcadas para cache local (ADR-0005): implementam XIEntidadeEmCache<Self>. */
+    Cached: XICodeTable[];
 
     /** Módulos donos citados pelos espelhos, para os `using` e os `Ignore<Base>()`. */
     OwnerModules: Array<{ Prefix: string; Module: string }>;
@@ -694,6 +696,7 @@ export function BuildCodeModel(pDoc: XORMDocument, pOpcoes: XICodeModelOptions):
         Lookups: tabelas.filter(t => t.Stereotype === "Lookup"),
         Mirrors: espelhos,
         Owned: tabelas.filter(t => t.HasTenant),
+        Cached: tabelas.filter(t => t.IsCached),
 
         OwnerModules: modulosDonos,
 
